@@ -1774,11 +1774,11 @@ dependencies = [
 name = "musicbirb"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "image",
  "libmpv",
  "reqwest 0.13.2",
  "submarine",
+ "thiserror 2.0.18",
  "tokio",
 ]
 

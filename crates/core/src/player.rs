@@ -1,80 +1,86 @@
-use anyhow::{anyhow, Result};
-use libmpv::{FileState, Mpv};
+use crate::error::CoreError;
+use libmpv::Mpv;
 use std::sync::Mutex;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerStatus {
+	Stopped,
+	Playing,
+	Paused,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlayerState {
+	pub position_secs: f64,
+	pub status: PlayerStatus,
+}
+
 pub struct Player {
-    mpv: Mutex<Mpv>,
+	mpv: Mutex<Mpv>,
 }
 
 impl Player {
-    pub fn new() -> Result<Self> {
-        let mpv = Mpv::new().map_err(|e| anyhow!("Failed to initialize MPV: {:?}", e))?;
-        mpv.set_property("keep-open", "yes")
-            .map_err(|e| anyhow!("{:?}", e))?;
-        mpv.set_property("vo", "null")
-            .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(Self {
-            mpv: Mutex::new(mpv),
-        })
-    }
+	pub fn new() -> Result<Self, CoreError> {
+		let mpv = Mpv::new().map_err(|e| CoreError::Player(format!("Init failed: {:?}", e)))?;
+		mpv.set_property("vo", "null")
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		Ok(Self {
+			mpv: Mutex::new(mpv),
+		})
+	}
 
-    pub fn enqueue(&self, url: &str) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .playlist_load_files(&[(url, FileState::AppendPlay, None)])
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+	pub fn play(&self, url: &str) -> Result<(), CoreError> {
+		let mpv = self.mpv.lock().unwrap();
+		mpv.command("loadfile", &[url])
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		mpv.set_property("pause", false)
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		Ok(())
+	}
 
-    pub fn next(&self) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .command("playlist-next", &["weak"])
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+	pub fn stop(&self) -> Result<(), CoreError> {
+		self.mpv
+			.lock()
+			.unwrap()
+			.command("stop", &[])
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		Ok(())
+	}
 
-    pub fn prev(&self) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .command("playlist-prev", &["weak"])
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+	pub fn toggle_pause(&self) -> Result<(), CoreError> {
+		let mpv = self.mpv.lock().unwrap();
+		let paused: bool = mpv.get_property("pause").unwrap_or(false);
+		mpv.set_property("pause", !paused)
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		Ok(())
+	}
 
-    pub fn seek_relative(&self, seconds: f64) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .command("seek", &[&seconds.to_string(), "relative"])
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+	pub fn seek_relative(&self, seconds: f64) -> Result<(), CoreError> {
+		self.mpv
+			.lock()
+			.unwrap()
+			.command("seek", &[&seconds.to_string(), "relative"])
+			.map_err(|e| CoreError::Player(format!("{:?}", e)))?;
+		Ok(())
+	}
 
-    pub fn pause(&self) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .set_property("pause", true)
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+	pub fn get_state(&self) -> PlayerState {
+		let mpv = self.mpv.lock().unwrap();
+		let idle: bool = mpv.get_property("idle-active").unwrap_or(true);
+		let paused: bool = mpv.get_property("pause").unwrap_or(false);
+		let time: f64 = mpv.get_property("time-pos").unwrap_or(0.0);
 
-    pub fn resume(&self) -> Result<()> {
-        self.mpv
-            .lock()
-            .unwrap()
-            .set_property("pause", false)
-            .map_err(|e| anyhow!("{:?}", e))
-    }
+		let status = if idle {
+			PlayerStatus::Stopped
+		} else if paused {
+			PlayerStatus::Paused
+		} else {
+			PlayerStatus::Playing
+		};
 
-    pub fn get_state(&self) -> (Option<usize>, f64, bool) {
-        let mpv = self.mpv.lock().unwrap();
-        let pos: i64 = mpv.get_property("playlist-pos").unwrap_or(-1);
-        let time: f64 = mpv.get_property("time-pos").unwrap_or(0.0);
-        let paused: bool = mpv.get_property("pause").unwrap_or(false);
-        (
-            if pos >= 0 { Some(pos as usize) } else { None },
-            time,
-            paused,
-        )
-    }
+		PlayerState {
+			position_secs: time,
+			status,
+		}
+	}
 }

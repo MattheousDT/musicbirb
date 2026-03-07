@@ -1,191 +1,253 @@
 use crate::api::SubsonicClient;
-use crate::models::Track;
-use crate::player::Player;
-use anyhow::Result;
+use crate::error::CoreError;
+use crate::models::{AlbumId, CoverArtId, PlaylistId, Track, TrackId};
+use crate::player::{Player, PlayerStatus};
 use image::DynamicImage;
 use std::collections::HashMap;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, Mutex,
-};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{mpsc, watch};
 
-#[derive(Default)]
-struct PlaybackState {
-    index: Option<usize>,
-    time: f64,
-    paused: bool,
+#[derive(Debug, Clone)]
+pub struct CoreState {
+	pub queue: Vec<Track>,
+	pub queue_position: usize,
+	pub time: f64,
+	pub status: PlayerStatus,
+	pub current_art: Option<Arc<DynamicImage>>,
+}
+
+impl Default for CoreState {
+	fn default() -> Self {
+		Self {
+			queue: Vec::new(),
+			queue_position: 0,
+			time: 0.0,
+			status: PlayerStatus::Stopped,
+			current_art: None,
+		}
+	}
+}
+
+pub enum CoreMessage {
+	AddTracks(Vec<Track>),
+	Next,
+	Prev,
+	SeekRelative(f64),
+	TogglePause,
+	UrlReady {
+		url: String,
+		index: usize,
+	},
+	ArtReady {
+		art: Arc<DynamicImage>,
+		id: CoverArtId,
+	},
 }
 
 pub struct Musicbirb {
-    api: Arc<SubsonicClient>,
-    player: Arc<Player>,
-    queue: Arc<Mutex<Vec<Track>>>,
-    playback_state: Arc<Mutex<PlaybackState>>,
-    current_art: Arc<Mutex<Option<Arc<DynamicImage>>>>,
-    art_cache: Arc<Mutex<HashMap<String, Arc<DynamicImage>>>>,
-    art_version: Arc<AtomicU64>,
+	api: Arc<SubsonicClient>,
+	tx: mpsc::UnboundedSender<CoreMessage>,
+	state_rx: watch::Receiver<CoreState>,
 }
 
 impl Musicbirb {
-    pub fn new(api: SubsonicClient, player: Player) -> Arc<Self> {
-        let core = Arc::new(Self {
-            api: Arc::new(api),
-            player: Arc::new(player),
-            queue: Arc::new(Mutex::new(Vec::new())),
-            playback_state: Arc::new(Mutex::new(PlaybackState::default())),
-            current_art: Arc::new(Mutex::new(None)),
-            art_cache: Arc::new(Mutex::new(HashMap::new())),
-            art_version: Arc::new(AtomicU64::new(0)),
-        });
+	pub fn new(api: SubsonicClient, player: Player) -> Arc<Self> {
+		let (tx, rx) = mpsc::unbounded_channel();
+		let (state_tx, state_rx) = watch::channel(CoreState::default());
+		let api_arc = Arc::new(api);
 
-        core.start_background_workers();
-        core
-    }
+		let core = Arc::new(Self {
+			api: Arc::clone(&api_arc),
+			tx: tx.clone(),
+			state_rx,
+		});
 
-    fn start_background_workers(&self) {
-        let player = Arc::clone(&self.player);
-        let pb_state = Arc::clone(&self.playback_state);
-        let queue = Arc::clone(&self.queue);
-        let current_art = Arc::clone(&self.current_art);
-        let art_cache = Arc::clone(&self.art_cache);
-        let art_version = Arc::clone(&self.art_version);
-        let api = Arc::clone(&self.api);
+		core.start_actor_loop(player, rx, tx, state_tx, api_arc);
+		core
+	}
 
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(33));
-            let mut last_index = None;
+	fn start_actor_loop(
+		&self,
+		player: Player,
+		mut rx: mpsc::UnboundedReceiver<CoreMessage>,
+		tx: mpsc::UnboundedSender<CoreMessage>,
+		state_tx: watch::Sender<CoreState>,
+		api: Arc<SubsonicClient>,
+	) {
+		tokio::spawn(async move {
+			let mut interval = tokio::time::interval(Duration::from_millis(33));
+			let mut queue: Vec<Track> = Vec::new();
+			let mut queue_position: usize = 0;
 
-            loop {
-                interval.tick().await;
+			let mut active_index: Option<usize> = None;
+			let mut fetching_index: Option<usize> = None;
 
-                let (index, time, paused) = player.get_state();
-                if let Ok(mut lock) = pb_state.lock() {
-                    lock.index = index;
-                    lock.time = time;
-                    lock.paused = paused;
-                }
+			let mut art_cache: HashMap<CoverArtId, Arc<DynamicImage>> = HashMap::new();
+			let mut current_art_id: Option<CoverArtId> = None;
+			let mut current_art: Option<Arc<DynamicImage>> = None;
 
-                if index != last_index {
-                    last_index = index;
-                    let track = index.and_then(|i| queue.lock().unwrap().get(i).cloned());
+			loop {
+				tokio::select! {
+						_ = interval.tick() => {
+								let p_state = player.get_state();
 
-                    if let Some(t) = track {
-                        if let Some(art_id) = t.cover_art {
-                            let ver = art_version.fetch_add(1, Ordering::SeqCst) + 1;
+								if p_state.status == PlayerStatus::Stopped && active_index == Some(queue_position) {
+										if queue_position + 1 < queue.len() {
+												queue_position += 1;
+										}
+								}
 
-                            if let Some(cached) = art_cache.lock().unwrap().get(&art_id) {
-                                *current_art.lock().unwrap() = Some(Arc::clone(cached));
-                                continue;
-                            }
+								if !queue.is_empty() && Some(queue_position) != active_index && Some(queue_position) != fetching_index {
+										fetching_index = Some(queue_position);
+										let track_id = queue[queue_position].id.clone();
+										let api_clone = Arc::clone(&api);
+										let tx_clone = tx.clone();
+										let idx = queue_position;
 
-                            *current_art.lock().unwrap() = None;
+										tokio::spawn(async move {
+												if let Ok(url) = api_clone.get_stream_url(&track_id).await {
+														let _ = tx_clone.send(CoreMessage::UrlReady { url, index: idx });
+												}
+										});
+								}
 
-                            let a = Arc::clone(&api);
-                            let c_art = Arc::clone(&current_art);
-                            let c_cache = Arc::clone(&art_cache);
-                            let c_ver = Arc::clone(&art_version);
+								if let Some(track) = queue.get(queue_position) {
+										if track.cover_art != current_art_id {
+												current_art_id = track.cover_art.clone();
+												current_art = None;
 
-                            tokio::spawn(async move {
-                                if let Ok(bytes) = a.get_cover_art_bytes(&art_id).await {
-                                    if c_ver.load(Ordering::SeqCst) == ver {
-                                        if let Ok(img) = image::load_from_memory(&bytes) {
-                                            let arc_img = Arc::new(img);
-                                            c_cache
-                                                .lock()
-                                                .unwrap()
-                                                .insert(art_id, Arc::clone(&arc_img));
+												if let Some(art_id) = &current_art_id {
+														if let Some(cached) = art_cache.get(art_id) {
+																current_art = Some(Arc::clone(cached));
+														} else {
+																let api_clone = Arc::clone(&api);
+																let tx_clone = tx.clone();
+																let aid = art_id.clone();
 
-                                            if c_ver.load(Ordering::SeqCst) == ver {
-                                                *c_art.lock().unwrap() = Some(arc_img);
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        } else {
-                            *current_art.lock().unwrap() = None;
-                        }
-                    } else {
-                        *current_art.lock().unwrap() = None;
-                    }
-                }
-            }
-        });
-    }
+																tokio::spawn(async move {
+																		if let Ok(bytes) = api_clone.get_cover_art_bytes(&aid).await {
+																				if let Ok(img) = image::load_from_memory(&bytes) {
+																						let _ = tx_clone.send(CoreMessage::ArtReady {
+																								art: Arc::new(img),
+																								id: aid
+																						});
+																				}
+																		}
+																});
+														}
+												}
+										}
+								}
 
-    pub async fn queue_track(&self, id: &str) -> Result<()> {
-        let track = self.api.get_track(id).await?;
-        self.enqueue_track(track).await
-    }
+								let _ = state_tx.send(CoreState {
+										queue: queue.clone(),
+										queue_position,
+										time: p_state.position_secs,
+										status: p_state.status,
+										current_art: current_art.clone(),
+								});
+						}
 
-    pub async fn queue_album(&self, id: &str) -> Result<usize> {
-        let tracks = self.api.get_album_tracks(id).await?;
-        let count = tracks.len();
-        for t in tracks {
-            self.enqueue_track(t).await?;
-        }
-        Ok(count)
-    }
+						Some(msg) = rx.recv() => {
+								match msg {
+										CoreMessage::AddTracks(tracks) => {
+												queue.extend(tracks);
+										}
+										CoreMessage::Next => {
+												if queue_position + 1 < queue.len() {
+														queue_position += 1;
+														active_index = None;
+														let _ = player.stop();
+												}
+										}
+										CoreMessage::Prev => {
+												if queue_position > 0 {
+														queue_position -= 1;
+														active_index = None;
+														let _ = player.stop();
+												} else {
+														active_index = None;
+														let _ = player.stop();
+												}
+										}
+										CoreMessage::SeekRelative(secs) => {
+												let _ = player.seek_relative(secs);
+										}
+										CoreMessage::TogglePause => {
+												let _ = player.toggle_pause();
+										}
+										CoreMessage::UrlReady { url, index } => {
+												if Some(index) == fetching_index && index == queue_position {
+														let _ = player.play(&url);
+														active_index = Some(index);
+														fetching_index = None;
+												}
+										}
+										CoreMessage::ArtReady { art, id } => {
+												art_cache.insert(id.clone(), Arc::clone(&art));
+												if Some(id) == current_art_id {
+														current_art = Some(art);
+												}
+										}
+								}
+						}
+				}
+			}
+		});
+	}
 
-    pub async fn queue_playlist(&self, id: &str) -> Result<usize> {
-        let tracks = self.api.get_playlist_tracks(id).await?;
-        let count = tracks.len();
-        for t in tracks {
-            self.enqueue_track(t).await?;
-        }
-        Ok(count)
-    }
+	pub async fn queue_track(&self, id: &TrackId) -> Result<(), CoreError> {
+		let track = self.api.get_track(id).await?;
+		self.tx
+			.send(CoreMessage::AddTracks(vec![track]))
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+		Ok(())
+	}
 
-    async fn enqueue_track(&self, track: Track) -> Result<()> {
-        let url = self.api.get_stream_url(&track.id).await?;
-        self.player.enqueue(&url)?;
-        self.queue.lock().unwrap().push(track);
-        Ok(())
-    }
+	pub async fn queue_album(&self, id: &AlbumId) -> Result<usize, CoreError> {
+		let tracks = self.api.get_album_tracks(id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::AddTracks(tracks))
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+		Ok(count)
+	}
 
-    pub fn next(&self) -> Result<()> {
-        self.player.next()
-    }
-    pub fn prev(&self) -> Result<()> {
-        self.player.prev()
-    }
-    pub fn seek(&self, seconds: f64) -> Result<()> {
-        self.player.seek_relative(seconds)
-    }
+	pub async fn queue_playlist(&self, id: &PlaylistId) -> Result<usize, CoreError> {
+		let tracks = self.api.get_playlist_tracks(id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::AddTracks(tracks))
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+		Ok(count)
+	}
 
-    pub fn toggle_pause(&self) -> Result<()> {
-        let paused = self.playback_state.lock().unwrap().paused;
-        if paused {
-            self.player.resume()
-        } else {
-            self.player.pause()
-        }
-    }
+	pub fn next(&self) -> Result<(), CoreError> {
+		self.tx
+			.send(CoreMessage::Next)
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+	}
 
-    pub fn current_track(&self) -> Option<Track> {
-        let index = self.playback_state.lock().unwrap().index?;
-        self.queue.lock().unwrap().get(index).cloned()
-    }
+	pub fn prev(&self) -> Result<(), CoreError> {
+		self.tx
+			.send(CoreMessage::Prev)
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+	}
 
-    pub fn queue(&self) -> Vec<Track> {
-        self.queue.lock().unwrap().clone()
-    }
-    pub fn queue_position(&self) -> usize {
-        self.playback_state.lock().unwrap().index.unwrap_or(0)
-    }
-    pub fn playback_time(&self) -> f64 {
-        self.playback_state.lock().unwrap().time
-    }
-    pub fn is_paused(&self) -> bool {
-        self.playback_state.lock().unwrap().paused
-    }
+	pub fn seek(&self, seconds: f64) -> Result<(), CoreError> {
+		self.tx
+			.send(CoreMessage::SeekRelative(seconds))
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+	}
 
-    pub fn current_cover_art(&self) -> Option<Arc<DynamicImage>> {
-        self.current_art.lock().unwrap().clone()
-    }
+	pub fn toggle_pause(&self) -> Result<(), CoreError> {
+		self.tx
+			.send(CoreMessage::TogglePause)
+			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+	}
 
-    pub fn raw_player(&self) -> &Player {
-        &self.player
-    }
+	pub fn subscribe(&self) -> watch::Receiver<CoreState> {
+		self.state_rx.clone()
+	}
 }

@@ -1,12 +1,12 @@
 [package]
 name = "musicbirb"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-anyhow = "1.0.102"
 image = "0.25.9"
 libmpv = { git = "https://github.com/ParadoxSpiral/libmpv-rs" }
 reqwest = "0.13.2"
 submarine = "0.1.1"
+thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["full"] }
