@@ -90,4 +90,25 @@ impl SubsonicClient {
 		let bytes = resp.bytes().await?;
 		Ok(bytes.to_vec())
 	}
+
+	pub async fn now_playing(&self, track_id: &TrackId) -> Result<(), CoreError> {
+		self.client
+			.scrobble(vec![(track_id.0.clone(), None::<usize>)], Some(false))
+			.await
+			.map_err(|e| CoreError::Api(format!("Now playing failed: {}", e)))?;
+		Ok(())
+	}
+
+	pub async fn scrobble(&self, tracks: &[(TrackId, u64)]) -> Result<(), CoreError> {
+		let id_at_time: Vec<(String, Option<usize>)> = tracks
+			.iter()
+			.map(|(id, time)| (id.0.clone(), Some(*time as usize)))
+			.collect();
+
+		self.client
+			.scrobble(id_at_time, Some(true))
+			.await
+			.map_err(|e| CoreError::Api(format!("Scrobble failed: {}", e)))?;
+		Ok(())
+	}
 }

@@ -1,4 +1,7 @@
+mod components;
+
 use anyhow::Result;
+use components::{now_playing::render_now_playing, queue::render_queue};
 use crossterm::{
 	ExecutableCommand,
 	event::{self, Event, KeyCode},
@@ -99,69 +102,16 @@ async fn main() -> Result<()> {
 				f.render_widget(Paragraph::new(txt).alignment(Alignment::Center), art_area);
 			}
 
-			let items: Vec<ListItem> = queue
-				.iter()
-				.enumerate()
-				.map(|(i, t)| {
-					let style = if i == pos {
-						Style::default().fg(Color::Yellow).bold()
-					} else {
-						Style::default()
-					};
-					ListItem::new(format!("{}. {} - {}", i + 1, t.title, t.artist)).style(style)
-				})
-				.collect();
-			let mut l_state = ListState::default().with_selected(Some(pos));
-			f.render_stateful_widget(
-				List::new(items).block(Block::bordered().title(" Queue ")),
-				top[1],
-				&mut l_state,
-			);
+			render_queue(f, top[1], &queue, pos);
 
-			let (title, artist, album, ratio, dur) = if let Some(t) = &current_track {
-				let r = if t.duration_secs > 0 {
-					(time / t.duration_secs as f64).clamp(0.0, 1.0)
-				} else {
-					0.0
-				};
-				(
-					t.title.clone(),
-					t.artist.clone(),
-					t.album.clone(),
-					r,
-					format!("{:.0}s / {}s", time, t.duration_secs),
-				)
-			} else {
-				("Idle".into(), "".into(), "".into(), 0.0, "--/--".into())
-			};
-
-			let bar = Block::bordered().title(" Now Playing ").inner(main[1]);
-			f.render_widget(Block::bordered().title(" Now Playing "), main[1]);
-			let b_lay = Layout::vertical([
-				Constraint::Length(1),
-				Constraint::Length(1),
-				Constraint::Length(1),
-				Constraint::Length(1),
-			])
-			.split(bar);
-			f.render_widget(
-				Paragraph::new(format!(
-					"{}{}",
-					title,
-					if paused { " [PAUSED]" } else { "" }
-				))
-				.cyan()
-				.bold(),
-				b_lay[0],
+			render_now_playing(
+				f,
+				main[1],
+				current_track.as_ref(),
+				time,
+				paused,
+				state.scrobble_mark_pos,
 			);
-			f.render_widget(Paragraph::new(format!("{} - {}", artist, album)), b_lay[1]);
-			f.render_widget(
-				Gauge::default()
-					.gauge_style(Style::default().fg(Color::Green))
-					.ratio(ratio),
-				b_lay[2],
-			);
-			f.render_widget(Paragraph::new(dur).alignment(Alignment::Right), b_lay[3]);
 
 			if let Some(e) = current_err {
 				f.render_widget(
