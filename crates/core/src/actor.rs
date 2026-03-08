@@ -1,20 +1,23 @@
 use crate::api::SubsonicClient;
+use crate::art_cache::ArtCache;
 use crate::models::{CoverArtId, Track};
 use crate::player::{Player, PlayerState, PlayerStatus};
 use crate::scrobble::ScrobbleManager;
 use crate::state::{CoreMessage, CoreState};
 use image::DynamicImage;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch};
+
+#[cfg(feature = "os-media-controls")]
+use crate::mpris::MprisManager;
 
 pub struct CoreActor {
 	queue: Vec<Track>,
 	queue_position: usize,
 	active_index: Option<usize>,
 	fetching_index: Option<usize>,
-	art_cache: HashMap<CoverArtId, Arc<DynamicImage>>,
+	art_cache: ArtCache,
 	current_art_id: Option<CoverArtId>,
 	current_art: Option<Arc<DynamicImage>>,
 	scrobble_manager: Arc<Mutex<ScrobbleManager>>,
@@ -24,12 +27,11 @@ pub struct CoreActor {
 	track_start_time: u64,
 	scrobble_flush_timer: Instant,
 	last_tick_time: Instant,
-}
 
-impl Default for CoreActor {
-	fn default() -> Self {
-		Self::new()
-	}
+	#[cfg(feature = "os-media-controls")]
+	mpris: Option<MprisManager>,
+	last_mpris_status: PlayerStatus,
+	last_mpris_index: Option<usize>,
 }
 
 impl CoreActor {
@@ -39,7 +41,7 @@ impl CoreActor {
 			queue_position: 0,
 			active_index: None,
 			fetching_index: None,
-			art_cache: HashMap::new(),
+			art_cache: ArtCache::new(),
 			current_art_id: None,
 			current_art: None,
 			scrobble_manager: Arc::new(Mutex::new(ScrobbleManager::new())),
@@ -49,6 +51,11 @@ impl CoreActor {
 			track_start_time: 0,
 			scrobble_flush_timer: Instant::now(),
 			last_tick_time: Instant::now(),
+
+			#[cfg(feature = "os-media-controls")]
+			mpris: None,
+			last_mpris_status: PlayerStatus::Stopped,
+			last_mpris_index: None,
 		}
 	}
 
@@ -60,6 +67,11 @@ impl CoreActor {
 		api: Arc<SubsonicClient>,
 		player: Player,
 	) {
+		#[cfg(feature = "os-media-controls")]
+		{
+			self.mpris = MprisManager::new(tx.clone());
+		}
+
 		let mut interval = tokio::time::interval(Duration::from_millis(33));
 
 		loop {
@@ -95,6 +107,25 @@ impl CoreActor {
 
 		let scrobble_mark_pos = self.handle_scrobbling(current_pos, api);
 		self.flush_scrobbles_if_needed(api);
+
+		#[cfg(feature = "os-media-controls")]
+		if let Some(mpris) = &mut self.mpris {
+			if self.active_index != self.last_mpris_index {
+				self.last_mpris_index = self.active_index;
+				if let Some(idx) = self.active_index {
+					if let Some(track) = self.queue.get(idx) {
+						if let Some(art) = &track.cover_art {
+							let path = self.art_cache.get_path(&art);
+							mpris.update_metadata(track, Some(path.as_path()));
+						}
+					}
+				}
+			}
+			if p_state.status != self.last_mpris_status {
+				self.last_mpris_status = p_state.status;
+				mpris.set_playback_status(p_state.status);
+			}
+		}
 
 		let _ = state_tx.send(CoreState {
 			queue: self.queue.clone(),
@@ -149,8 +180,20 @@ impl CoreActor {
 				self.current_art = None;
 
 				if let Some(art_id) = &self.current_art_id {
-					if let Some(cached) = self.art_cache.get(art_id) {
-						self.current_art = Some(Arc::clone(cached));
+					if self.art_cache.is_cached(art_id) {
+						if let Some(art) = self.art_cache.load_image(art_id) {
+							self.current_art = Some(art);
+
+							#[cfg(feature = "os-media-controls")]
+							if let Some(mpris) = &mut self.mpris {
+								if self.active_index == Some(self.queue_position) {
+									if let Some(art) = &track.cover_art {
+										let path = self.art_cache.get_path(&art);
+										mpris.update_metadata(track, Some(path.as_path()));
+									}
+								}
+							}
+						}
 					} else {
 						let api_clone = Arc::clone(api);
 						let tx_clone = tx.clone();
@@ -158,12 +201,8 @@ impl CoreActor {
 
 						tokio::spawn(async move {
 							if let Ok(bytes) = api_clone.get_cover_art_bytes(&aid).await {
-								if let Ok(img) = image::load_from_memory(&bytes) {
-									let _ = tx_clone.send(CoreMessage::ArtReady {
-										art: Arc::new(img),
-										id: aid,
-									});
-								}
+								let _ =
+									tx_clone.send(CoreMessage::ArtDownloaded { id: aid, bytes });
 							}
 						});
 					}
@@ -283,12 +322,30 @@ impl CoreActor {
 					});
 				}
 			}
-			CoreMessage::ArtReady { art, id } => {
-				self.art_cache.insert(id.clone(), Arc::clone(&art));
-				if Some(id) == self.current_art_id {
-					self.current_art = Some(art);
+			CoreMessage::ArtDownloaded { id, bytes } => {
+				if let Some(art) = self.art_cache.save_and_load(&id, &bytes) {
+					if Some(id) == self.current_art_id {
+						self.current_art = Some(art);
+
+						#[cfg(feature = "os-media-controls")]
+						if let Some(mpris) = &mut self.mpris {
+							if let Some(track) = self.queue.get(self.queue_position) {
+								if let Some(art) = &track.cover_art {
+									let path = self.art_cache.get_path(&art);
+									mpris.update_metadata(track, Some(path.as_path()));
+								}
+							}
+						}
+					}
 				}
 			}
+			_ => {}
 		}
+	}
+}
+
+impl Default for CoreActor {
+	fn default() -> Self {
+		Self::new()
 	}
 }

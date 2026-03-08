@@ -40,4 +40,8 @@ pub enum CoreMessage {
 		art: Arc<DynamicImage>,
 		id: CoverArtId,
 	},
+	ArtDownloaded {
+		id: CoverArtId,
+		bytes: Vec<u8>,
+	},
 }
