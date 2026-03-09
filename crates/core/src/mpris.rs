@@ -60,4 +60,16 @@ impl MprisManager {
 		};
 		let _ = self.controls.set_playback(pb);
 	}
+
+	pub fn sync(
+		&mut self,
+		track: Option<&Track>,
+		status: PlayerStatus,
+		art_path: Option<&std::path::Path>,
+	) {
+		self.set_playback_status(status);
+		if let Some(t) = track {
+			self.update_metadata(t, art_path);
+		}
+	}
 }

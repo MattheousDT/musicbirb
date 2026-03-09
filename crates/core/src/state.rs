@@ -35,6 +35,7 @@ pub enum CoreMessage {
 	UrlReady {
 		url: String,
 		index: usize,
+		is_preload: bool,
 	},
 	ArtReady {
 		art: Arc<DynamicImage>,

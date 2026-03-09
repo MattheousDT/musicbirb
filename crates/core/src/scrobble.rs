@@ -3,6 +3,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScrobbleEntry {
@@ -57,7 +58,7 @@ impl ScrobbleManager {
 		}
 	}
 
-	fn save(&self) {
+	pub fn save(&self) {
 		if let Ok(data) = serde_json::to_string(&self.queue) {
 			let _ = fs::write(&self.file_path, data);
 		}
@@ -67,5 +68,62 @@ impl ScrobbleManager {
 impl Default for ScrobbleManager {
 	fn default() -> Self {
 		Self::new()
+	}
+}
+
+pub struct ScrobbleTracker {
+	pub accumulated_time: f64,
+	pub last_pos: f64,
+	pub has_scrobbled: bool,
+	pub start_time: u64,
+}
+
+impl ScrobbleTracker {
+	pub fn new() -> Self {
+		Self {
+			accumulated_time: 0.0,
+			last_pos: 0.0,
+			has_scrobbled: false,
+			start_time: 0,
+		}
+	}
+
+	pub fn reset(&mut self) {
+		self.accumulated_time = 0.0;
+		self.last_pos = 0.0;
+		self.has_scrobbled = false;
+		self.start_time = SystemTime::now()
+			.duration_since(UNIX_EPOCH)
+			.unwrap_or_default()
+			.as_millis() as u64;
+	}
+
+	pub fn update(&mut self, current_pos: f64, delta_time: f64, is_playing: bool) {
+		if is_playing {
+			let diff = current_pos - self.last_pos;
+			if diff > 0.0 && diff <= delta_time + 1.0 {
+				self.accumulated_time += diff;
+			}
+		}
+		self.last_pos = current_pos;
+	}
+
+	pub fn check_threshold(&self, duration_secs: u32) -> (bool, Option<f64>) {
+		let duration = duration_secs as f64;
+		if duration < 30.0 {
+			return (false, None);
+		}
+
+		let threshold = (duration / 2.0).min(240.0);
+		let remaining = threshold - self.accumulated_time;
+
+		let mark = if remaining > 0.0 {
+			let m = self.last_pos + remaining;
+			if m <= duration + 1.0 { Some(m) } else { None }
+		} else {
+			None
+		};
+
+		(self.accumulated_time >= threshold, mark)
 	}
 }
