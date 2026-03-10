@@ -2,13 +2,20 @@ use crate::backend::PlayerStatus;
 use crate::models::{CoverArtId, Track};
 use image::DynamicImage;
 use std::sync::Arc;
+use std::time::Instant;
+
+#[derive(Debug, Clone)]
+pub struct PlaybackSync {
+	pub position_secs: f64,
+	pub timestamp: Instant,
+	pub status: PlayerStatus,
+}
 
 #[derive(Debug, Clone)]
 pub struct CoreState {
 	pub queue: Vec<Track>,
 	pub queue_position: usize,
-	pub time: f64,
-	pub status: PlayerStatus,
+	pub sync: PlaybackSync,
 	pub current_art: Option<Arc<DynamicImage>>,
 	pub scrobble_mark_pos: Option<f64>,
 }
@@ -18,8 +25,11 @@ impl Default for CoreState {
 		Self {
 			queue: Vec::new(),
 			queue_position: 0,
-			time: 0.0,
-			status: PlayerStatus::Stopped,
+			sync: PlaybackSync {
+				position_secs: 0.0,
+				timestamp: Instant::now(),
+				status: PlayerStatus::Stopped,
+			},
 			current_art: None,
 			scrobble_mark_pos: None,
 		}
@@ -36,10 +46,6 @@ pub enum CoreMessage {
 		url: String,
 		index: usize,
 		is_preload: bool,
-	},
-	ArtReady {
-		art: Arc<DynamicImage>,
-		id: CoverArtId,
 	},
 	ArtDownloaded {
 		id: CoverArtId,

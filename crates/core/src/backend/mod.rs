@@ -1,9 +1,7 @@
-//! Audio backend interface for `musicbirb`.
-//!
-//! This module defines the generic [`AudioBackend`] trait which abstracts over
-//! underlying platform-specific audio playback engines.
-
 use crate::error::MusicbirbError;
+use async_trait::async_trait;
+use std::time::Instant;
+use tokio::sync::mpsc;
 
 #[cfg(feature = "mpv")]
 pub mod mpv;
@@ -19,7 +17,25 @@ pub enum PlayerStatus {
 	Paused,
 }
 
-/// A snapshot of the audio backend's current state.
+/// Events emitted by the audio backend to notify the core actor of state changes.
+#[derive(Debug, Clone)]
+pub enum BackendEvent {
+	/// Emitted when the play/pause/stop status changes.
+	StatusUpdate(PlayerStatus),
+	/// Emitted periodically or on seek to synchronize the current playback time.
+	PositionCorrection {
+		/// The current playback position in seconds.
+		seconds: f64,
+		/// The monotonic timestamp when this position was recorded.
+		timestamp: Instant,
+	},
+	/// Emitted when the backend successfully starts a new file in its internal playlist.
+	TrackStarted,
+	/// Emitted when a track reaches its natural end.
+	EndOfTrack,
+}
+
+/// A snapshot of the audio backend's internal state.
 #[derive(Debug, Clone)]
 pub struct PlayerState {
 	/// Current playback position in seconds.
@@ -30,57 +46,63 @@ pub struct PlayerState {
 	pub playlist_index: i64,
 	/// The total number of items in the backend's internal playlist.
 	pub playlist_count: i64,
+	/// The monotonic timestamp when this state snapshot was captured.
+	pub timestamp: Instant,
 }
 
-/// The generic interface required for all audio engines used by the core player.
-///
-/// Implementers of this trait are responsible for interfacing with their respective
-/// native audio libraries, managing playback queues, and returning accurate states.
+/// Defines the interface for audio playback engines.
+#[async_trait]
 pub trait AudioBackend: Send + Sync {
+	/// Provides the backend with a channel to emit events.
+	///
+	/// This is called once during the initialization of the core actor. Implementation
+	/// should be non-blocking.
+	fn set_event_sender(&self, tx: mpsc::UnboundedSender<BackendEvent>);
+
 	/// Resumes playback (the inverse of pause).
-	fn play(&self) -> Result<(), MusicbirbError>;
+	async fn play(&self) -> Result<(), MusicbirbError>;
 
 	/// Pauses the current playback.
-	fn pause(&self) -> Result<(), MusicbirbError>;
+	async fn pause(&self) -> Result<(), MusicbirbError>;
 
 	/// Toggles the current playback state between playing and paused.
-	fn toggle_pause(&self) -> Result<(), MusicbirbError>;
+	async fn toggle_pause(&self) -> Result<(), MusicbirbError>;
 
-	/// Completely stops current playback. Does not guarantee clearing the playlist.
-	fn stop(&self) -> Result<(), MusicbirbError>;
+	/// Completely stops current playback.
+	async fn stop(&self) -> Result<(), MusicbirbError>;
 
-	/// Appends a media stream to the end of the backend's internal playlist.
-	fn add(&self, url: &str) -> Result<(), MusicbirbError>;
+	/// Appends a media stream URL to the end of the backend's internal playlist.
+	async fn add(&self, url: &str) -> Result<(), MusicbirbError>;
 
-	/// Inserts a media stream at a specific index in the backend's internal playlist.
-	fn insert(&self, url: &str, index: i64) -> Result<(), MusicbirbError>;
+	/// Inserts a media stream URL at a specific index in the backend's internal playlist.
+	async fn insert(&self, url: &str, index: i64) -> Result<(), MusicbirbError>;
 
-	/// Removes an item from the underlying engine's internal playlist by index.
-	fn remove_index(&self, index: i64) -> Result<(), MusicbirbError>;
+	/// Removes an item from the backend's internal playlist by index.
+	async fn remove_index(&self, index: i64) -> Result<(), MusicbirbError>;
 
-	/// Clears the backend's internal playlist.
-	fn clear_playlist(&self) -> Result<(), MusicbirbError>;
+	/// Clears all items from the backend's internal playlist.
+	async fn clear_playlist(&self) -> Result<(), MusicbirbError>;
 
-	/// Starts playback at the specified index in the backend's internal playlist.
-	fn play_index(&self, index: i64) -> Result<(), MusicbirbError>;
+	/// Starts playback of the item at the specified index in the backend's internal playlist.
+	async fn play_index(&self, index: i64) -> Result<(), MusicbirbError>;
 
 	/// Seeks the current playback position by a relative offset in seconds.
 	///
-	/// Can be a negative value to seek backward.
-	fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError>;
+	/// Use a negative value to seek backward.
+	async fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError>;
 
 	/// Seeks the current playback position to an absolute time in seconds.
-	fn seek_absolute(&self, seconds: f64) -> Result<(), MusicbirbError>;
+	async fn seek_absolute(&self, seconds: f64) -> Result<(), MusicbirbError>;
 
-	/// Sets the current playback volume.
-	fn set_volume(&self, volume: f64) -> Result<(), MusicbirbError>;
+	/// Sets the output volume (typically 0.0 to 100.0).
+	async fn set_volume(&self, volume: f64) -> Result<(), MusicbirbError>;
 
-	/// Retrieves the current playback volume.
-	fn get_volume(&self) -> Result<f64, MusicbirbError>;
+	/// Retrieves the current output volume.
+	async fn get_volume(&self) -> Result<f64, MusicbirbError>;
 
-	/// Retrieves a snapshot of the player's current state (status, time, and playlist info).
+	/// Retrieves a snapshot of the player's current state.
 	///
-	/// This is typically called frequently (e.g., on a tick interval) by the orchestrator
-	/// to sync the core state with the backend's state.
+	/// This is called reactively by the orchestrator to reconcile internal core state
+	/// with the truth of the audio engine after events or user messages occur.
 	fn get_state(&self) -> PlayerState;
 }

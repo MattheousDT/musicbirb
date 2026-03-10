@@ -1,15 +1,22 @@
 use crate::components::progress::ScrobbleProgressBar;
-use musicbirb::Track;
+use musicbirb::{PlayerStatus, Track, state::PlaybackSync};
 use ratatui::{prelude::*, widgets::*};
+use std::time::Instant;
 
 pub fn render_now_playing(
 	f: &mut Frame,
 	area: Rect,
 	current_track: Option<&Track>,
-	time: f64,
-	paused: bool,
+	sync: &PlaybackSync,
 	scrobble_mark_pos: Option<f64>,
 ) {
+	let elapsed = if sync.status == PlayerStatus::Playing {
+		Instant::now().duration_since(sync.timestamp).as_secs_f64()
+	} else {
+		0.0
+	};
+	let time = sync.position_secs + elapsed;
+
 	let (title, artist, album, ratio, dur, scrobble_ratio) = if let Some(t) = current_track {
 		let duration = t.duration_secs as f64;
 		let r = if duration > 0.0 {
@@ -57,7 +64,11 @@ pub fn render_now_playing(
 		Paragraph::new(format!(
 			"{}{}",
 			title,
-			if paused { " [PAUSED]" } else { "" }
+			if sync.status == PlayerStatus::Paused {
+				" [PAUSED]"
+			} else {
+				""
+			}
 		))
 		.cyan()
 		.bold(),
@@ -67,6 +78,5 @@ pub fn render_now_playing(
 
 	let progress = ScrobbleProgressBar::new(ratio, scrobble_ratio);
 	f.render_widget(progress, b_lay[2]);
-
 	f.render_widget(Paragraph::new(dur).alignment(Alignment::Right), b_lay[3]);
 }

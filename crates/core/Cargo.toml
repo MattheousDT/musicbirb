@@ -19,3 +19,5 @@ souvlaki = { version = "0.8.3", optional = true, default-features = false, featu
 submarine = "0.1.1"
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["full"] }
+async-trait = "0.1"
+

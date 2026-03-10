@@ -3,7 +3,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScrobbleEntry {
@@ -98,32 +98,41 @@ impl ScrobbleTracker {
 			.as_millis() as u64;
 	}
 
-	pub fn update(&mut self, current_pos: f64, delta_time: f64, is_playing: bool) {
-		if is_playing {
-			let diff = current_pos - self.last_pos;
-			if diff > 0.0 && diff <= delta_time + 1.0 {
-				self.accumulated_time += diff;
-			}
+	pub fn get_remaining_duration(&self, track_duration_secs: u32) -> Option<Duration> {
+		if track_duration_secs < 30 {
+			return None;
 		}
+
+		let threshold = (track_duration_secs as f64 / 2.0).min(240.0);
+		let remaining = threshold - self.accumulated_time;
+
+		if remaining > 0.0 {
+			Some(Duration::from_secs_f64(remaining))
+		} else {
+			None
+		}
+	}
+
+	pub fn commit_played_time(&mut self, duration: Duration) {
+		self.accumulated_time += duration.as_secs_f64();
+	}
+
+	pub fn sync_position(&mut self, current_pos: f64) {
 		self.last_pos = current_pos;
 	}
 
-	pub fn check_threshold(&self, duration_secs: u32) -> (bool, Option<f64>) {
-		let duration = duration_secs as f64;
+	pub fn get_mark_pos(&self, track_duration_secs: u32) -> Option<f64> {
+		let duration = track_duration_secs as f64;
 		if duration < 30.0 {
-			return (false, None);
+			return None;
 		}
-
 		let threshold = (duration / 2.0).min(240.0);
 		let remaining = threshold - self.accumulated_time;
-
-		let mark = if remaining > 0.0 {
+		if remaining > 0.0 {
 			let m = self.last_pos + remaining;
 			if m <= duration + 1.0 { Some(m) } else { None }
 		} else {
 			None
-		};
-
-		(self.accumulated_time >= threshold, mark)
+		}
 	}
 }

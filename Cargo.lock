@@ -2251,6 +2251,7 @@ dependencies = [
 name = "musicbirb"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "directories",
  "image",
  "libmpv",

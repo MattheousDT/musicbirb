@@ -8,7 +8,7 @@ use crossterm::{
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use musicbirb::mpv::MpvBackend;
-use musicbirb::{AlbumId, Musicbirb, PlayerStatus, PlaylistId, SubsonicClient, TrackId};
+use musicbirb::{AlbumId, Musicbirb, PlaylistId, SubsonicClient, TrackId};
 use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use std::{
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
 	let api = SubsonicClient::new(&url, &user, &pass)?;
 	let player = Arc::new(MpvBackend::new()?);
 	let core = Musicbirb::new(api, player);
-	let state_rx = core.subscribe();
+	let mut state_rx = core.subscribe();
 
 	enable_raw_mode()?;
 	stdout().execute(EnterAlternateScreen)?;
@@ -49,8 +49,6 @@ async fn main() -> Result<()> {
 		let current_track = state.queue.get(state.queue_position).cloned();
 		let queue = state.queue;
 		let pos = state.queue_position;
-		let time = state.time;
-		let paused = state.status == PlayerStatus::Paused;
 		let current_art = state.current_art;
 
 		if let Some(art) = current_art {
@@ -104,13 +102,11 @@ async fn main() -> Result<()> {
 			}
 
 			render_queue(f, top[1], &queue, pos);
-
 			render_now_playing(
 				f,
 				main[1],
 				current_track.as_ref(),
-				time,
-				paused,
+				&state.sync,
 				state.scrobble_mark_pos,
 			);
 

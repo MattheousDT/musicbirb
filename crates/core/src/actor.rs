@@ -1,13 +1,14 @@
 use crate::api::subsonic::SubsonicClient;
 use crate::art_cache::ArtCache;
-use crate::backend::{AudioBackend, PlayerState, PlayerStatus};
+use crate::backend::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
 use crate::models::{CoverArtId, Track};
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
-use crate::state::{CoreMessage, CoreState};
+use crate::state::{CoreMessage, CoreState, PlaybackSync};
 use image::DynamicImage;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, watch};
+use tokio::time::{Sleep, sleep};
 
 #[cfg(feature = "os-media-controls")]
 use crate::mpris::MprisManager;
@@ -25,15 +26,17 @@ pub struct CoreActor {
 
 	scrobble_tracker: ScrobbleTracker,
 	scrobble_manager: Arc<Mutex<ScrobbleManager>>,
-	scrobble_flush_timer: Instant,
+	scrobble_timer: Option<Pin<Box<Sleep>>>,
+	scrobble_flush_timer: Option<Pin<Box<Sleep>>>,
 
-	last_tick_time: Instant,
+	auto_play: bool,
 
 	#[cfg(feature = "os-media-controls")]
 	mpris: Option<MprisManager>,
 }
 
 impl CoreActor {
+	/// Creates a new CoreActor instance with default state and initialized scrobble managers.
 	pub fn new() -> Self {
 		Self {
 			queue: Vec::new(),
@@ -48,15 +51,18 @@ impl CoreActor {
 
 			scrobble_tracker: ScrobbleTracker::new(),
 			scrobble_manager: Arc::new(Mutex::new(ScrobbleManager::new())),
-			scrobble_flush_timer: Instant::now(),
+			scrobble_timer: None,
+			scrobble_flush_timer: Some(Box::pin(sleep(std::time::Duration::from_secs(60)))),
 
-			last_tick_time: Instant::now(),
+			auto_play: true,
 
 			#[cfg(feature = "os-media-controls")]
 			mpris: None,
 		}
 	}
 
+	/// Main event loop for the core actor.
+	/// Listens for messages from the UI, events from the audio backend, and scrobble timers.
 	pub async fn run(
 		mut self,
 		mut rx: mpsc::UnboundedReceiver<CoreMessage>,
@@ -70,65 +76,321 @@ impl CoreActor {
 			self.mpris = MprisManager::new(tx.clone());
 		}
 
-		let mut interval = tokio::time::interval(Duration::from_millis(33));
+		let (backend_tx, mut backend_rx) = mpsc::unbounded_channel();
+		player.set_event_sender(backend_tx);
 
 		loop {
 			tokio::select! {
-				_ = interval.tick() => self.tick(&player, &api, &tx, &state_tx),
-				Some(msg) = rx.recv() => self.handle_message(msg, &player, &api),
+				Some(msg) = rx.recv() => self.handle_message(msg, &player, &api, &tx, &state_tx).await,
+				Some(event) = backend_rx.recv() => self.handle_backend_event(event, &player, &api, &tx, &state_tx).await,
+				_ = async {
+					if let Some(timer) = self.scrobble_timer.as_mut() {
+						timer.await;
+					} else {
+						std::future::pending::<()>().await;
+					}
+				}, if self.scrobble_timer.is_some() => {
+					self.scrobble_timer = None;
+					self.trigger_scrobble(&api);
+				},
+				_ = async {
+					if let Some(timer) = self.scrobble_flush_timer.as_mut() {
+						timer.await;
+					} else {
+						std::future::pending::<()>().await;
+					}
+				} => {
+					self.scrobble_flush_timer = Some(Box::pin(sleep(std::time::Duration::from_secs(60))));
+					self.spawn_scrobble_flush(&api);
+				}
 			}
 		}
 	}
 
-	fn tick(
+	/// Commits the time elapsed since the last playback sync to the scrobble tracker.
+	fn sync_scrobble_duration(&mut self, current_sync: &PlaybackSync) {
+		if current_sync.status == PlayerStatus::Playing {
+			let elapsed = std::time::Instant::now().duration_since(current_sync.timestamp);
+			self.scrobble_tracker.commit_played_time(elapsed);
+		}
+	}
+
+	/// Handles events emitted by the audio backend (e.g., MPV).
+	async fn handle_backend_event(
+		&mut self,
+		event: BackendEvent,
+		player: &Arc<dyn AudioBackend>,
+		api: &Arc<SubsonicClient>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+		state_tx: &watch::Sender<CoreState>,
+	) {
+		let current_sync = state_tx.borrow().sync.clone();
+		let p_state = player.get_state();
+
+		match event {
+			BackendEvent::TrackStarted => {
+				self.sync_scrobble_duration(&current_sync);
+				// If the backend has moved to the second item in its internal playlist,
+				// and that item matches what we preloaded, we treat it as a gapless transition.
+				if p_state.playlist_index > 0
+					&& self.preloading_index == Some(self.queue_position + 1)
+				{
+					self.advance_queue_gapless(player, api, state_tx).await;
+				} else {
+					self.dispatch_state(&p_state, state_tx);
+				}
+			}
+			BackendEvent::StatusUpdate(_) => {
+				self.sync_scrobble_duration(&current_sync);
+				self.scrobble_tracker.sync_position(p_state.position_secs);
+
+				if p_state.status == PlayerStatus::Playing {
+					self.start_scrobble_timer();
+				} else {
+					self.scrobble_timer = None;
+				}
+
+				if p_state.status == PlayerStatus::Stopped {
+					if self.active_index.is_some() {
+						if self.queue_position + 1 < self.queue.len() {
+							self.advance_queue(player).await;
+						} else {
+							self.reset_to_start(player, api, tx, state_tx).await;
+							return;
+						}
+					}
+				}
+				self.dispatch_state(&p_state, state_tx);
+			}
+			BackendEvent::PositionCorrection { seconds, .. } => {
+				self.sync_scrobble_duration(&current_sync);
+				self.scrobble_tracker.sync_position(seconds);
+
+				if p_state.playlist_index > 0
+					&& self.preloading_index == Some(self.queue_position + 1)
+				{
+					self.advance_queue_gapless(player, api, state_tx).await;
+				}
+
+				if p_state.status == PlayerStatus::Playing {
+					self.start_scrobble_timer();
+				}
+				self.dispatch_state(&p_state, state_tx);
+			}
+			BackendEvent::EndOfTrack => {
+				self.scrobble_timer = None;
+			}
+		}
+		self.sync_resources(api, tx, &player.get_state());
+	}
+
+	/// Steps the queue forward when the backend has stopped naturally.
+	async fn advance_queue(&mut self, player: &Arc<dyn AudioBackend>) {
+		self.queue_position += 1;
+		self.active_index = None;
+		self.preloading_index = None;
+		self.scrobble_timer = None;
+		self.auto_play = true;
+		let _ = player.clear_playlist().await;
+	}
+
+	/// Steps the queue forward when the backend has already started playing the next track in its buffer.
+	async fn advance_queue_gapless(
+		&mut self,
+		player: &Arc<dyn AudioBackend>,
+		api: &Arc<SubsonicClient>,
+		state_tx: &watch::Sender<CoreState>,
+	) {
+		self.queue_position += 1;
+		self.active_index = Some(self.queue_position);
+		self.preloading_index = None;
+
+		self.on_track_start(api);
+		// Remove the finished track from the backend's internal playlist
+		let _ = player.remove_index(0).await;
+		let _ = player.play().await;
+
+		self.dispatch_state(&player.get_state(), state_tx);
+	}
+
+	/// Resets the queue to the beginning and stops playback.
+	async fn reset_to_start(
 		&mut self,
 		player: &Arc<dyn AudioBackend>,
 		api: &Arc<SubsonicClient>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
-		let now = Instant::now();
-		let delta = now.duration_since(self.last_tick_time).as_secs_f64();
-		self.last_tick_time = now;
+		self.queue_position = 0;
+		self.active_index = None;
+		self.preloading_index = None;
+		self.scrobble_timer = None;
+		self.auto_play = false;
+
+		let _ = player.stop().await;
+		let _ = player.clear_playlist().await;
 
 		let p_state = player.get_state();
-
-		self.sync_playback_engine(&p_state, player, api);
-
 		self.sync_resources(api, tx, &p_state);
-
-		self.scrobble_tracker.update(
-			p_state.position_secs,
-			delta,
-			p_state.status == PlayerStatus::Playing,
-		);
-		let mark = self.update_scrobbles(api);
-
-		self.dispatch_state(&p_state, state_tx, mark);
+		self.dispatch_state(&p_state, state_tx);
 	}
 
-	fn sync_playback_engine(
+	/// Processes incoming messages from the UI or Internal components.
+	async fn handle_message(
 		&mut self,
-		p_state: &PlayerState,
+		msg: CoreMessage,
 		player: &Arc<dyn AudioBackend>,
 		api: &Arc<SubsonicClient>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+		state_tx: &watch::Sender<CoreState>,
 	) {
-		let has_next = self.queue_position + 1 < self.queue.len();
+		let current_sync = state_tx.borrow().sync.clone();
+		self.sync_scrobble_duration(&current_sync);
 
-		if p_state.status == PlayerStatus::Stopped {
-			if self.active_index == Some(self.queue_position) && has_next {
-				self.queue_position += 1;
-				self.active_index = None;
+		match msg {
+			CoreMessage::AddTracks(tracks) => {
+				self.queue.extend(tracks);
+				self.sync_resources(api, tx, &player.get_state());
+				self.dispatch_state(&player.get_state(), state_tx);
 			}
-		} else if p_state.playlist_index > 0 && has_next {
-			self.queue_position += 1;
-			self.active_index = Some(self.queue_position);
-			self.preloading_index = None;
-			self.on_track_start(api);
-			let _ = player.remove_index(0);
+			CoreMessage::Next | CoreMessage::Prev => {
+				let next = matches!(msg, CoreMessage::Next);
+				let possible = if next {
+					self.queue_position + 1 < self.queue.len()
+				} else {
+					self.queue_position > 0
+				};
+
+				if possible {
+					self.queue_position = if next {
+						self.queue_position + 1
+					} else {
+						self.queue_position - 1
+					};
+
+					// Hard reset on explicit track change
+					self.active_index = None;
+					self.fetching_index = None;
+					self.preloading_index = None;
+					self.scrobble_timer = None;
+					self.auto_play = true;
+
+					let _ = player.stop().await;
+					let _ = player.clear_playlist().await;
+
+					self.sync_resources(api, tx, &player.get_state());
+					self.dispatch_state(&player.get_state(), state_tx);
+				}
+			}
+			CoreMessage::SeekRelative(secs) => {
+				let _ = player.seek_relative(secs).await;
+			}
+			CoreMessage::TogglePause => {
+				let _ = player.toggle_pause().await;
+			}
+			CoreMessage::UrlReady {
+				url,
+				index,
+				is_preload,
+			} => {
+				if is_preload && Some(index) == self.preloading_index {
+					let _ = player.add(&url).await;
+				} else if !is_preload && Some(index) == self.fetching_index {
+					let _ = player.clear_playlist().await;
+					let _ = player.add(&url).await;
+					let _ = player.play_index(0).await;
+					if self.auto_play {
+						let _ = player.play().await;
+					} else {
+						let _ = player.pause().await;
+					}
+					self.active_index = Some(index);
+					self.fetching_index = None;
+					self.on_track_start(api);
+					self.dispatch_state(&player.get_state(), state_tx);
+				}
+			}
+			CoreMessage::ArtDownloaded { id, bytes } => {
+				if let Some(art) = self.art_cache.save_and_load(&id, &bytes) {
+					if Some(id) == self.current_art_id {
+						self.current_art = Some(art);
+						self.dispatch_state(&player.get_state(), state_tx);
+					}
+				}
+			}
 		}
 	}
 
+	/// Calculates and starts a timer to trigger a scrobble once the track threshold is met.
+	fn start_scrobble_timer(&mut self) {
+		if self.scrobble_tracker.has_scrobbled {
+			self.scrobble_timer = None;
+			return;
+		}
+
+		if let Some(track) = self.queue.get(self.queue_position) {
+			if let Some(rem) = self
+				.scrobble_tracker
+				.get_remaining_duration(track.duration_secs)
+			{
+				self.scrobble_timer = Some(Box::pin(sleep(rem)));
+			}
+		}
+	}
+
+	/// Pushes a scrobble entry to the manager and attempts to flush.
+	fn trigger_scrobble(&mut self, api: &Arc<SubsonicClient>) {
+		if let Some(track) = self.queue.get(self.queue_position) {
+			self.scrobble_tracker.has_scrobbled = true;
+			self.scrobble_manager
+				.lock()
+				.unwrap()
+				.push(&track.id, self.scrobble_tracker.start_time);
+			self.spawn_scrobble_flush(api);
+		}
+	}
+
+	/// Updates the public core state and external integrations (MPRIS).
+	fn dispatch_state(&mut self, p_state: &PlayerState, state_tx: &watch::Sender<CoreState>) {
+		let track = self.active_index.and_then(|i| self.queue.get(i));
+		let mark = track.and_then(|t| self.scrobble_tracker.get_mark_pos(t.duration_secs));
+
+		#[cfg(feature = "os-media-controls")]
+		if let Some(mpris) = &mut self.mpris {
+			let art_path = self
+				.current_art_id
+				.as_ref()
+				.map(|id| self.art_cache.get_path(id));
+			mpris.sync(track, p_state.status, art_path.as_deref());
+		}
+
+		let _ = state_tx.send(CoreState {
+			queue: self.queue.clone(),
+			queue_position: self.queue_position,
+			sync: PlaybackSync {
+				position_secs: p_state.position_secs,
+				timestamp: p_state.timestamp,
+				status: p_state.status,
+			},
+			current_art: self.current_art.clone(),
+			scrobble_mark_pos: mark,
+		});
+	}
+
+	/// Handles initialization tasks when a track begins playback.
+	fn on_track_start(&mut self, api: &Arc<SubsonicClient>) {
+		self.scrobble_tracker.reset();
+		if let Some(track) = self.queue.get(self.queue_position) {
+			let id = track.id.clone();
+			let api_clone = Arc::clone(api);
+			tokio::spawn(async move {
+				let _ = api_clone.now_playing(&id).await;
+			});
+			self.start_scrobble_timer();
+		}
+	}
+
+	/// Ensures the backend and actor have the necessary URLs and metadata for the current and next track.
 	fn sync_resources(
 		&mut self,
 		api: &Arc<SubsonicClient>,
@@ -139,12 +401,14 @@ impl CoreActor {
 			return;
 		}
 
+		// Fetch current track URL if not active or currently being fetched
 		if self.active_index != Some(self.queue_position)
 			&& self.fetching_index != Some(self.queue_position)
 		{
 			self.fetching_index = Some(self.queue_position);
 			self.spawn_url_fetch(api, tx, self.queue_position, false);
-		} else if p_state.playlist_count < 2
+		} else if self.active_index == Some(self.queue_position)
+			&& p_state.playlist_count < 2 // Preload if only the current track is in backend buffer
 			&& self.queue_position + 1 < self.queue.len()
 			&& self.preloading_index != Some(self.queue_position + 1)
 		{
@@ -160,6 +424,7 @@ impl CoreActor {
 		self.update_art_state(art_id, api, tx);
 	}
 
+	/// Checks if the requested art ID is different from current and triggers a load or fetch.
 	fn update_art_state(
 		&mut self,
 		art_id: Option<CoverArtId>,
@@ -169,9 +434,7 @@ impl CoreActor {
 		if art_id != self.current_art_id {
 			self.current_art_id = art_id.clone();
 			self.current_art = None;
-
 			let Some(id) = art_id else { return };
-
 			if let Some(img) = self.art_cache.load_image(&id) {
 				self.current_art = Some(img);
 			} else {
@@ -180,63 +443,7 @@ impl CoreActor {
 		}
 	}
 
-	fn update_scrobbles(&mut self, api: &Arc<SubsonicClient>) -> Option<f64> {
-		let track = self.active_index.and_then(|i| self.queue.get(i))?;
-		let (ready, mark) = self.scrobble_tracker.check_threshold(track.duration_secs);
-
-		if ready && !self.scrobble_tracker.has_scrobbled {
-			self.scrobble_tracker.has_scrobbled = true;
-			self.scrobble_manager
-				.lock()
-				.unwrap()
-				.push(&track.id, self.scrobble_tracker.start_time);
-			self.spawn_scrobble_flush(api);
-		}
-
-		if self.scrobble_flush_timer.elapsed().as_secs() >= 60 {
-			self.scrobble_flush_timer = Instant::now();
-			self.spawn_scrobble_flush(api);
-		}
-		mark
-	}
-
-	fn dispatch_state(
-		&mut self,
-		p_state: &PlayerState,
-		state_tx: &watch::Sender<CoreState>,
-		scrobble_mark: Option<f64>,
-	) {
-		#[cfg(feature = "os-media-controls")]
-		if let Some(mpris) = &mut self.mpris {
-			let track = self.active_index.and_then(|i| self.queue.get(i));
-			let art_path = self
-				.current_art_id
-				.as_ref()
-				.map(|id| self.art_cache.get_path(id));
-			mpris.sync(track, p_state.status, art_path.as_deref());
-		}
-
-		let _ = state_tx.send(CoreState {
-			queue: self.queue.clone(),
-			queue_position: self.queue_position,
-			time: p_state.position_secs,
-			status: p_state.status,
-			current_art: self.current_art.clone(),
-			scrobble_mark_pos: scrobble_mark,
-		});
-	}
-
-	fn on_track_start(&mut self, api: &Arc<SubsonicClient>) {
-		self.scrobble_tracker.reset();
-		if let Some(track) = self.queue.get(self.queue_position) {
-			let id = track.id.clone();
-			let api_clone = Arc::clone(api);
-			tokio::spawn(async move {
-				let _ = api_clone.now_playing(&id).await;
-			});
-		}
-	}
-
+	/// Spawns an async task to resolve a Subsonic stream URL.
 	fn spawn_url_fetch(
 		&self,
 		api: &Arc<SubsonicClient>,
@@ -257,6 +464,7 @@ impl CoreActor {
 		});
 	}
 
+	/// Spawns an async task to download cover art bytes.
 	fn spawn_art_fetch(
 		&self,
 		id: &CoverArtId,
@@ -271,6 +479,7 @@ impl CoreActor {
 		});
 	}
 
+	/// Spawns an async task to send pending scrobbles to the server.
 	fn spawn_scrobble_flush(&self, api: &Arc<SubsonicClient>) {
 		let (sm, api_c) = (Arc::clone(&self.scrobble_manager), Arc::clone(api));
 		tokio::spawn(async move {
@@ -279,67 +488,5 @@ impl CoreActor {
 				sm.lock().unwrap().remove_flushed(items.len());
 			}
 		});
-	}
-
-	fn handle_message(
-		&mut self,
-		msg: CoreMessage,
-		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
-	) {
-		match msg {
-			CoreMessage::AddTracks(tracks) => self.queue.extend(tracks),
-			CoreMessage::Next | CoreMessage::Prev => {
-				let next = matches!(msg, CoreMessage::Next);
-				let possible = if next {
-					self.queue_position + 1 < self.queue.len()
-				} else {
-					self.queue_position > 0
-				};
-				if possible {
-					self.queue_position = if next {
-						self.queue_position + 1
-					} else {
-						self.queue_position - 1
-					};
-					self.active_index = None;
-					self.fetching_index = None;
-					self.preloading_index = None;
-					let _ = player.stop();
-					let _ = player.clear_playlist();
-				}
-			}
-			CoreMessage::SeekRelative(secs) => {
-				let _ = player.seek_relative(secs);
-			}
-			CoreMessage::TogglePause => {
-				let _ = player.toggle_pause();
-			}
-			CoreMessage::UrlReady {
-				url,
-				index,
-				is_preload,
-			} => {
-				if is_preload && Some(index) == self.preloading_index {
-					let _ = player.add(&url);
-				} else if !is_preload && Some(index) == self.fetching_index {
-					let _ = player.clear_playlist();
-					let _ = player.add(&url);
-					let _ = player.play_index(0);
-					let _ = player.play();
-					self.active_index = Some(index);
-					self.fetching_index = None;
-					self.on_track_start(api);
-				}
-			}
-			CoreMessage::ArtDownloaded { id, bytes } => {
-				if let Some(art) = self.art_cache.save_and_load(&id, &bytes) {
-					if Some(id) == self.current_art_id {
-						self.current_art = Some(art);
-					}
-				}
-			}
-			_ => {}
-		}
 	}
 }
