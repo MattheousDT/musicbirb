@@ -1,5 +1,5 @@
+use crate::backend::PlayerStatus;
 use crate::models::Track;
-use crate::player::PlayerStatus;
 use crate::state::CoreMessage;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 use std::path::Path;

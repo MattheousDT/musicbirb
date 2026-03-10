@@ -1,7 +1,7 @@
-use crate::api::SubsonicClient;
+use crate::api::subsonic::SubsonicClient;
 use crate::art_cache::ArtCache;
+use crate::backend::{AudioBackend, PlayerState, PlayerStatus};
 use crate::models::{CoverArtId, Track};
-use crate::player::{Player, PlayerState, PlayerStatus};
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
 use crate::state::{CoreMessage, CoreState};
 use image::DynamicImage;
@@ -63,7 +63,7 @@ impl CoreActor {
 		tx: mpsc::UnboundedSender<CoreMessage>,
 		state_tx: watch::Sender<CoreState>,
 		api: Arc<SubsonicClient>,
-		player: Player,
+		player: Arc<dyn AudioBackend>,
 	) {
 		#[cfg(feature = "os-media-controls")]
 		{
@@ -82,7 +82,7 @@ impl CoreActor {
 
 	fn tick(
 		&mut self,
-		player: &Player,
+		player: &Arc<dyn AudioBackend>,
 		api: &Arc<SubsonicClient>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
@@ -110,7 +110,7 @@ impl CoreActor {
 	fn sync_playback_engine(
 		&mut self,
 		p_state: &PlayerState,
-		player: &Player,
+		player: &Arc<dyn AudioBackend>,
 		api: &Arc<SubsonicClient>,
 	) {
 		let has_next = self.queue_position + 1 < self.queue.len();
@@ -281,7 +281,12 @@ impl CoreActor {
 		});
 	}
 
-	fn handle_message(&mut self, msg: CoreMessage, player: &Player, api: &Arc<SubsonicClient>) {
+	fn handle_message(
+		&mut self,
+		msg: CoreMessage,
+		player: &Arc<dyn AudioBackend>,
+		api: &Arc<SubsonicClient>,
+	) {
 		match msg {
 			CoreMessage::AddTracks(tracks) => self.queue.extend(tracks),
 			CoreMessage::Next | CoreMessage::Prev => {
@@ -301,6 +306,7 @@ impl CoreActor {
 					self.fetching_index = None;
 					self.preloading_index = None;
 					let _ = player.stop();
+					let _ = player.clear_playlist();
 				}
 			}
 			CoreMessage::SeekRelative(secs) => {
@@ -315,9 +321,12 @@ impl CoreActor {
 				is_preload,
 			} => {
 				if is_preload && Some(index) == self.preloading_index {
-					let _ = player.play(&url, false);
+					let _ = player.add(&url);
 				} else if !is_preload && Some(index) == self.fetching_index {
-					let _ = player.play(&url, true);
+					let _ = player.clear_playlist();
+					let _ = player.add(&url);
+					let _ = player.play_index(0);
+					let _ = player.play();
 					self.active_index = Some(index);
 					self.fetching_index = None;
 					self.on_track_start(api);

@@ -1,5 +1,5 @@
+use crate::backend::PlayerStatus;
 use crate::models::{CoverArtId, Track};
-use crate::player::PlayerStatus;
 use image::DynamicImage;
 use std::sync::Arc;
 

@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum CoreError {
+pub enum MusicbirbError {
 	#[error("Subsonic API error: {0}")]
 	Api(String),
 

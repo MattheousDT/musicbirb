@@ -8,7 +8,7 @@ anyhow = "1.0.102"
 crossterm = "0.29.0"
 dotenvy = "0.15.7"
 image = "0.25.9"
-musicbirb = { path = "../core", features = ["os-media-controls"] }
+musicbirb = { path = "../core", features = ["mpv", "os-media-controls"] }
 ratatui = "0.30.0"
 ratatui-image = "10.0.6"
 tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros"] }

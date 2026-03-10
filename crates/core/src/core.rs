@@ -1,8 +1,8 @@
 use crate::actor::CoreActor;
-use crate::api::SubsonicClient;
-use crate::error::CoreError;
+use crate::api::subsonic::SubsonicClient;
+use crate::backend::AudioBackend;
+use crate::error::MusicbirbError;
 use crate::models::{AlbumId, PlaylistId, TrackId};
-use crate::player::Player;
 use crate::state::{CoreMessage, CoreState};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
@@ -14,7 +14,7 @@ pub struct Musicbirb {
 }
 
 impl Musicbirb {
-	pub fn new(api: SubsonicClient, player: Player) -> Arc<Self> {
+	pub fn new(api: SubsonicClient, player: Arc<dyn AudioBackend>) -> Arc<Self> {
 		let (tx, rx) = mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(CoreState::default());
 		let api_arc = Arc::new(api);
@@ -35,54 +35,54 @@ impl Musicbirb {
 		core
 	}
 
-	pub async fn queue_track(&self, id: &TrackId) -> Result<(), CoreError> {
+	pub async fn queue_track(&self, id: &TrackId) -> Result<(), MusicbirbError> {
 		let track = self.api.get_track(id).await?;
 		self.tx
 			.send(CoreMessage::AddTracks(vec![track]))
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 		Ok(())
 	}
 
-	pub async fn queue_album(&self, id: &AlbumId) -> Result<usize, CoreError> {
+	pub async fn queue_album(&self, id: &AlbumId) -> Result<usize, MusicbirbError> {
 		let tracks = self.api.get_album_tracks(id).await?;
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::AddTracks(tracks))
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 		Ok(count)
 	}
 
-	pub async fn queue_playlist(&self, id: &PlaylistId) -> Result<usize, CoreError> {
+	pub async fn queue_playlist(&self, id: &PlaylistId) -> Result<usize, MusicbirbError> {
 		let tracks = self.api.get_playlist_tracks(id).await?;
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::AddTracks(tracks))
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))?;
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 		Ok(count)
 	}
 
-	pub fn next(&self) -> Result<(), CoreError> {
+	pub fn next(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::Next)
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
-	pub fn prev(&self) -> Result<(), CoreError> {
+	pub fn prev(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::Prev)
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
-	pub fn seek(&self, seconds: f64) -> Result<(), CoreError> {
+	pub fn seek(&self, seconds: f64) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::SeekRelative(seconds))
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
-	pub fn toggle_pause(&self) -> Result<(), CoreError> {
+	pub fn toggle_pause(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::TogglePause)
-			.map_err(|_| CoreError::Internal("Core loop dead".into()))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
 	pub fn subscribe(&self) -> watch::Receiver<CoreState> {
