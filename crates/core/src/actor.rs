@@ -253,19 +253,20 @@ impl CoreActor {
 				self.sync_resources(api, tx, &player.get_state());
 				self.dispatch_state(&player.get_state(), state_tx);
 			}
-			CoreMessage::Next | CoreMessage::Prev => {
-				let next = matches!(msg, CoreMessage::Next);
-				let possible = if next {
-					self.queue_position + 1 < self.queue.len()
-				} else {
-					self.queue_position > 0
+			CoreMessage::Next | CoreMessage::Prev | CoreMessage::PlayIndex(_) => {
+				let possible = match msg {
+					CoreMessage::Next => self.queue_position + 1 < self.queue.len(),
+					CoreMessage::Prev => self.queue_position > 0,
+					CoreMessage::PlayIndex(idx) => idx < self.queue.len(),
+					_ => false,
 				};
 
 				if possible {
-					self.queue_position = if next {
-						self.queue_position + 1
-					} else {
-						self.queue_position - 1
+					self.queue_position = match msg {
+						CoreMessage::Next => self.queue_position + 1,
+						CoreMessage::Prev => self.queue_position - 1,
+						CoreMessage::PlayIndex(idx) => idx,
+						_ => self.queue_position,
 					};
 
 					// Hard reset on explicit track change
@@ -408,7 +409,7 @@ impl CoreActor {
 			self.fetching_index = Some(self.queue_position);
 			self.spawn_url_fetch(api, tx, self.queue_position, false);
 		} else if self.active_index == Some(self.queue_position)
-			&& p_state.playlist_count < 2 // Preload if only the current track is in backend buffer
+			&& p_state.playlist_count < 2
 			&& self.queue_position + 1 < self.queue.len()
 			&& self.preloading_index != Some(self.queue_position + 1)
 		{

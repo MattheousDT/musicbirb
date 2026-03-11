@@ -40,6 +40,7 @@ pub enum CoreMessage {
 	AddTracks(Vec<Track>),
 	Next,
 	Prev,
+	PlayIndex(usize),
 	SeekRelative(f64),
 	TogglePause,
 	UrlReady {

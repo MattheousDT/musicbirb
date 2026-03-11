@@ -73,6 +73,12 @@ impl Musicbirb {
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
+	pub fn play_index(&self, index: usize) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::PlayIndex(index))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
 	pub fn seek(&self, seconds: f64) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::SeekRelative(seconds))

@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
 	let api = SubsonicClient::new(&url, &user, &pass)?;
 	let player = Arc::new(MpvBackend::new()?);
 	let core = Musicbirb::new(api, player);
-	let mut state_rx = core.subscribe();
+	let state_rx = core.subscribe();
 
 	enable_raw_mode()?;
 	stdout().execute(EnterAlternateScreen)?;
