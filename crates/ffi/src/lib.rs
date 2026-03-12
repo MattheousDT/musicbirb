@@ -66,6 +66,23 @@ pub struct FfiTrack {
 }
 
 #[derive(uniffi::Record, Clone, Debug)]
+pub struct FfiAlbum {
+	pub id: String,
+	pub title: String,
+	pub artist: String,
+	pub cover_art_id: Option<String>,
+}
+
+#[derive(uniffi::Record, Clone, Debug)]
+pub struct FfiPlaylist {
+	pub id: String,
+	pub name: String,
+	pub song_count: u32,
+	pub duration_secs: u32,
+	pub cover_art_id: Option<String>,
+}
+
+#[derive(uniffi::Record, Clone, Debug)]
 pub struct FfiUiState {
 	pub queue: Vec<FfiTrack>,
 	pub queue_position: u32,
@@ -274,6 +291,87 @@ impl MusicbirbMobile {
 		});
 	}
 
+	pub async fn get_last_played(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.get_last_played_albums().await })
+			.await
+			.map_err(|e| FfiError::InitializationError(e.to_string()))?
+			.map(|albums| {
+				albums
+					.into_iter()
+					.map(|a| FfiAlbum {
+						id: a.id.0,
+						title: a.title,
+						artist: a.artist,
+						cover_art_id: a.cover_art.map(|c| c.0),
+					})
+					.collect()
+			})
+			.map_err(|e| FfiError::InitializationError(e.to_string()))
+	}
+
+	pub async fn get_recently_added(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.get_recently_added_albums().await })
+			.await
+			.map_err(|e| FfiError::InitializationError(e.to_string()))?
+			.map(|albums| {
+				albums
+					.into_iter()
+					.map(|a| FfiAlbum {
+						id: a.id.0,
+						title: a.title,
+						artist: a.artist,
+						cover_art_id: a.cover_art.map(|c| c.0),
+					})
+					.collect()
+			})
+			.map_err(|e| FfiError::InitializationError(e.to_string()))
+	}
+
+	pub async fn get_new_releases(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.get_newly_released_albums().await })
+			.await
+			.map_err(|e| FfiError::InitializationError(e.to_string()))?
+			.map(|albums| {
+				albums
+					.into_iter()
+					.map(|a| FfiAlbum {
+						id: a.id.0,
+						title: a.title,
+						artist: a.artist,
+						cover_art_id: a.cover_art.map(|c| c.0),
+					})
+					.collect()
+			})
+			.map_err(|e| FfiError::InitializationError(e.to_string()))
+	}
+
+	pub async fn get_playlists(&self) -> Result<Vec<FfiPlaylist>, FfiError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.get_playlists().await })
+			.await
+			.map_err(|e| FfiError::InitializationError(e.to_string()))?
+			.map(|playlists| {
+				playlists
+					.into_iter()
+					.map(|p| FfiPlaylist {
+						id: p.id.0,
+						name: p.name,
+						song_count: p.song_count,
+						duration_secs: p.duration_secs,
+						cover_art_id: p.cover_art.map(|c| c.0),
+					})
+					.collect()
+			})
+			.map_err(|e| FfiError::InitializationError(e.to_string()))
+	}
+
 	pub fn next(&self) {
 		let _ = self.core.next();
 	}
@@ -292,6 +390,10 @@ impl MusicbirbMobile {
 
 	pub fn seek(&self, seconds: f64) {
 		let _ = self.core.seek(seconds);
+	}
+
+	pub fn close(&self) {
+		self.core.shutdown();
 	}
 
 	pub fn get_ui_state(&self) -> FfiUiState {

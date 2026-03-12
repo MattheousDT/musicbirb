@@ -1,11 +1,13 @@
 use crate::error::MusicbirbError;
-use crate::models::{AlbumId, CoverArtId, PlaylistId, Track, TrackId};
+use crate::models::{Album, AlbumId, CoverArtId, Playlist, PlaylistId, Track, TrackId};
 use reqwest::StatusCode;
+use submarine::api::get_album_list::Order;
 use submarine::{Client, auth::AuthBuilder};
 
 pub struct SubsonicClient {
 	client: Client,
 	http_client: reqwest::Client,
+	username: String,
 }
 
 impl SubsonicClient {
@@ -20,6 +22,7 @@ impl SubsonicClient {
 		Ok(Self {
 			client,
 			http_client,
+			username: username.to_string(),
 		})
 	}
 
@@ -113,5 +116,87 @@ impl SubsonicClient {
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Scrobble failed: {}", e)))?;
 		Ok(())
+	}
+
+	pub async fn get_last_played_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		let list = self
+			.client
+			.get_album_list2(Order::Recent, Some(20), None, None::<String>)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get recent albums: {}", e)))?;
+
+		Ok(list.into_iter().map(Album::from).collect())
+	}
+
+	pub async fn get_recently_added_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		let list = self
+			.client
+			.get_album_list2(Order::Newest, Some(20), None, None::<String>)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get newest albums: {}", e)))?;
+		Ok(list.into_iter().map(Album::from).collect())
+	}
+
+	pub async fn get_newly_released_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		let list = self
+			.client
+			.get_album_list2_by_year(Some(9999), Some(0), Some(20), None, None::<String>)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get recent albums: {}", e)))?;
+		Ok(list.into_iter().map(Album::from).collect())
+	}
+
+	pub async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
+		let list = self
+			.client
+			.get_playlists(Some(&self.username))
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get playlists: {}", e)))?;
+		Ok(list.into_iter().map(Playlist::from).collect())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::env;
+
+	fn init_client() -> SubsonicClient {
+		dotenvy::dotenv().ok();
+		let url = env::var("SUBSONIC_URL").expect("SUBSONIC_URL not set");
+		let user = env::var("SUBSONIC_USER").expect("SUBSONIC_USER not set");
+		let pass = env::var("SUBSONIC_PASS").expect("SUBSONIC_PASS not set");
+		SubsonicClient::new(&url, &user, &pass).unwrap()
+	}
+
+	#[tokio::test]
+	async fn test_get_last_played() {
+		let client = init_client();
+		let albums = client.get_last_played_albums().await.unwrap();
+		println!("Last Played: {:?}", albums.len());
+		assert!(!albums.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_get_recently_added() {
+		let client = init_client();
+		let albums = client.get_recently_added_albums().await.unwrap();
+		println!("Recently Added: {:?}", albums.len());
+		assert!(!albums.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_newly_released() {
+		let client = init_client();
+		let albums = client.get_newly_released_albums().await.unwrap();
+		println!("Newly Released: {:?}", albums.len());
+		assert!(!albums.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_get_playlists() {
+		let client = init_client();
+		let playlists = client.get_playlists().await.unwrap();
+		println!("Playlists: {:?}", playlists.len());
 	}
 }

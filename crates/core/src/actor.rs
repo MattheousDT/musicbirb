@@ -82,7 +82,12 @@ impl CoreActor {
 
 		loop {
 			tokio::select! {
-				Some(msg) = rx.recv() => self.handle_message(msg, &player, &api, &tx, &state_tx).await,
+				msg = rx.recv() => {
+					match msg {
+						Some(CoreMessage::Shutdown) | None => break,
+						Some(m) => self.handle_message(m, &player, &api, &tx, &state_tx).await,
+					}
+				},
 				Some(event) = backend_rx.recv() => self.handle_backend_event(event, &player, &api, &tx, &state_tx).await,
 				_ = async {
 					if let Some(timer) = self.scrobble_timer.as_mut() {
@@ -106,6 +111,8 @@ impl CoreActor {
 				}
 			}
 		}
+
+		let _ = player.stop().await;
 	}
 
 	/// Commits the time elapsed since the last playback sync to the scrobble tracker.
@@ -154,7 +161,7 @@ impl CoreActor {
 				if p_state.status == PlayerStatus::Stopped {
 					if self.active_index.is_some() {
 						if self.queue_position + 1 < self.queue.len() {
-							self.advance_queue(player).await;
+							self.advance_queue(player, api, tx, state_tx).await;
 						} else {
 							self.reset_to_start(player, api, tx, state_tx).await;
 							return;
@@ -186,13 +193,25 @@ impl CoreActor {
 	}
 
 	/// Steps the queue forward when the backend has stopped naturally.
-	async fn advance_queue(&mut self, player: &Arc<dyn AudioBackend>) {
+	async fn advance_queue(
+		&mut self,
+		player: &Arc<dyn AudioBackend>,
+		api: &Arc<SubsonicClient>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+		state_tx: &watch::Sender<CoreState>,
+	) {
 		self.queue_position += 1;
 		self.active_index = None;
+		self.fetching_index = None;
 		self.preloading_index = None;
 		self.scrobble_timer = None;
 		self.auto_play = true;
+
+		let _ = player.stop().await;
 		let _ = player.clear_playlist().await;
+
+		self.sync_resources(api, tx, &player.get_state());
+		self.dispatch_state(&player.get_state(), state_tx);
 	}
 
 	/// Steps the queue forward when the backend has already started playing the next track in its buffer.
@@ -224,6 +243,7 @@ impl CoreActor {
 	) {
 		self.queue_position = 0;
 		self.active_index = None;
+		self.fetching_index = None;
 		self.preloading_index = None;
 		self.scrobble_timer = None;
 		self.auto_play = false;
@@ -249,6 +269,7 @@ impl CoreActor {
 		self.sync_scrobble_duration(&current_sync);
 
 		match msg {
+			CoreMessage::Shutdown => {}
 			CoreMessage::AddTracks(tracks) => {
 				self.queue.extend(tracks);
 				self.sync_resources(api, tx, &player.get_state());

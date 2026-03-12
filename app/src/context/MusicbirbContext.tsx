@@ -1,29 +1,30 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
 import {
-  useAudioPlaylist,
-  AudioPlaylist,
-  setAudioModeAsync,
-  AudioPlaylistStatus,
+	AudioPlaylist,
+	AudioPlaylistStatus,
+	setAudioModeAsync,
+	useAudioPlaylist,
 } from "expo-audio";
+import { Paths } from "expo-file-system";
 import {
-  AudioEngineDelegate,
-  FfiPlayerState,
-  FfiPlayerStatus,
-  FfiUiState,
-  MusicbirbMobile,
+	AudioEngineDelegate,
+	FfiPlayerState,
+	FfiPlayerStatus,
+	FfiUiState,
+	MusicbirbMobile,
 } from "musicbirb-ffi";
-import { Directory, Paths } from "expo-file-system";
+import React, {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 interface MusicbirbContextValue {
   uiState: FfiUiState | null;
   playlistStatus: AudioPlaylistStatus | null;
+  mobileClient: MusicbirbMobile | null;
   queueTrack: (id: string) => void;
   queueAlbum: (id: string) => void;
   queuePlaylist: (id: string) => void;
@@ -38,60 +39,77 @@ const MusicbirbContext = createContext<MusicbirbContextValue | null>(null);
 
 class DelegateImpl implements AudioEngineDelegate {
   private lastKnownCount = 0;
+  private isDestroyed = false;
 
   constructor(
     private playlist: AudioPlaylist,
     private onUpdate: () => void,
   ) {}
 
+  destroy() {
+    this.isDestroyed = true;
+  }
+
   play() {
+    if (this.isDestroyed) return;
     this.playlist.play();
   }
   pause() {
+    if (this.isDestroyed) return;
     this.playlist.pause();
   }
   togglePause() {
+    if (this.isDestroyed) return;
     this.playlist.playing ? this.playlist.pause() : this.playlist.play();
   }
   stop() {
+    if (this.isDestroyed) return;
     this.playlist.pause();
     this.playlist.seekTo(0);
   }
 
   add(url: string) {
+    if (this.isDestroyed) return;
     this.playlist.add({ uri: url });
     this.lastKnownCount++;
     this.onUpdate();
   }
 
   insert(url: string, index: number) {
+    if (this.isDestroyed) return;
     this.playlist.insert({ uri: url }, index);
     this.lastKnownCount++;
     this.onUpdate();
   }
 
   removeIndex(index: number) {
+    if (this.isDestroyed) return;
     this.playlist.remove(index);
     this.lastKnownCount = Math.max(0, this.lastKnownCount - 1);
     this.onUpdate();
   }
 
   clearPlaylist() {
+    if (this.isDestroyed) return;
     this.playlist.clear();
     this.lastKnownCount = 0;
     this.onUpdate();
   }
 
   playIndex(index: number) {
+    if (this.isDestroyed) return;
     this.playlist.skipTo(index);
   }
   seekRelative(seconds: number) {
+    if (this.isDestroyed) return;
     this.playlist.seekTo(this.playlist.currentTime + seconds);
   }
   seekAbsolute(seconds: number) {
+    if (this.isDestroyed) return;
     this.playlist.seekTo(seconds);
   }
   setVolume(volume: number) {
+    if (this.isDestroyed) return;
     this.playlist.volume = volume;
   }
   getVolume() {
@@ -116,8 +134,12 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
   const [uiState, setUiState] = useState<FfiUiState | null>(null);
   const [playlistStatus, setPlaylistStatus] =
     useState<AudioPlaylistStatus | null>(null);
+  const [mobileClient, setMobileClient] = useState<MusicbirbMobile | null>(
+    null,
+  );
   const playlist = useAudioPlaylist({ loop: "none" });
   const mobileRef = useRef<MusicbirbMobile | null>(null);
+  const delegateRef = useRef<DelegateImpl | null>(null);
   const isProcessingDelegateCall = useRef(false);
 
   const updateUiState = useCallback(() => {
@@ -148,6 +170,7 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
     if (url && user && pass) {
       try {
         const delegate = new DelegateImpl(playlist, wrappedOnUpdate);
+        delegateRef.current = delegate;
 
         // This is yuck but for some reason directories in Rust are brokey on Android
         // So let's prop-drill baby drill
@@ -162,6 +185,7 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
           cacheDir,
           delegate,
         );
+        setMobileClient(mobileRef.current);
         updateUiState();
       } catch (e) {
         console.error("FFI Initialization Error:", e);
@@ -169,6 +193,7 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
     }
 
     return () => {
+      delegateRef.current?.destroy();
       mobileRef.current?.uniffiDestroy();
       mobileRef.current = null;
     };
@@ -201,13 +226,14 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
       sub.remove();
       trackSub.remove();
     };
-  }, [playlist, updateUiState]);
+  }, [playlist, updateUiState, mobileClient]);
 
   return (
     <MusicbirbContext.Provider
       value={{
         uiState,
         playlistStatus,
+        mobileClient,
         queueTrack: (id) => mobileRef.current?.queueTrack(id),
         queueAlbum: (id) => mobileRef.current?.queueAlbum(id),
         queuePlaylist: (id) => mobileRef.current?.queuePlaylist(id),

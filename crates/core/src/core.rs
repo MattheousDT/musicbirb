@@ -2,14 +2,14 @@ use crate::actor::CoreActor;
 use crate::api::subsonic::SubsonicClient;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
-use crate::models::{AlbumId, PlaylistId, TrackId};
+use crate::models::{Album, AlbumId, Playlist, PlaylistId, TrackId};
 use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 pub struct Musicbirb {
-	api: Arc<SubsonicClient>,
+	pub api: Arc<SubsonicClient>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
 }
@@ -39,12 +39,17 @@ impl Musicbirb {
 
 		let actor = CoreActor::new(data_dir, cache_dir);
 		let api_clone = Arc::clone(&api_arc);
+		let tx_clone = tx.clone();
 
 		tokio::spawn(async move {
-			actor.run(rx, tx, state_tx, api_clone, player).await;
+			actor.run(rx, tx_clone, state_tx, api_clone, player).await;
 		});
 
 		core
+	}
+
+	pub fn shutdown(&self) {
+		let _ = self.tx.send(CoreMessage::Shutdown);
 	}
 
 	pub async fn queue_track(&self, id: &TrackId) -> Result<(), MusicbirbError> {
@@ -71,6 +76,22 @@ impl Musicbirb {
 			.send(CoreMessage::AddTracks(tracks))
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 		Ok(count)
+	}
+
+	pub async fn get_last_played_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		self.api.get_last_played_albums().await
+	}
+
+	pub async fn get_recently_added_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		self.api.get_recently_added_albums().await
+	}
+
+	pub async fn get_newly_released_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+		self.api.get_newly_released_albums().await
+	}
+
+	pub async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
+		self.api.get_playlists().await
 	}
 
 	pub fn next(&self) -> Result<(), MusicbirbError> {

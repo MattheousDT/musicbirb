@@ -1,16 +1,21 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  PanResponder,
-  LayoutRectangle,
+	LayoutRectangle,
+	PanResponder,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 import { useMusicbirb } from "../context/MusicbirbContext";
 
 export function ProgressBar() {
   const { playlistStatus, uiState, seek } = useMusicbirb();
-  const currentTrack = uiState?.queue[uiState.queuePosition];
+
+  const currentTrack = useMemo(
+    () => uiState?.queue[uiState.queuePosition],
+    [uiState?.queue, uiState?.queuePosition],
+  );
+
   const trackLayout = useRef<LayoutRectangle | null>(null);
 
   const [isSeeking, setIsSeeking] = useState(false);
@@ -20,7 +25,6 @@ export function ProgressBar() {
   const actualProgress =
     duration > 0 ? ((playlistStatus?.currentTime || 0) / duration) * 100 : 0;
 
-  // Calculate visual progress based on gesture X relative to component width
   let displayProgress = actualProgress;
   if (isSeeking && trackLayout.current) {
     const relativeX = Math.max(

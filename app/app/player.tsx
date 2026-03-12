@@ -1,30 +1,38 @@
+import { PlayerControls } from "@/components/PlayerControls";
+import { ProgressBar } from "@/components/ProgressBar";
+import { QueueList } from "@/components/QueueList";
+import { useMusicbirb } from "@/context/MusicbirbContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Animated,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+	Animated,
+	Modal,
+	Platform,
+	Pressable,
+	StyleSheet,
+	Text,
+	View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PlayerControls } from "../components/PlayerControls";
-import { ProgressBar } from "../components/ProgressBar";
-import { QueueList } from "../components/QueueList";
-import { useMusicbirb } from "../context/MusicbirbContext";
 
-export function PlayerScreen() {
+export default function PlayerScreen() {
   const { uiState } = useMusicbirb();
   const [isQueueOpen, setQueueOpen] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(1));
 
-  const currentTrack = uiState?.queue[uiState.queuePosition];
-  const coverUrl = currentTrack?.coverArtId
-    ? `${process.env.EXPO_PUBLIC_SUBSONIC_URL}/rest/getCoverArt?id=${currentTrack.coverArtId}&u=${process.env.EXPO_PUBLIC_SUBSONIC_USER}&p=${process.env.EXPO_PUBLIC_SUBSONIC_PASS}&v=1.16.1&c=musicbirb`
-    : null;
+  const currentTrack = useMemo(
+    () => uiState?.queue[uiState.queuePosition],
+    [uiState?.queue, uiState?.queuePosition],
+  );
+
+  const coverUrl = useMemo(
+    () =>
+      currentTrack?.coverArtId
+        ? `${process.env.EXPO_PUBLIC_SUBSONIC_URL}/rest/getCoverArt?id=${currentTrack.coverArtId}&u=${process.env.EXPO_PUBLIC_SUBSONIC_USER}&p=${process.env.EXPO_PUBLIC_SUBSONIC_PASS}&v=1.16.1&c=musicbirb`
+        : null,
+    [currentTrack?.coverArtId],
+  );
 
   const handleOpenQueue = () => {
     setQueueOpen(true);
@@ -51,9 +59,6 @@ export function PlayerScreen() {
       >
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.header}>
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>Musicbirb</Text>
-            </View>
             <Pressable onPress={handleOpenQueue} style={styles.queueBtn}>
               <Ionicons name="list" size={24} color="#1e293b" />
             </Pressable>
@@ -64,9 +69,7 @@ export function PlayerScreen() {
               <View style={styles.shadow}>
                 <Image
                   source={
-                    coverUrl
-                      ? { uri: coverUrl }
-                      : require("../../assets/icon.png")
+                    coverUrl ? { uri: coverUrl } : require("../assets/icon.png")
                   }
                   style={styles.artwork}
                   contentFit="cover"
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc", overflow: "hidden" },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
     paddingHorizontal: 24,
     paddingVertical: 16,

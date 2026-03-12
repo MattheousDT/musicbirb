@@ -37,6 +37,7 @@ impl Default for CoreState {
 }
 
 pub enum CoreMessage {
+	Shutdown,
 	AddTracks(Vec<Track>),
 	Next,
 	Prev,

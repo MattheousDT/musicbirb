@@ -1,16 +1,23 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMusicbirb } from "../context/MusicbirbContext";
 
 export function QueueList() {
   const { uiState, playIndex } = useMusicbirb();
   const listRef = useRef<FlatList>(null);
-  const queue = uiState?.queue || [];
-  const currentIdx = uiState?.queuePosition || 0;
+
+  const currentIdx = useMemo(
+    () => uiState?.queuePosition ?? 0,
+    [uiState?.queuePosition],
+  );
 
   useEffect(() => {
     setTimeout(() => {
-      if (listRef.current && currentIdx >= 0 && currentIdx < queue.length) {
+      if (
+        listRef.current &&
+        currentIdx >= 0 &&
+        currentIdx < (uiState?.queue.length ?? 0)
+      ) {
         listRef.current.scrollToIndex({
           index: currentIdx,
           animated: false,
@@ -23,7 +30,7 @@ export function QueueList() {
   return (
     <FlatList
       ref={listRef}
-      data={queue}
+      data={uiState?.queue}
       keyExtractor={(item, idx) => `${item.id}-${idx}`}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 40 }}
