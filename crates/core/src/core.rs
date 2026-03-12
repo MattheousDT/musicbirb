@@ -4,6 +4,7 @@ use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
 use crate::models::{AlbumId, PlaylistId, TrackId};
 use crate::state::{CoreMessage, CoreState};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
@@ -15,6 +16,17 @@ pub struct Musicbirb {
 
 impl Musicbirb {
 	pub fn new(api: SubsonicClient, player: Arc<dyn AudioBackend>) -> Arc<Self> {
+		Self::with_paths(api, player, None, None)
+	}
+
+	pub fn with_paths(
+		api: SubsonicClient,
+		player: Arc<dyn AudioBackend>,
+		// I shouldn't need these but Android paths are brokey in rust
+		// Prop-drill baby drill!
+		data_dir: Option<PathBuf>,
+		cache_dir: Option<PathBuf>,
+	) -> Arc<Self> {
 		let (tx, rx) = mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(CoreState::default());
 		let api_arc = Arc::new(api);
@@ -25,7 +37,7 @@ impl Musicbirb {
 			state_rx,
 		});
 
-		let actor = CoreActor::new();
+		let actor = CoreActor::new(data_dir, cache_dir);
 		let api_clone = Arc::clone(&api_arc);
 
 		tokio::spawn(async move {

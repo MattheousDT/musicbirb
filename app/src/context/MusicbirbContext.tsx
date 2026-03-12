@@ -19,6 +19,7 @@ import {
   FfiUiState,
   MusicbirbMobile,
 } from "musicbirb-ffi";
+import { Directory, Paths } from "expo-file-system";
 
 interface MusicbirbContextValue {
   uiState: FfiUiState | null;
@@ -145,9 +146,26 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
     const pass = process.env.EXPO_PUBLIC_SUBSONIC_PASS || "";
 
     if (url && user && pass) {
-      const delegate = new DelegateImpl(playlist, wrappedOnUpdate);
-      mobileRef.current = new MusicbirbMobile(url, user, pass, delegate);
-      updateUiState();
+      try {
+        const delegate = new DelegateImpl(playlist, wrappedOnUpdate);
+
+        // This is yuck but for some reason directories in Rust are brokey on Android
+        // So let's prop-drill baby drill
+        const dataDir = Paths.document.uri.replace(/^file:\/\//, "") || "";
+        const cacheDir = Paths.cache.uri.replace(/^file:\/\//, "") || "";
+
+        mobileRef.current = new MusicbirbMobile(
+          url,
+          user,
+          pass,
+          dataDir,
+          cacheDir,
+          delegate,
+        );
+        updateUiState();
+      } catch (e) {
+        console.error("FFI Initialization Error:", e);
+      }
     }
 
     return () => {

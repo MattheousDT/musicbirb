@@ -5,6 +5,7 @@ use crate::models::{CoverArtId, Track};
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
 use crate::state::{CoreMessage, CoreState, PlaybackSync};
 use image::DynamicImage;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{mpsc, watch};
@@ -37,7 +38,7 @@ pub struct CoreActor {
 
 impl CoreActor {
 	/// Creates a new CoreActor instance with default state and initialized scrobble managers.
-	pub fn new() -> Self {
+	pub fn new(data_dir: Option<PathBuf>, cache_dir: Option<PathBuf>) -> Self {
 		Self {
 			queue: Vec::new(),
 			queue_position: 0,
@@ -45,12 +46,12 @@ impl CoreActor {
 			fetching_index: None,
 			preloading_index: None,
 
-			art_cache: ArtCache::new(),
+			art_cache: ArtCache::new(cache_dir),
 			current_art_id: None,
 			current_art: None,
 
 			scrobble_tracker: ScrobbleTracker::new(),
-			scrobble_manager: Arc::new(Mutex::new(ScrobbleManager::new())),
+			scrobble_manager: Arc::new(Mutex::new(ScrobbleManager::new(data_dir))),
 			scrobble_timer: None,
 			scrobble_flush_timer: Some(Box::pin(sleep(std::time::Duration::from_secs(60)))),
 

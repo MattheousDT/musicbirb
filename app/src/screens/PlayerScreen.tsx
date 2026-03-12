@@ -1,19 +1,20 @@
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Modal,
   Animated,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
-import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
-import { useMusicbirb } from "../context/MusicbirbContext";
-import { ProgressBar } from "../components/ProgressBar";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { PlayerControls } from "../components/PlayerControls";
+import { ProgressBar } from "../components/ProgressBar";
 import { QueueList } from "../components/QueueList";
+import { useMusicbirb } from "../context/MusicbirbContext";
 
 export function PlayerScreen() {
   const { uiState } = useMusicbirb();
@@ -92,18 +93,20 @@ export function PlayerScreen() {
       <Modal
         visible={isQueueOpen}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
         onRequestClose={handleCloseQueue}
       >
         <View style={styles.modal}>
-          <View style={styles.handle} />
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Queue</Text>
-            <Pressable onPress={handleCloseQueue} style={styles.closeBtn}>
-              <Ionicons name="close-circle" size={32} color="#cbd5e1" />
-            </Pressable>
-          </View>
-          <QueueList />
+          <SafeAreaView>
+            {Platform.OS === "ios" && <View style={styles.handle} />}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Queue</Text>
+              <Pressable onPress={handleCloseQueue} style={styles.closeBtn}>
+                <Ionicons name="close-circle" size={32} color="#cbd5e1" />
+              </Pressable>
+            </View>
+            <QueueList />
+          </SafeAreaView>
         </View>
       </Modal>
     </View>
@@ -111,7 +114,7 @@ export function PlayerScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#ffffff" },
+  root: { flex: 1, backgroundColor: "#f8fafc" },
   container: { flex: 1, backgroundColor: "#f8fafc", overflow: "hidden" },
   header: {
     flexDirection: "row",

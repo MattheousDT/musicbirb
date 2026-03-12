@@ -17,9 +17,11 @@ pub struct ScrobbleManager {
 }
 
 impl ScrobbleManager {
-	pub fn new() -> Self {
-		let file_path = if let Some(proj_dirs) = ProjectDirs::from("com", "musicbirb", "musicbirb")
-		{
+	pub fn new(data_dir: Option<PathBuf>) -> Self {
+		let file_path = if let Some(dir) = data_dir {
+			let _ = fs::create_dir_all(&dir);
+			dir.join("scrobbles.json")
+		} else if let Some(proj_dirs) = ProjectDirs::from("com", "musicbirb", "musicbirb") {
 			let dir = proj_dirs.data_dir();
 			let _ = fs::create_dir_all(dir);
 			dir.join("scrobbles.json")
@@ -67,7 +69,7 @@ impl ScrobbleManager {
 
 impl Default for ScrobbleManager {
 	fn default() -> Self {
-		Self::new()
+		Self::new(None)
 	}
 }
 

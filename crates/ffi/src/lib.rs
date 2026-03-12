@@ -6,11 +6,18 @@ use musicbirb::{
 	SubsonicClient, TrackId,
 };
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 lazy_static! {
 	static ref RUNTIME: tokio::runtime::Runtime =
 		tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+}
+
+#[derive(Error, Debug, uniffi::Error)]
+pub enum FfiError {
+	#[error("Initialization error: {0}")]
+	InitializationError(String),
 }
 
 #[derive(uniffi::Enum, Clone, Copy, Debug)]
@@ -207,13 +214,16 @@ impl MusicbirbMobile {
 		url: String,
 		user: String,
 		pass: String,
+		data_dir: String,
+		cache_dir: String,
 		delegate: Box<dyn AudioEngineDelegate>,
-	) -> Arc<Self> {
+	) -> Result<Arc<Self>, FfiError> {
 		let _guard = RUNTIME.enter();
 
-		let api = SubsonicClient::new(&url, &user, &pass).unwrap();
-		let shared_tx = Arc::new(Mutex::new(None));
+		let api = SubsonicClient::new(&url, &user, &pass)
+			.map_err(|e| FfiError::InitializationError(e.to_string()))?;
 
+		let shared_tx = Arc::new(Mutex::new(None));
 		let backend = Arc::new(MobileBackend {
 			delegate,
 			tx: Arc::clone(&shared_tx),
@@ -223,8 +233,20 @@ impl MusicbirbMobile {
 			tx: Arc::clone(&shared_tx),
 		});
 
-		let core = Musicbirb::new(api, backend);
-		Arc::new(Self { core, event_target })
+		// Parse the injected directory paths
+		let data_dir_opt = if data_dir.is_empty() {
+			None
+		} else {
+			Some(std::path::PathBuf::from(data_dir))
+		};
+		let cache_dir_opt = if cache_dir.is_empty() {
+			None
+		} else {
+			Some(std::path::PathBuf::from(cache_dir))
+		};
+
+		let core = Musicbirb::with_paths(api, backend, data_dir_opt, cache_dir_opt);
+		Ok(Arc::new(Self { core, event_target }))
 	}
 
 	pub fn get_event_target(&self) -> Arc<AudioEventTarget> {

@@ -12,19 +12,16 @@
     "expo": "~55.0.5",
     "expo-audio": "~55.0.8",
     "expo-dev-client": "~55.0.13",
+    "expo-file-system": "~55.0.10",
     "expo-image": "~55.0.6",
     "expo-status-bar": "~55.0.4",
     "musicbirb-ffi": "workspace:*",
     "react": "19.2.0",
     "react-native": "0.83.2",
-    "react-native-reanimated": "^4.2.2",
     "react-native-safe-area-context": "^5.7.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "babel-preset-expo": "^55.0.11",
-    "prettier-plugin-tailwindcss": "^0.5.14",
-    "tailwindcss": "^3.4.19",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.musicbirb"
+      "bundleIdentifier": "com.musicbirb.musicbirb"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +33,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.anonymous.musicbirb"
+      "package": "com.musicbirb.musicbirb"
     },
     "web": {
       "favicon": "./assets/favicon.png"
