@@ -14,10 +14,7 @@ import {
 	Text,
 	View,
 } from "react-native";
-import {
-	SafeAreaView,
-	useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PlayerScreen() {
 	const { uiState } = useMusicbirb();

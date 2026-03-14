@@ -8,9 +8,4 @@ edition = "2024"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-async-trait = "0.1"
-lazy_static = "1.5.0"
 musicbirb = { path = "../core", features = ["ffi"] }
-thiserror = "2.0.18"
-tokio = { version = "1.50.0", features = ["rt-multi-thread"] }
-uniffi = { version = "0.30.0", features = ["tokio"] }

@@ -1,6 +1,6 @@
-import React from "react";
-import { View, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useMusicbirb } from "../context/MusicbirbContext";
 
 export function PlayerControls() {

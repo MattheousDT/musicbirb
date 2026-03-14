@@ -10,8 +10,9 @@ import {
 	FfiPlayerState,
 	PlayerStatus,
 	UiState,
-	MusicbirbMobile,
+	MusicbirbInterface,
 	StateObserver,
+	initClient, // <-- Using the freestanding synchronous function
 } from "musicbirb-ffi";
 import React, {
 	createContext,
@@ -24,7 +25,7 @@ import React, {
 interface MusicbirbContextValue {
 	uiState: UiState | null;
 	playlistStatus: AudioPlaylistStatus | null;
-	mobileClient: MusicbirbMobile | null;
+	core: MusicbirbInterface | null;
 	isBuffering: boolean;
 
 	// Appends to queue
@@ -143,9 +144,7 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 	const [uiState, setUiState] = useState<UiState | null>(null);
 	const [playlistStatus, setPlaylistStatus] =
 		useState<AudioPlaylistStatus | null>(null);
-	const [mobileClient, setMobileClient] = useState<MusicbirbMobile | null>(
-		null,
-	);
+	const [core, setCore] = useState<MusicbirbInterface | null>(null);
 
 	const playlist = useAudioPlaylist({ loop: "none" });
 	const delegateRef = useRef<DelegateImpl | null>(null);
@@ -161,8 +160,6 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 		const user = process.env.EXPO_PUBLIC_SUBSONIC_USER || "";
 		const pass = process.env.EXPO_PUBLIC_SUBSONIC_PASS || "";
 
-		let initializedClient: MusicbirbMobile | null = null;
-
 		if (url && user && pass) {
 			try {
 				const delegate = new DelegateImpl(playlist);
@@ -172,7 +169,8 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 				const dataDir = Paths.document.uri.replace(/^file:\/\//, "") || "";
 				const cacheDir = Paths.cache.uri.replace(/^file:\/\//, "") || "";
 
-				initializedClient = new MusicbirbMobile(
+				// Synchronous boot resolves all Tokio context panic issues immediately
+				const initialisedCore = initClient(
 					url,
 					user,
 					pass,
@@ -181,7 +179,8 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 					delegate,
 					observer,
 				);
-				setMobileClient(initializedClient);
+
+				setCore(initialisedCore);
 			} catch (e) {
 				console.error("FFI Initialization Error:", e);
 			}
@@ -189,13 +188,12 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 
 		return () => {
 			delegateRef.current?.destroy();
-			initializedClient?.uniffiDestroy();
 		};
 	}, [playlist]);
 
 	useEffect(() => {
-		if (!mobileClient) return;
-		const target = mobileClient.getEventTarget();
+		if (!core) return;
+		const target = core.getEventTarget();
 
 		const sub = playlist.addListener("playlistStatusUpdate", (status) => {
 			setPlaylistStatus(status);
@@ -221,7 +219,7 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 			sub.remove();
 			trackSub.remove();
 		};
-	}, [playlist, mobileClient]);
+	}, [playlist, core]);
 
 	const isBuffering = uiState?.status === PlayerStatus.Buffering;
 
@@ -230,29 +228,29 @@ export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
 			value={{
 				uiState,
 				playlistStatus,
-				mobileClient,
+				core,
 				isBuffering,
 
 				queueTrack: async (id) => {
-					await mobileClient?.queueTrack(id);
+					await core?.queueTrack(id);
 				},
-				queueAlbum: async (id) => mobileClient?.queueAlbum(id) ?? 0,
-				queuePlaylist: async (id) => mobileClient?.queuePlaylist(id) ?? 0,
+				queueAlbum: async (id) => core?.queueAlbum(id) ?? 0,
+				queuePlaylist: async (id) => core?.queuePlaylist(id) ?? 0,
 
 				playTrack: async (id) => {
-					await mobileClient?.playTrack(id);
+					await core?.playTrack(id);
 				},
-				playAlbum: async (id) => mobileClient?.playAlbum(id) ?? 0,
-				playPlaylist: async (id) => mobileClient?.playPlaylist(id) ?? 0,
+				playAlbum: async (id) => core?.playAlbum(id) ?? 0,
+				playPlaylist: async (id) => core?.playPlaylist(id) ?? 0,
 
-				clearQueue: () => mobileClient?.clearQueue(),
-				removeIndex: (idx) => mobileClient?.removeIndex(idx),
+				clearQueue: () => core?.clearQueue(),
+				removeIndex: (idx) => core?.removeIndex(idx),
 
-				togglePause: () => mobileClient?.togglePause(),
-				next: () => mobileClient?.next(),
-				prev: () => mobileClient?.prev(),
-				seek: (s) => mobileClient?.seek(s),
-				playIndex: (idx) => mobileClient?.playIndex(idx),
+				togglePause: () => core?.togglePause(),
+				next: () => core?.next(),
+				prev: () => core?.prev(),
+				seek: (s) => core?.seek(s),
+				playIndex: (idx) => core?.playIndex(idx),
 			}}
 		>
 			{children}

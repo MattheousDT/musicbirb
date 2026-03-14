@@ -36,8 +36,8 @@ impl Default for CoreState {
 	}
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg(feature = "ffi")]
+#[derive(uniffi::Record, Debug, Clone)]
 pub struct UiState {
 	pub queue: Vec<Track>,
 	pub queue_position: u32,

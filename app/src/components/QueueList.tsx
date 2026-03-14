@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import {
-	VirtualizedList,
 	Pressable,
 	StyleSheet,
 	Text,
 	View,
+	VirtualizedList,
 } from "react-native";
 import { useMusicbirb } from "../context/MusicbirbContext";
 

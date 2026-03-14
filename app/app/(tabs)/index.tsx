@@ -2,9 +2,9 @@ import { PaginatedList } from "@/components/PaginatedList";
 import { useMusicbirb } from "@/context/MusicbirbContext";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import { Album } from "musicbirb-ffi";
 import React from "react";
 import {
-	Dimensions,
 	FlatList,
 	Pressable,
 	ScrollView,
@@ -14,49 +14,47 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get("window");
-
 export default function HomeScreen() {
-	const { mobileClient, playAlbum, playPlaylist } = useMusicbirb();
+	const { core, playAlbum, playPlaylist } = useMusicbirb();
 
-	const { data: lastPlayed } = useQuery({
+	const { data: lastPlayed, isLoading: lastPlayedLoading } = useQuery({
 		queryKey: ["lastPlayed"],
 		queryFn: async () => {
-			if (!mobileClient) return [];
-			return await mobileClient.getLastPlayedAlbums();
+			if (!core) return [];
+			return await core.getLastPlayedAlbums();
 		},
-		enabled: !!mobileClient,
+		enabled: !!core,
 		throwOnError: true,
 	});
 
-	const { data: recentlyAdded } = useQuery({
+	const { data: recentlyAdded, isLoading: recentlyAddedLoading } = useQuery({
 		queryKey: ["recentlyAdded"],
 		queryFn: async () => {
-			if (!mobileClient) return [];
-			return await mobileClient.getRecentlyAddedAlbums();
+			if (!core) return [];
+			return await core.getRecentlyAddedAlbums();
 		},
-		enabled: !!mobileClient,
+		enabled: !!core,
 	});
 
 	const { data: newReleases } = useQuery({
 		queryKey: ["newReleases"],
 		queryFn: async () => {
-			if (!mobileClient) return [];
-			return await mobileClient.getNewReleases();
+			if (!core) return [];
+			return await core.getNewlyReleasedAlbums();
 		},
-		enabled: !!mobileClient,
+		enabled: !!core,
 	});
 
 	const { data: playlists } = useQuery({
 		queryKey: ["playlists"],
 		queryFn: async () => {
-			if (!mobileClient) return [];
-			return await mobileClient.getPlaylists();
+			if (!core) return [];
+			return await core.getPlaylists();
 		},
-		enabled: !!mobileClient,
+		enabled: !!core,
 	});
 
-	const renderAlbum = ({ item }: { item: any }) => {
+	const renderAlbum = ({ item }: { item: Album }) => {
 		const coverUrl = item.coverArt
 			? `${process.env.EXPO_PUBLIC_SUBSONIC_URL}/rest/getCoverArt?id=${item.coverArt}&u=${process.env.EXPO_PUBLIC_SUBSONIC_USER}&p=${process.env.EXPO_PUBLIC_SUBSONIC_PASS}&v=1.16.1&c=musicbirb`
 			: null;
@@ -76,6 +74,20 @@ export default function HomeScreen() {
 					{item.artist}
 				</Text>
 			</Pressable>
+		);
+	};
+
+	const renderPlaceholderAlbum = () => {
+		return (
+			<View style={styles.albumCard}>
+				<View style={styles.albumArt} />
+				<Text numberOfLines={1} style={styles.albumTitle}>
+					{/**/}
+				</Text>
+				<Text numberOfLines={1} style={styles.albumArtist}>
+					{/**/}
+				</Text>
+			</View>
 		);
 	};
 
@@ -120,28 +132,56 @@ export default function HomeScreen() {
 				<Text style={styles.header}>Home</Text>
 
 				<Text style={styles.sectionTitle}>Last Played</Text>
-				<FlatList
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					data={lastPlayed}
-					keyExtractor={(item) => item.id}
-					renderItem={renderAlbum}
-					contentContainerStyle={styles.carousel}
-					snapToInterval={140 + 16}
-					decelerationRate="fast"
-				/>
+				{lastPlayedLoading ? (
+					<FlatList
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						data={Array(5)}
+						keyExtractor={(_, i) => `lp-${i}`}
+						renderItem={renderPlaceholderAlbum}
+						contentContainerStyle={styles.carousel}
+						snapToInterval={140 + 16}
+						decelerationRate="fast"
+						scrollEnabled={false}
+					/>
+				) : (
+					<FlatList
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						data={lastPlayed}
+						keyExtractor={(item) => item.id}
+						renderItem={renderAlbum}
+						contentContainerStyle={styles.carousel}
+						snapToInterval={140 + 16}
+						decelerationRate="fast"
+					/>
+				)}
 
 				<Text style={styles.sectionTitle}>Recently Added</Text>
-				<FlatList
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					data={recentlyAdded}
-					keyExtractor={(item) => item.id}
-					renderItem={renderAlbum}
-					contentContainerStyle={styles.carousel}
-					snapToInterval={140 + 16}
-					decelerationRate="fast"
-				/>
+				{recentlyAddedLoading ? (
+					<FlatList
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						data={Array(5)}
+						keyExtractor={(_, i) => `ra-${i}`}
+						renderItem={renderPlaceholderAlbum}
+						contentContainerStyle={styles.carousel}
+						snapToInterval={140 + 16}
+						decelerationRate="fast"
+						scrollEnabled={false}
+					/>
+				) : (
+					<FlatList
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						data={recentlyAdded}
+						keyExtractor={(item) => item.id}
+						renderItem={renderAlbum}
+						contentContainerStyle={styles.carousel}
+						snapToInterval={140 + 16}
+						decelerationRate="fast"
+					/>
+				)}
 
 				<Text style={styles.sectionTitle}>New Releases</Text>
 				<PaginatedList

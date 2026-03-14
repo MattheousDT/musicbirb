@@ -1,5 +1,14 @@
 #[cfg(feature = "ffi")]
-uniffi::setup_scaffolding!("musicbirb");
+uniffi::setup_scaffolding!("musicbirb_ffi");
+#[cfg(feature = "ffi")]
+use lazy_static::lazy_static;
+#[cfg(feature = "ffi")]
+lazy_static! {
+	pub static ref RUNTIME: tokio::runtime::Runtime =
+		tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+}
+#[cfg(feature = "ffi")]
+pub mod ffi;
 
 pub mod actor;
 pub mod api;
