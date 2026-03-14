@@ -46,3 +46,6 @@ yarn-error.*
 app-ffi/*
 !app-ffi/package.json
 !app-ffi/*.yaml
+
+# Expo CLI keeps creating this
+app/.gitignore

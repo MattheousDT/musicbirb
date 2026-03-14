@@ -8,6 +8,7 @@ use image::DynamicImage;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tokio::sync::{mpsc, watch};
 use tokio::time::{Sleep, sleep};
 
@@ -31,6 +32,7 @@ pub struct CoreActor {
 	scrobble_flush_timer: Option<Pin<Box<Sleep>>>,
 
 	auto_play: bool,
+	last_track_start_time: Instant,
 
 	#[cfg(feature = "os-media-controls")]
 	mpris: Option<MprisManager>,
@@ -56,6 +58,7 @@ impl CoreActor {
 			scrobble_flush_timer: Some(Box::pin(sleep(std::time::Duration::from_secs(60)))),
 
 			auto_play: true,
+			last_track_start_time: Instant::now(),
 
 			#[cfg(feature = "os-media-controls")]
 			mpris: None,
@@ -187,6 +190,15 @@ impl CoreActor {
 			}
 			BackendEvent::EndOfTrack => {
 				self.scrobble_timer = None;
+
+				if self.active_index.is_some() && self.last_track_start_time.elapsed().as_secs() > 2
+				{
+					if self.queue_position + 1 < self.queue.len() {
+						self.advance_queue(player, api, tx, state_tx).await;
+					} else {
+						self.reset_to_start(player, api, tx, state_tx).await;
+					}
+				}
 			}
 		}
 		self.sync_resources(api, tx, &player.get_state());
@@ -274,6 +286,92 @@ impl CoreActor {
 				self.queue.extend(tracks);
 				self.sync_resources(api, tx, &player.get_state());
 				self.dispatch_state(&player.get_state(), state_tx);
+			}
+			CoreMessage::ReplaceTracks(tracks) => {
+				self.queue = tracks;
+				self.queue_position = 0;
+				self.active_index = None;
+				self.fetching_index = None;
+				self.preloading_index = None;
+				self.scrobble_timer = None;
+				self.auto_play = true;
+
+				let _ = player.stop().await;
+				let _ = player.clear_playlist().await;
+
+				let p_state = player.get_state();
+				self.sync_resources(api, tx, &p_state);
+				self.dispatch_state(&p_state, state_tx);
+			}
+			CoreMessage::ClearQueue => {
+				self.queue.clear();
+				self.queue_position = 0;
+				self.active_index = None;
+				self.fetching_index = None;
+				self.preloading_index = None;
+				self.scrobble_timer = None;
+				self.auto_play = false;
+
+				let _ = player.stop().await;
+				let _ = player.clear_playlist().await;
+
+				let p_state = player.get_state();
+				self.sync_resources(api, tx, &p_state);
+				self.dispatch_state(&p_state, state_tx);
+			}
+			CoreMessage::RemoveIndex(idx) => {
+				if idx >= self.queue.len() {
+					return;
+				}
+
+				self.queue.remove(idx);
+
+				if idx < self.queue_position {
+					// We removed an earlier track, decrement our tracking indexes to match the shift
+					self.queue_position -= 1;
+					if let Some(ref mut a) = self.active_index {
+						*a -= 1;
+					}
+					if let Some(ref mut f) = self.fetching_index {
+						*f -= 1;
+					}
+					if let Some(ref mut p) = self.preloading_index {
+						*p -= 1;
+					}
+				} else if idx == self.queue_position {
+					// We removed the currently playing track! Hard stop and load whatever is now at this position.
+					self.active_index = None;
+					self.fetching_index = None;
+					self.preloading_index = None;
+					self.scrobble_timer = None;
+
+					let _ = player.stop().await;
+					let _ = player.clear_playlist().await;
+
+					if self.queue_position >= self.queue.len() {
+						if self.queue.is_empty() {
+							self.queue_position = 0;
+						} else {
+							self.queue_position = self.queue.len() - 1;
+						}
+					}
+				} else {
+					// We removed a future track. If it was the one currently preloaded in gapless memory, evict it.
+					if Some(idx) == self.preloading_index {
+						self.preloading_index = None;
+						if player.get_state().playlist_count > 1 {
+							let _ = player.remove_index(1).await;
+						}
+					} else if let Some(p) = self.preloading_index {
+						if idx < p {
+							self.preloading_index = Some(p - 1);
+						}
+					}
+				}
+
+				let p_state = player.get_state();
+				self.sync_resources(api, tx, &p_state);
+				self.dispatch_state(&p_state, state_tx);
 			}
 			CoreMessage::Next | CoreMessage::Prev | CoreMessage::PlayIndex(_) => {
 				let possible = match msg {

@@ -8,6 +8,7 @@ pub mod mpv;
 
 /// Represents the current playback status of the audio backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
 pub enum PlayerStatus {
 	/// Playback is completely stopped or no media is loaded.
 	Stopped,
@@ -15,6 +16,8 @@ pub enum PlayerStatus {
 	Playing,
 	/// Playback is temporarily paused.
 	Paused,
+	/// Track is being loaded
+	Buffering,
 }
 
 /// Events emitted by the audio backend to notify the core actor of state changes.

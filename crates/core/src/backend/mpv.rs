@@ -205,12 +205,16 @@ impl AudioBackend for MpvBackend {
 	fn get_state(&self) -> PlayerState {
 		let idle: bool = self.mpv.get_property("idle-active").unwrap_or(true);
 		let paused: bool = self.mpv.get_property("pause").unwrap_or(false);
+		let core_idle: bool = self.mpv.get_property("core-idle").unwrap_or(false);
+		let seeking: bool = self.mpv.get_property("seeking").unwrap_or(false);
 		let time: f64 = self.mpv.get_property("time-pos").unwrap_or(0.0);
 		let playlist_pos: i64 = self.mpv.get_property("playlist-pos").unwrap_or(-1);
 		let playlist_count: i64 = self.mpv.get_property("playlist-count").unwrap_or(0);
 
 		let status = if idle {
 			PlayerStatus::Stopped
+		} else if core_idle || seeking {
+			PlayerStatus::Buffering
 		} else if paused {
 			PlayerStatus::Paused
 		} else {

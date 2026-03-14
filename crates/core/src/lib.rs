@@ -1,3 +1,6 @@
+#[cfg(feature = "ffi")]
+uniffi::setup_scaffolding!("musicbirb");
+
 pub mod actor;
 pub mod api;
 pub mod art_cache;

@@ -36,9 +36,22 @@ impl Default for CoreState {
 	}
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+pub struct UiState {
+	pub queue: Vec<Track>,
+	pub queue_position: u32,
+	pub position_secs: f64,
+	pub status: PlayerStatus,
+	pub scrobble_mark_pos: Option<f64>,
+}
+
 pub enum CoreMessage {
 	Shutdown,
 	AddTracks(Vec<Track>),
+	ReplaceTracks(Vec<Track>),
+	ClearQueue,
+	RemoveIndex(usize),
 	Next,
 	Prev,
 	PlayIndex(usize),

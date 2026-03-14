@@ -17,7 +17,10 @@ impl SubsonicClient {
 			.hashed(password);
 
 		let client = Client::new(url, auth);
-		let http_client = reqwest::Client::new();
+
+		let http_client = reqwest::ClientBuilder::new()
+			.build()
+			.map_err(|e| MusicbirbError::Network(format!("HTTP Client Init Error: {}", e)))?;
 
 		Ok(Self {
 			client,
@@ -84,7 +87,12 @@ impl SubsonicClient {
 			.get_cover_art_url(&cover_id.0, Some(600))
 			.map_err(|e| MusicbirbError::Api(e.to_string()))?;
 
-		let resp = self.http_client.get(url.clone()).send().await?;
+		let resp = self
+			.http_client
+			.get(url.clone())
+			.send()
+			.await
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 
 		if resp.status() != StatusCode::OK {
 			return Err(MusicbirbError::Api(format!(
@@ -93,7 +101,10 @@ impl SubsonicClient {
 			)));
 		}
 
-		let bytes = resp.bytes().await?;
+		let bytes = resp
+			.bytes()
+			.await
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 		Ok(bytes.to_vec())
 	}
 

@@ -5,7 +5,8 @@ edition = "2024"
 
 [features]
 default = []
-mpv = ["dep:libmpv"]
+ffi =["dep:uniffi"]
+mpv =["dep:libmpv"]
 os-media-controls = ["dep:souvlaki"]
 
 [dependencies]
@@ -20,6 +21,7 @@ souvlaki = { version = "0.8.3", optional = true, default-features = false, featu
 submarine = "0.1.1"
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["full"] }
+uniffi = { version = "0.30.0", optional = true, features = ["tokio"] }
 
 [dev-dependencies]
 dotenvy = "0.15.7"

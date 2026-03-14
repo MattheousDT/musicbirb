@@ -1,12 +1,13 @@
 use thiserror::Error;
 
+#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
 #[derive(Error, Debug)]
 pub enum MusicbirbError {
 	#[error("Subsonic API error: {0}")]
 	Api(String),
 
 	#[error("Network error: {0}")]
-	Network(#[from] reqwest::Error),
+	Network(String),
 
 	#[error("Player error: {0}")]
 	Player(String),
@@ -14,3 +15,4 @@ pub enum MusicbirbError {
 	#[error("Internal core error: {0}")]
 	Internal(String),
 }
+

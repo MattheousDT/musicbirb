@@ -55,7 +55,9 @@ impl MprisManager {
 	pub fn set_playback_status(&mut self, status: PlayerStatus) {
 		let pb = match status {
 			PlayerStatus::Playing => MediaPlayback::Playing { progress: None },
-			PlayerStatus::Paused => MediaPlayback::Paused { progress: None },
+			PlayerStatus::Paused | PlayerStatus::Buffering => {
+				MediaPlayback::Paused { progress: None }
+			}
 			PlayerStatus::Stopped => MediaPlayback::Stopped,
 		};
 		let _ = self.controls.set_playback(pb);

@@ -1,10 +1,8 @@
 uniffi::setup_scaffolding!("musicbirb_ffi");
+musicbirb::uniffi_reexport_scaffolding!();
 
 use lazy_static::lazy_static;
-use musicbirb::{
-	AlbumId, AudioBackend, BackendEvent, Musicbirb, PlayerState, PlayerStatus, PlaylistId,
-	SubsonicClient, TrackId,
-};
+use musicbirb::{AudioBackend, BackendEvent, Musicbirb, PlayerState, PlayerStatus, SubsonicClient};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -15,80 +13,17 @@ lazy_static! {
 }
 
 #[derive(Error, Debug, uniffi::Error)]
-pub enum FfiError {
+pub enum FfiInitError {
 	#[error("Initialization error: {0}")]
-	InitializationError(String),
-}
-
-#[derive(uniffi::Enum, Clone, Copy, Debug)]
-pub enum FfiPlayerStatus {
-	Stopped,
-	Playing,
-	Paused,
-}
-
-impl From<FfiPlayerStatus> for PlayerStatus {
-	fn from(s: FfiPlayerStatus) -> Self {
-		match s {
-			FfiPlayerStatus::Stopped => PlayerStatus::Stopped,
-			FfiPlayerStatus::Playing => PlayerStatus::Playing,
-			FfiPlayerStatus::Paused => PlayerStatus::Paused,
-		}
-	}
-}
-
-impl From<PlayerStatus> for FfiPlayerStatus {
-	fn from(s: PlayerStatus) -> Self {
-		match s {
-			PlayerStatus::Stopped => FfiPlayerStatus::Stopped,
-			PlayerStatus::Playing => FfiPlayerStatus::Playing,
-			PlayerStatus::Paused => FfiPlayerStatus::Paused,
-		}
-	}
+	Init(String),
 }
 
 #[derive(uniffi::Record, Clone, Debug)]
 pub struct FfiPlayerState {
 	pub position_secs: f64,
-	pub status: FfiPlayerStatus,
+	pub status: PlayerStatus,
 	pub playlist_index: i32,
 	pub playlist_count: i32,
-}
-
-#[derive(uniffi::Record, Clone, Debug)]
-pub struct FfiTrack {
-	pub id: String,
-	pub title: String,
-	pub artist: String,
-	pub album: String,
-	pub duration_secs: u32,
-	pub cover_art_id: Option<String>,
-}
-
-#[derive(uniffi::Record, Clone, Debug)]
-pub struct FfiAlbum {
-	pub id: String,
-	pub title: String,
-	pub artist: String,
-	pub cover_art_id: Option<String>,
-}
-
-#[derive(uniffi::Record, Clone, Debug)]
-pub struct FfiPlaylist {
-	pub id: String,
-	pub name: String,
-	pub song_count: u32,
-	pub duration_secs: u32,
-	pub cover_art_id: Option<String>,
-}
-
-#[derive(uniffi::Record, Clone, Debug)]
-pub struct FfiUiState {
-	pub queue: Vec<FfiTrack>,
-	pub queue_position: u32,
-	pub position_secs: f64,
-	pub is_playing: bool,
-	pub scrobble_mark_pos: Option<f64>,
 }
 
 #[uniffi::export(callback_interface)]
@@ -107,6 +42,11 @@ pub trait AudioEngineDelegate: Send + Sync {
 	fn set_volume(&self, volume: f64);
 	fn get_volume(&self) -> f64;
 	fn get_state(&self) -> FfiPlayerState;
+}
+
+#[uniffi::export(callback_interface)]
+pub trait StateObserver: Send + Sync {
+	fn on_state_changed(&self, state: musicbirb::state::UiState);
 }
 
 pub struct MobileBackend {
@@ -175,7 +115,7 @@ impl AudioBackend for MobileBackend {
 		let st = self.delegate.get_state();
 		PlayerState {
 			position_secs: st.position_secs,
-			status: st.status.into(),
+			status: st.status,
 			playlist_index: st.playlist_index as i64,
 			playlist_count: st.playlist_count as i64,
 			timestamp: std::time::Instant::now(),
@@ -190,24 +130,21 @@ pub struct AudioEventTarget {
 
 #[uniffi::export]
 impl AudioEventTarget {
-	pub fn on_status_update(&self, status: FfiPlayerStatus) {
+	pub fn on_status_update(&self, status: PlayerStatus) {
 		if let Some(tx) = self.tx.lock().unwrap().as_ref() {
-			let _ = tx.send(BackendEvent::StatusUpdate(status.into()));
+			let _ = tx.send(BackendEvent::StatusUpdate(status));
 		}
 	}
-
 	pub fn on_track_started(&self) {
 		if let Some(tx) = self.tx.lock().unwrap().as_ref() {
 			let _ = tx.send(BackendEvent::TrackStarted);
 		}
 	}
-
 	pub fn on_end_of_track(&self) {
 		if let Some(tx) = self.tx.lock().unwrap().as_ref() {
 			let _ = tx.send(BackendEvent::EndOfTrack);
 		}
 	}
-
 	pub fn on_position_correction(&self, seconds: f64) {
 		if let Some(tx) = self.tx.lock().unwrap().as_ref() {
 			let _ = tx.send(BackendEvent::PositionCorrection {
@@ -234,11 +171,12 @@ impl MusicbirbMobile {
 		data_dir: String,
 		cache_dir: String,
 		delegate: Box<dyn AudioEngineDelegate>,
-	) -> Result<Arc<Self>, FfiError> {
+		observer: Box<dyn StateObserver>,
+	) -> Result<Arc<Self>, FfiInitError> {
 		let _guard = RUNTIME.enter();
 
 		let api = SubsonicClient::new(&url, &user, &pass)
-			.map_err(|e| FfiError::InitializationError(e.to_string()))?;
+			.map_err(|e| FfiInitError::Init(e.to_string()))?;
 
 		let shared_tx = Arc::new(Mutex::new(None));
 		let backend = Arc::new(MobileBackend {
@@ -250,7 +188,6 @@ impl MusicbirbMobile {
 			tx: Arc::clone(&shared_tx),
 		});
 
-		// Parse the injected directory paths
 		let data_dir_opt = if data_dir.is_empty() {
 			None
 		} else {
@@ -263,6 +200,18 @@ impl MusicbirbMobile {
 		};
 
 		let core = Musicbirb::with_paths(api, backend, data_dir_opt, cache_dir_opt);
+
+		let mut state_rx = core.subscribe();
+		let observer_arc = Arc::new(observer);
+		let core_clone = Arc::clone(&core);
+
+		RUNTIME.spawn(async move {
+			observer_arc.on_state_changed(core_clone.get_ui_state()); // Push initial
+			while state_rx.changed().await.is_ok() {
+				observer_arc.on_state_changed(core_clone.get_ui_state()); // Push updates
+			}
+		});
+
 		Ok(Arc::new(Self { core, event_target }))
 	}
 
@@ -270,152 +219,127 @@ impl MusicbirbMobile {
 		Arc::clone(&self.event_target)
 	}
 
-	pub fn queue_track(&self, id: String) {
-		let core = Arc::clone(&self.core);
-		RUNTIME.spawn(async move {
-			let _ = core.queue_track(&TrackId(id)).await;
-		});
+	pub fn get_ui_state(&self) -> musicbirb::state::UiState {
+		self.core.get_ui_state()
 	}
 
-	pub fn queue_album(&self, id: String) {
+	pub async fn queue_track(&self, id: String) -> Result<(), musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
-		RUNTIME.spawn(async move {
-			let _ = core.queue_album(&AlbumId(id)).await;
-		});
+		RUNTIME
+			.spawn(async move { core.queue_track(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub fn queue_playlist(&self, id: String) {
+	pub async fn queue_album(&self, id: String) -> Result<u32, musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
-		RUNTIME.spawn(async move {
-			let _ = core.queue_playlist(&PlaylistId(id)).await;
-		});
+		RUNTIME
+			.spawn(async move { core.queue_album(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub async fn get_last_played(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+	pub async fn queue_playlist(&self, id: String) -> Result<u32, musicbirb::MusicbirbError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.queue_playlist(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
+	}
+
+	pub async fn play_track(&self, id: String) -> Result<(), musicbirb::MusicbirbError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.play_track(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
+	}
+
+	pub async fn play_album(&self, id: String) -> Result<u32, musicbirb::MusicbirbError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.play_album(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
+	}
+
+	pub async fn play_playlist(&self, id: String) -> Result<u32, musicbirb::MusicbirbError> {
+		let core = Arc::clone(&self.core);
+		RUNTIME
+			.spawn(async move { core.play_playlist(id.into()).await })
+			.await
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
+	}
+
+	pub fn clear_queue(&self) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.clear_queue()
+	}
+
+	pub fn remove_index(&self, index: u32) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.remove_index(index)
+	}
+
+	pub async fn get_last_played_albums(
+		&self,
+	) -> Result<Vec<musicbirb::models::Album>, musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
 		RUNTIME
 			.spawn(async move { core.get_last_played_albums().await })
 			.await
-			.map_err(|e| FfiError::InitializationError(e.to_string()))?
-			.map(|albums| {
-				albums
-					.into_iter()
-					.map(|a| FfiAlbum {
-						id: a.id.0,
-						title: a.title,
-						artist: a.artist,
-						cover_art_id: a.cover_art.map(|c| c.0),
-					})
-					.collect()
-			})
-			.map_err(|e| FfiError::InitializationError(e.to_string()))
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub async fn get_recently_added(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+	pub async fn get_recently_added_albums(
+		&self,
+	) -> Result<Vec<musicbirb::models::Album>, musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
 		RUNTIME
 			.spawn(async move { core.get_recently_added_albums().await })
 			.await
-			.map_err(|e| FfiError::InitializationError(e.to_string()))?
-			.map(|albums| {
-				albums
-					.into_iter()
-					.map(|a| FfiAlbum {
-						id: a.id.0,
-						title: a.title,
-						artist: a.artist,
-						cover_art_id: a.cover_art.map(|c| c.0),
-					})
-					.collect()
-			})
-			.map_err(|e| FfiError::InitializationError(e.to_string()))
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub async fn get_new_releases(&self) -> Result<Vec<FfiAlbum>, FfiError> {
+	pub async fn get_new_releases(
+		&self,
+	) -> Result<Vec<musicbirb::models::Album>, musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
 		RUNTIME
 			.spawn(async move { core.get_newly_released_albums().await })
 			.await
-			.map_err(|e| FfiError::InitializationError(e.to_string()))?
-			.map(|albums| {
-				albums
-					.into_iter()
-					.map(|a| FfiAlbum {
-						id: a.id.0,
-						title: a.title,
-						artist: a.artist,
-						cover_art_id: a.cover_art.map(|c| c.0),
-					})
-					.collect()
-			})
-			.map_err(|e| FfiError::InitializationError(e.to_string()))
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub async fn get_playlists(&self) -> Result<Vec<FfiPlaylist>, FfiError> {
+	pub async fn get_playlists(
+		&self,
+	) -> Result<Vec<musicbirb::models::Playlist>, musicbirb::MusicbirbError> {
 		let core = Arc::clone(&self.core);
 		RUNTIME
 			.spawn(async move { core.get_playlists().await })
 			.await
-			.map_err(|e| FfiError::InitializationError(e.to_string()))?
-			.map(|playlists| {
-				playlists
-					.into_iter()
-					.map(|p| FfiPlaylist {
-						id: p.id.0,
-						name: p.name,
-						song_count: p.song_count,
-						duration_secs: p.duration_secs,
-						cover_art_id: p.cover_art.map(|c| c.0),
-					})
-					.collect()
-			})
-			.map_err(|e| FfiError::InitializationError(e.to_string()))
+			.map_err(|e| musicbirb::MusicbirbError::Internal(e.to_string()))?
 	}
 
-	pub fn next(&self) {
-		let _ = self.core.next();
+	pub fn next(&self) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.next()
 	}
 
-	pub fn prev(&self) {
-		let _ = self.core.prev();
+	pub fn prev(&self) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.prev()
 	}
 
-	pub fn play_index(&self, index: i32) {
-		let _ = self.core.play_index(index as usize);
+	pub fn play_index(&self, index: u32) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.play_index(index)
 	}
 
-	pub fn toggle_pause(&self) {
-		let _ = self.core.toggle_pause();
+	pub fn seek(&self, seconds: f64) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.seek(seconds)
 	}
 
-	pub fn seek(&self, seconds: f64) {
-		let _ = self.core.seek(seconds);
+	pub fn toggle_pause(&self) -> Result<(), musicbirb::MusicbirbError> {
+		self.core.toggle_pause()
 	}
 
-	pub fn close(&self) {
-		self.core.shutdown();
-	}
-
-	pub fn get_ui_state(&self) -> FfiUiState {
-		let state = self.core.subscribe().borrow().clone();
-
-		FfiUiState {
-			queue: state
-				.queue
-				.into_iter()
-				.map(|t| FfiTrack {
-					id: t.id.0,
-					title: t.title,
-					artist: t.artist,
-					album: t.album,
-					duration_secs: t.duration_secs,
-					cover_art_id: t.cover_art.map(|c| c.0),
-				})
-				.collect(),
-			queue_position: state.queue_position as u32,
-			position_secs: state.sync.position_secs,
-			is_playing: state.sync.status == PlayerStatus::Playing,
-			scrobble_mark_pos: state.scrobble_mark_pos,
-		}
+	pub fn shutdown(&self) {
+		self.core.shutdown()
 	}
 }

@@ -8,13 +8,13 @@ import { Paths } from "expo-file-system";
 import {
 	AudioEngineDelegate,
 	FfiPlayerState,
-	FfiPlayerStatus,
-	FfiUiState,
+	PlayerStatus,
+	UiState,
 	MusicbirbMobile,
+	StateObserver,
 } from "musicbirb-ffi";
 import React, {
 	createContext,
-	useCallback,
 	useContext,
 	useEffect,
 	useRef,
@@ -22,235 +22,246 @@ import React, {
 } from "react";
 
 interface MusicbirbContextValue {
-  uiState: FfiUiState | null;
-  playlistStatus: AudioPlaylistStatus | null;
-  mobileClient: MusicbirbMobile | null;
-  queueTrack: (id: string) => void;
-  queueAlbum: (id: string) => void;
-  queuePlaylist: (id: string) => void;
-  togglePause: () => void;
-  next: () => void;
-  prev: () => void;
-  seek: (seconds: number) => void;
-  playIndex: (index: number) => void;
+	uiState: UiState | null;
+	playlistStatus: AudioPlaylistStatus | null;
+	mobileClient: MusicbirbMobile | null;
+	isBuffering: boolean;
+
+	// Appends to queue
+	queueTrack: (id: string) => Promise<void>;
+	queueAlbum: (id: string) => Promise<number>;
+	queuePlaylist: (id: string) => Promise<number>;
+
+	// Replaces queue completely
+	playTrack: (id: string) => Promise<void>;
+	playAlbum: (id: string) => Promise<number>;
+	playPlaylist: (id: string) => Promise<number>;
+
+	// Queue mutators
+	clearQueue: () => void;
+	removeIndex: (index: number) => void;
+
+	togglePause: () => void;
+	next: () => void;
+	prev: () => void;
+	seek: (seconds: number) => void;
+	playIndex: (index: number) => void;
 }
 
 const MusicbirbContext = createContext<MusicbirbContextValue | null>(null);
 
 class DelegateImpl implements AudioEngineDelegate {
-  private lastKnownCount = 0;
-  private isDestroyed = false;
+	private isDestroyed = false;
+	private internalCount = 0;
 
-  constructor(
-    private playlist: AudioPlaylist,
-    private onUpdate: () => void,
-  ) {}
+	constructor(private playlist: AudioPlaylist) {}
 
-  destroy() {
-    this.isDestroyed = true;
-  }
+	destroy() {
+		this.isDestroyed = true;
+	}
 
-  play() {
-    if (this.isDestroyed) return;
-    this.playlist.play();
-  }
-  pause() {
-    if (this.isDestroyed) return;
-    this.playlist.pause();
-  }
-  togglePause() {
-    if (this.isDestroyed) return;
-    this.playlist.playing ? this.playlist.pause() : this.playlist.play();
-  }
-  stop() {
-    if (this.isDestroyed) return;
-    this.playlist.pause();
-    this.playlist.seekTo(0);
-  }
+	play() {
+		if (!this.isDestroyed) this.playlist.play();
+	}
+	pause() {
+		if (!this.isDestroyed) this.playlist.pause();
+	}
+	togglePause() {
+		if (!this.isDestroyed) {
+			this.playlist.playing ? this.playlist.pause() : this.playlist.play();
+		}
+	}
+	stop() {
+		if (this.isDestroyed) return;
+		this.playlist.pause();
+		this.playlist.seekTo(0);
+	}
 
-  add(url: string) {
-    if (this.isDestroyed) return;
-    this.playlist.add({ uri: url });
-    this.lastKnownCount++;
-    this.onUpdate();
-  }
+	add(url: string) {
+		if (this.isDestroyed) return;
+		this.playlist.add({ uri: url });
+		this.internalCount++;
+	}
+	insert(url: string, index: number) {
+		if (this.isDestroyed) return;
+		this.playlist.insert({ uri: url }, index);
+		this.internalCount++;
+	}
+	removeIndex(index: number) {
+		if (this.isDestroyed) return;
+		this.playlist.remove(index);
+		this.internalCount = Math.max(0, this.internalCount - 1);
+	}
+	clearPlaylist() {
+		if (this.isDestroyed) return;
+		this.playlist.clear();
+		this.internalCount = 0;
+	}
+	playIndex(index: number) {
+		if (!this.isDestroyed) this.playlist.skipTo(index);
+	}
+	seekRelative(seconds: number) {
+		if (!this.isDestroyed)
+			this.playlist.seekTo(this.playlist.currentTime + seconds);
+	}
+	seekAbsolute(seconds: number) {
+		if (!this.isDestroyed) this.playlist.seekTo(seconds);
+	}
+	setVolume(volume: number) {
+		if (!this.isDestroyed) this.playlist.volume = volume;
+	}
+	getVolume() {
+		return this.playlist.volume;
+	}
 
-  insert(url: string, index: number) {
-    if (this.isDestroyed) return;
-    this.playlist.insert({ uri: url }, index);
-    this.lastKnownCount++;
-    this.onUpdate();
-  }
+	getState(): FfiPlayerState {
+		let status = PlayerStatus.Stopped;
 
-  removeIndex(index: number) {
-    if (this.isDestroyed) return;
-    this.playlist.remove(index);
-    this.lastKnownCount = Math.max(0, this.lastKnownCount - 1);
-    this.onUpdate();
-  }
+		if (this.playlist.isBuffering) status = PlayerStatus.Buffering;
+		else if (this.playlist.playing) status = PlayerStatus.Playing;
+		else if (this.playlist.currentTime > 0) status = PlayerStatus.Paused;
 
-  clearPlaylist() {
-    if (this.isDestroyed) return;
-    this.playlist.clear();
-    this.lastKnownCount = 0;
-    this.onUpdate();
-  }
+		const count = Math.max(this.internalCount, this.playlist.trackCount ?? 0);
 
-  playIndex(index: number) {
-    if (this.isDestroyed) return;
-    this.playlist.skipTo(index);
-  }
-  seekRelative(seconds: number) {
-    if (this.isDestroyed) return;
-    this.playlist.seekTo(this.playlist.currentTime + seconds);
-  }
-  seekAbsolute(seconds: number) {
-    if (this.isDestroyed) return;
-    this.playlist.seekTo(seconds);
-  }
-  setVolume(volume: number) {
-    if (this.isDestroyed) return;
-    this.playlist.volume = volume;
-  }
-  getVolume() {
-    return this.playlist.volume;
-  }
+		return {
+			positionSecs: this.playlist.currentTime,
+			status,
+			playlistIndex: this.playlist.currentIndex,
+			playlistCount: count,
+		};
+	}
+}
 
-  getState(): FfiPlayerState {
-    let status = FfiPlayerStatus.Stopped;
-    if (this.playlist.playing) status = FfiPlayerStatus.Playing;
-    else if (this.playlist.currentTime > 0) status = FfiPlayerStatus.Paused;
-
-    return {
-      positionSecs: this.playlist.currentTime,
-      status,
-      playlistIndex: this.playlist.currentIndex,
-      playlistCount: Math.max(this.lastKnownCount, this.playlist.trackCount),
-    };
-  }
+class ObserverImpl implements StateObserver {
+	constructor(private setUiState: (state: UiState) => void) {}
+	onStateChanged(state: UiState) {
+		this.setUiState(state);
+	}
 }
 
 export function MusicbirbProvider({ children }: { children: React.ReactNode }) {
-  const [uiState, setUiState] = useState<FfiUiState | null>(null);
-  const [playlistStatus, setPlaylistStatus] =
-    useState<AudioPlaylistStatus | null>(null);
-  const [mobileClient, setMobileClient] = useState<MusicbirbMobile | null>(
-    null,
-  );
-  const playlist = useAudioPlaylist({ loop: "none" });
-  const mobileRef = useRef<MusicbirbMobile | null>(null);
-  const delegateRef = useRef<DelegateImpl | null>(null);
-  const isProcessingDelegateCall = useRef(false);
+	const [uiState, setUiState] = useState<UiState | null>(null);
+	const [playlistStatus, setPlaylistStatus] =
+		useState<AudioPlaylistStatus | null>(null);
+	const [mobileClient, setMobileClient] = useState<MusicbirbMobile | null>(
+		null,
+	);
 
-  const updateUiState = useCallback(() => {
-    if (mobileRef.current) {
-      setUiState(mobileRef.current.getUiState());
-    }
-  }, []);
+	const playlist = useAudioPlaylist({ loop: "none" });
+	const delegateRef = useRef<DelegateImpl | null>(null);
 
-  const wrappedOnUpdate = useCallback(() => {
-    isProcessingDelegateCall.current = true;
-    updateUiState();
-    setTimeout(() => {
-      isProcessingDelegateCall.current = false;
-    }, 100);
-  }, [updateUiState]);
+	useEffect(() => {
+		setAudioModeAsync({
+			playsInSilentMode: true,
+			shouldPlayInBackground: true,
+			interruptionMode: "doNotMix",
+		});
 
-  useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: "doNotMix",
-    });
+		const url = process.env.EXPO_PUBLIC_SUBSONIC_URL || "";
+		const user = process.env.EXPO_PUBLIC_SUBSONIC_USER || "";
+		const pass = process.env.EXPO_PUBLIC_SUBSONIC_PASS || "";
 
-    const url = process.env.EXPO_PUBLIC_SUBSONIC_URL || "";
-    const user = process.env.EXPO_PUBLIC_SUBSONIC_USER || "";
-    const pass = process.env.EXPO_PUBLIC_SUBSONIC_PASS || "";
+		let initializedClient: MusicbirbMobile | null = null;
 
-    if (url && user && pass) {
-      try {
-        const delegate = new DelegateImpl(playlist, wrappedOnUpdate);
-        delegateRef.current = delegate;
+		if (url && user && pass) {
+			try {
+				const delegate = new DelegateImpl(playlist);
+				delegateRef.current = delegate;
+				const observer = new ObserverImpl(setUiState);
 
-        // This is yuck but for some reason directories in Rust are brokey on Android
-        // So let's prop-drill baby drill
-        const dataDir = Paths.document.uri.replace(/^file:\/\//, "") || "";
-        const cacheDir = Paths.cache.uri.replace(/^file:\/\//, "") || "";
+				const dataDir = Paths.document.uri.replace(/^file:\/\//, "") || "";
+				const cacheDir = Paths.cache.uri.replace(/^file:\/\//, "") || "";
 
-        mobileRef.current = new MusicbirbMobile(
-          url,
-          user,
-          pass,
-          dataDir,
-          cacheDir,
-          delegate,
-        );
-        setMobileClient(mobileRef.current);
-        updateUiState();
-      } catch (e) {
-        console.error("FFI Initialization Error:", e);
-      }
-    }
+				initializedClient = new MusicbirbMobile(
+					url,
+					user,
+					pass,
+					dataDir,
+					cacheDir,
+					delegate,
+					observer,
+				);
+				setMobileClient(initializedClient);
+			} catch (e) {
+				console.error("FFI Initialization Error:", e);
+			}
+		}
 
-    return () => {
-      delegateRef.current?.destroy();
-      mobileRef.current?.uniffiDestroy();
-      mobileRef.current = null;
-    };
-  }, [playlist, wrappedOnUpdate, updateUiState]);
+		return () => {
+			delegateRef.current?.destroy();
+			initializedClient?.uniffiDestroy();
+		};
+	}, [playlist]);
 
-  useEffect(() => {
-    if (!mobileRef.current) return;
-    const target = mobileRef.current.getEventTarget();
+	useEffect(() => {
+		if (!mobileClient) return;
+		const target = mobileClient.getEventTarget();
 
-    const sub = playlist.addListener("playlistStatusUpdate", (status) => {
-      setPlaylistStatus(status);
-      if (isProcessingDelegateCall.current) return;
+		const sub = playlist.addListener("playlistStatusUpdate", (status) => {
+			setPlaylistStatus(status);
 
-      let ffiStatus = FfiPlayerStatus.Stopped;
-      if (status.playing) ffiStatus = FfiPlayerStatus.Playing;
-      else if (status.currentTime > 0) ffiStatus = FfiPlayerStatus.Paused;
+			let ffiStatus = PlayerStatus.Stopped;
+			if (status.isBuffering) ffiStatus = PlayerStatus.Buffering;
+			else if (status.playing) ffiStatus = PlayerStatus.Playing;
+			else if (status.currentTime > 0) ffiStatus = PlayerStatus.Paused;
 
-      target.onStatusUpdate(ffiStatus);
-      target.onPositionCorrection(status.currentTime);
-      if (status.didJustFinish) target.onEndOfTrack();
-    });
+			target.onStatusUpdate(ffiStatus);
+			target.onPositionCorrection(status.currentTime);
 
-    const trackSub = playlist.addListener("trackChanged", () => {
-      if (isProcessingDelegateCall.current) return;
-      target.onTrackStarted();
-      updateUiState();
-    });
+			if (status.didJustFinish) {
+				target.onEndOfTrack();
+			}
+		});
 
-    return () => {
-      sub.remove();
-      trackSub.remove();
-    };
-  }, [playlist, updateUiState, mobileClient]);
+		const trackSub = playlist.addListener("trackChanged", () => {
+			target.onTrackStarted();
+		});
 
-  return (
-    <MusicbirbContext.Provider
-      value={{
-        uiState,
-        playlistStatus,
-        mobileClient,
-        queueTrack: (id) => mobileRef.current?.queueTrack(id),
-        queueAlbum: (id) => mobileRef.current?.queueAlbum(id),
-        queuePlaylist: (id) => mobileRef.current?.queuePlaylist(id),
-        togglePause: () => mobileRef.current?.togglePause(),
-        next: () => mobileRef.current?.next(),
-        prev: () => mobileRef.current?.prev(),
-        seek: (s) => mobileRef.current?.seek(s),
-        playIndex: (idx) => mobileRef.current?.playIndex(idx),
-      }}
-    >
-      {children}
-    </MusicbirbContext.Provider>
-  );
+		return () => {
+			sub.remove();
+			trackSub.remove();
+		};
+	}, [playlist, mobileClient]);
+
+	const isBuffering = uiState?.status === PlayerStatus.Buffering;
+
+	return (
+		<MusicbirbContext.Provider
+			value={{
+				uiState,
+				playlistStatus,
+				mobileClient,
+				isBuffering,
+
+				queueTrack: async (id) => {
+					await mobileClient?.queueTrack(id);
+				},
+				queueAlbum: async (id) => mobileClient?.queueAlbum(id) ?? 0,
+				queuePlaylist: async (id) => mobileClient?.queuePlaylist(id) ?? 0,
+
+				playTrack: async (id) => {
+					await mobileClient?.playTrack(id);
+				},
+				playAlbum: async (id) => mobileClient?.playAlbum(id) ?? 0,
+				playPlaylist: async (id) => mobileClient?.playPlaylist(id) ?? 0,
+
+				clearQueue: () => mobileClient?.clearQueue(),
+				removeIndex: (idx) => mobileClient?.removeIndex(idx),
+
+				togglePause: () => mobileClient?.togglePause(),
+				next: () => mobileClient?.next(),
+				prev: () => mobileClient?.prev(),
+				seek: (s) => mobileClient?.seek(s),
+				playIndex: (idx) => mobileClient?.playIndex(idx),
+			}}
+		>
+			{children}
+		</MusicbirbContext.Provider>
+	);
 }
 
 export const useMusicbirb = () => {
-  const ctx = useContext(MusicbirbContext);
-  if (!ctx) throw new Error("MusicbirbProvider missing");
-  return ctx;
+	const ctx = useContext(MusicbirbContext);
+	if (!ctx) throw new Error("MusicbirbProvider missing");
+	return ctx;
 };
