@@ -5,31 +5,30 @@ import { useMusicbirb } from "@/context/MusicbirbContext";
 import { getCoverUrl } from "@/utils/subsonic";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useMemo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function AlbumScreen() {
+export default function PlaylistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
-  const { playAlbum, playIndex, queueAlbum, clearQueue } = useMusicbirb();
+  const { playPlaylist, playIndex, queuePlaylist, clearQueue } = useMusicbirb();
 
-  const { data: album, isLoading } = api.getAlbumDetails.useQuery([id], {
+  const { data: playlist, isLoading } = api.getPlaylistDetails.useQuery([id], {
     enabled: !!id,
   });
 
-  const handlePlayAlbum = async () => {
+  const handlePlayPlaylist = async () => {
     if (!id) return;
-    await playAlbum(id);
+    await playPlaylist(id);
   };
 
   const handlePlayTrack = async (idx: number) => {
     if (!id) return;
     clearQueue();
-    await queueAlbum(id);
+    await queuePlaylist(id);
     playIndex(idx);
   };
 
@@ -37,7 +36,7 @@ export default function AlbumScreen() {
     () => (
       <Stack.Screen
         options={{
-          title: isLoading ? "Loading" : (album?.title ?? "Unknown Album"),
+          title: isLoading ? "Loading" : (playlist?.name ?? "Unknown Playlist"),
           headerTitle: () => <View />,
           headerShown: true,
           headerTransparent: true,
@@ -45,10 +44,10 @@ export default function AlbumScreen() {
         }}
       />
     ),
-    [isLoading, album?.title],
+    [isLoading, playlist?.name],
   );
 
-  if (isLoading || !album) {
+  if (isLoading || !playlist) {
     return (
       <View style={styles.center}>
         {screenOptions}
@@ -61,7 +60,7 @@ export default function AlbumScreen() {
     <View style={styles.root}>
       {screenOptions}
       <FlatList
-        data={album.songs}
+        data={playlist.songs}
         keyExtractor={(item, idx) => `${item.id}-${idx}`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -70,48 +69,42 @@ export default function AlbumScreen() {
         }}
         ListHeaderComponent={
           <View style={styles.info}>
-            <Link.AppleZoomTarget>
-              <Image
-                key={album.coverArt}
-                source={
-                  getCoverUrl(album.coverArt)
-                    ? { uri: getCoverUrl(album.coverArt)! }
-                    : require("@assets/icon.png")
-                }
-                style={styles.cover}
-                cachePolicy="memory-disk"
-              />
-            </Link.AppleZoomTarget>
-            <Text style={styles.title}>{album.title}</Text>
-            <InteractivePressable
-              onPress={() =>
-                album.artistId
-                  ? router.push({
-                      pathname: "/artists/[id]",
-                      params: { id: album.artistId },
-                    })
-                  : null
+            <Image
+              key={playlist.coverArt}
+              source={
+                getCoverUrl(playlist.coverArt)
+                  ? { uri: getCoverUrl(playlist.coverArt)! }
+                  : require("@assets/icon.png")
               }
-            >
-              <Text style={styles.artist}>{album.artist}</Text>
-            </InteractivePressable>
+              style={styles.cover}
+              cachePolicy="memory-disk"
+            />
+            <Text style={styles.title}>{playlist.name}</Text>
+            {playlist.owner && (
+              <Text style={styles.owner}>Created by {playlist.owner}</Text>
+            )}
             <Text style={styles.meta}>
-              {album.year ? `${album.year} • ` : ""}
-              {album.songCount} tracks • {Math.floor(album.durationSecs / 60)}{" "}
-              mins
+              {playlist.songCount} tracks •{" "}
+              {Math.floor(playlist.durationSecs / 60)} mins
             </Text>
+            {playlist.comment && (
+              <Text style={styles.comment} numberOfLines={3}>
+                {playlist.comment}
+              </Text>
+            )}
             <InteractivePressable
               style={styles.playBtn}
-              onPress={handlePlayAlbum}
+              onPress={handlePlayPlaylist}
             >
               <Ionicons name="play" size={20} color="#fff" />
-              <Text style={styles.playBtnText}>Play Album</Text>
+              <Text style={styles.playBtnText}>Play</Text>
             </InteractivePressable>
           </View>
         }
         renderItem={({ item: track, index: idx }) => (
           <TrackItem
-            trackNum={track.trackNum || idx + 1}
+            showArt
+            imageUrl={getCoverUrl(track.coverArt)}
             title={track.title}
             artist={track.artist}
             durationSecs={track.durationSecs}
@@ -152,7 +145,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: -0.5,
   },
-  artist: {
+  owner: {
     fontSize: 18,
     fontWeight: "700",
     color: "#3b82f6",
@@ -163,6 +156,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#64748b",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  comment: {
+    fontSize: 14,
+    color: "#475569",
     textAlign: "center",
     marginBottom: 24,
   },

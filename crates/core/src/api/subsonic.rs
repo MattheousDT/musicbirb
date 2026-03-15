@@ -1,7 +1,7 @@
 use crate::error::MusicbirbError;
 use crate::models::{
 	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist,
-	PlaylistId, Track, TrackId,
+	PlaylistDetails, PlaylistId, Track, TrackId,
 };
 use reqwest::StatusCode;
 use submarine::api::get_album_list::Order;
@@ -88,6 +88,9 @@ impl SubsonicClient {
 			duration_secs: album.base.duration as u32,
 			year: album.base.year.map(|y| y as u32),
 			genre: album.base.genre,
+			play_count: album.base.play_count.map(|c| c as u64),
+			created_timestamp: Some(album.base.created.timestamp()),
+			starred_timestamp: album.base.starred.map(|d| d.timestamp()),
 			songs: album.song.into_iter().map(Track::from).collect(),
 		})
 	}
@@ -96,7 +99,7 @@ impl SubsonicClient {
 		&self,
 		artist_id: &ArtistId,
 	) -> Result<ArtistDetails, MusicbirbError> {
-		let artist = self
+		let mut artist = self
 			.client
 			.get_artist(&artist_id.0)
 			.await
@@ -114,7 +117,6 @@ impl SubsonicClient {
 			.await
 			.unwrap_or_default();
 
-		// Safely extract biography without fighting feature flags (Vec<String> vs Option<String>)
 		let biography = info
 			.as_ref()
 			.and_then(|i| i.base.biography.clone().into_iter().next());
@@ -122,6 +124,8 @@ impl SubsonicClient {
 		let similar_artists = info
 			.map(|i| i.similar_artist.into_iter().map(Artist::from).collect())
 			.unwrap_or_default();
+
+		artist.album.reverse();
 
 		Ok(ArtistDetails {
 			id: ArtistId(artist.base.id),
@@ -146,6 +150,31 @@ impl SubsonicClient {
 			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
 
 		Ok(playlist.entry.into_iter().map(Track::from).collect())
+	}
+
+	pub async fn get_playlist_details(
+		&self,
+		playlist_id: &PlaylistId,
+	) -> Result<PlaylistDetails, MusicbirbError> {
+		let pl_data = self
+			.client
+			.get_playlist(&playlist_id.0)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
+
+		Ok(PlaylistDetails {
+			id: PlaylistId(pl_data.base.id.clone()),
+			name: pl_data.base.name.clone(),
+			song_count: pl_data.base.song_count as u32,
+			duration_secs: pl_data.base.duration as u32,
+			cover_art: pl_data.base.cover_art.clone().map(CoverArtId),
+			owner: pl_data.base.owner.clone(),
+			public: pl_data.base.public,
+			created_timestamp: pl_data.base.created.timestamp(),
+			changed_timestamp: pl_data.base.changed.timestamp(),
+			comment: pl_data.base.comment.clone(),
+			songs: pl_data.entry.into_iter().map(Track::from).collect(),
+		})
 	}
 
 	pub async fn get_cover_art_bytes(

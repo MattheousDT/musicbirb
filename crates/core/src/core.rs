@@ -3,7 +3,8 @@ use crate::api::subsonic::SubsonicClient;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
 use crate::models::{
-	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistId, TrackId,
+	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId,
+	TrackId,
 };
 use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
@@ -215,6 +216,13 @@ impl Musicbirb {
 
 	pub async fn get_playlists(self: Arc<Self>) -> Result<Vec<Playlist>, MusicbirbError> {
 		run_async!(async move { self.api.get_playlists().await })
+	}
+
+	pub async fn get_playlist_details(
+		self: Arc<Self>,
+		playlist_id: PlaylistId,
+	) -> Result<PlaylistDetails, MusicbirbError> {
+		run_async!(async move { self.api.get_playlist_details(&playlist_id).await })
 	}
 
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------

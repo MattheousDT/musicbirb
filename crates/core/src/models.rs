@@ -94,11 +94,22 @@ pub struct Track {
 	pub id: TrackId,
 	pub title: String,
 	pub artist: String,
+	pub artist_id: Option<ArtistId>,
 	pub album: String,
+	pub album_id: Option<AlbumId>,
 	pub duration_secs: u32,
 	pub cover_art: Option<CoverArtId>,
 	pub track_num: Option<u32>,
 	pub disc_num: Option<u32>,
+	pub year: Option<u32>,
+	pub genre: Option<String>,
+	pub play_count: Option<u64>,
+	pub bit_rate: Option<u32>,
+	pub size: Option<u64>,
+	pub created_timestamp: Option<i64>,
+	pub starred_timestamp: Option<i64>,
+	pub content_type: Option<String>,
+	pub suffix: Option<String>,
 }
 
 impl From<submarine::data::Child> for Track {
@@ -107,11 +118,22 @@ impl From<submarine::data::Child> for Track {
 			id: TrackId(song.id),
 			title: song.title,
 			artist: song.artist.unwrap_or_else(|| "Unknown".to_string()),
+			artist_id: song.artist_id.map(ArtistId),
 			album: song.album.unwrap_or_else(|| "Unknown".to_string()),
+			album_id: song.album_id.map(AlbumId),
 			duration_secs: song.duration.unwrap_or(0) as u32,
 			cover_art: song.cover_art.map(CoverArtId),
 			track_num: song.track.map(|t| t as u32),
 			disc_num: song.disc_number.map(|d| d as u32),
+			year: song.year.map(|y| y as u32),
+			genre: song.genre,
+			play_count: song.play_count.map(|c| c as u64),
+			bit_rate: song.bit_rate.map(|b| b as u32),
+			size: song.size.map(|s| s as u64),
+			created_timestamp: song.created.map(|d| d.timestamp()),
+			starred_timestamp: song.starred.map(|d| d.timestamp()),
+			content_type: song.content_type,
+			suffix: song.suffix,
 		}
 	}
 }
@@ -122,8 +144,14 @@ pub struct Album {
 	pub id: AlbumId,
 	pub title: String,
 	pub artist: String,
-	pub year: Option<i32>,
+	pub artist_id: Option<ArtistId>,
+	pub year: Option<u32>,
 	pub cover_art: Option<CoverArtId>,
+	pub duration_secs: Option<u32>,
+	pub play_count: Option<u64>,
+	pub created_timestamp: Option<i64>,
+	pub starred_timestamp: Option<i64>,
+	pub song_count: Option<u32>,
 }
 
 impl From<submarine::data::Child> for Album {
@@ -132,8 +160,14 @@ impl From<submarine::data::Child> for Album {
 			id: AlbumId(item.id),
 			title: item.name,
 			artist: item.artist.unwrap_or_else(|| "Unknown".to_string()),
-			year: item.year,
+			artist_id: item.artist_id.map(ArtistId),
+			year: item.year.map(|y| y as u32),
 			cover_art: item.cover_art.map(CoverArtId),
+			duration_secs: item.duration.map(|d| d as u32),
+			play_count: item.play_count.map(|c| c as u64),
+			created_timestamp: item.created.map(|d| d.timestamp()),
+			starred_timestamp: item.starred.map(|d| d.timestamp()),
+			song_count: None,
 		}
 	}
 }
@@ -144,8 +178,14 @@ impl From<submarine::data::AlbumId3> for Album {
 			id: AlbumId(item.id),
 			title: item.name,
 			artist: item.artist.unwrap_or_else(|| "Unknown".to_string()),
-			year: item.year,
+			artist_id: item.artist_id.map(ArtistId),
+			year: item.year.map(|y| y as u32),
 			cover_art: item.cover_art.map(CoverArtId),
+			duration_secs: Some(item.duration as u32),
+			play_count: item.play_count.map(|c| c as u64),
+			created_timestamp: Some(item.created.timestamp()),
+			starred_timestamp: item.starred.map(|d| d.timestamp()),
+			song_count: Some(item.song_count as u32),
 		}
 	}
 }
@@ -162,6 +202,9 @@ pub struct AlbumDetails {
 	pub duration_secs: u32,
 	pub year: Option<u32>,
 	pub genre: Option<String>,
+	pub play_count: Option<u64>,
+	pub created_timestamp: Option<i64>,
+	pub starred_timestamp: Option<i64>,
 	pub songs: Vec<Track>,
 }
 
@@ -217,6 +260,10 @@ pub struct Playlist {
 	pub song_count: u32,
 	pub duration_secs: u32,
 	pub cover_art: Option<CoverArtId>,
+	pub owner: Option<String>,
+	pub public: Option<bool>,
+	pub created_timestamp: i64,
+	pub changed_timestamp: i64,
 }
 
 impl From<submarine::data::Playlist> for Playlist {
@@ -227,6 +274,26 @@ impl From<submarine::data::Playlist> for Playlist {
 			song_count: pl.song_count as u32,
 			duration_secs: pl.duration as u32,
 			cover_art: pl.cover_art.map(CoverArtId),
+			owner: pl.owner,
+			public: pl.public,
+			created_timestamp: pl.created.timestamp(),
+			changed_timestamp: pl.changed.timestamp(),
 		}
 	}
+}
+
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaylistDetails {
+	pub id: PlaylistId,
+	pub name: String,
+	pub song_count: u32,
+	pub duration_secs: u32,
+	pub cover_art: Option<CoverArtId>,
+	pub owner: Option<String>,
+	pub public: Option<bool>,
+	pub created_timestamp: i64,
+	pub changed_timestamp: i64,
+	pub comment: Option<String>,
+	pub songs: Vec<Track>,
 }
