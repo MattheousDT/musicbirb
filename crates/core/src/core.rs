@@ -2,7 +2,9 @@ use crate::actor::CoreActor;
 use crate::api::subsonic::SubsonicClient;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
-use crate::models::{Album, AlbumId, Playlist, PlaylistId, TrackId};
+use crate::models::{
+	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistId, TrackId,
+};
 use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -195,6 +197,20 @@ impl Musicbirb {
 
 	pub async fn get_newly_released_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
 		run_async!(async move { self.api.get_newly_released_albums().await })
+	}
+
+	pub async fn get_album_details(
+		self: Arc<Self>,
+		album_id: AlbumId,
+	) -> Result<AlbumDetails, MusicbirbError> {
+		run_async!(async move { self.api.get_album_details(&album_id).await })
+	}
+
+	pub async fn get_artist_details(
+		self: Arc<Self>,
+		artist_id: ArtistId,
+	) -> Result<ArtistDetails, MusicbirbError> {
+		run_async!(async move { self.api.get_artist_details(&artist_id).await })
 	}
 
 	pub async fn get_playlists(self: Arc<Self>) -> Result<Vec<Playlist>, MusicbirbError> {

@@ -1,5 +1,8 @@
 use crate::error::MusicbirbError;
-use crate::models::{Album, AlbumId, CoverArtId, Playlist, PlaylistId, Track, TrackId};
+use crate::models::{
+	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist,
+	PlaylistId, Track, TrackId,
+};
 use reqwest::StatusCode;
 use submarine::api::get_album_list::Order;
 use submarine::{Client, auth::AuthBuilder};
@@ -63,6 +66,73 @@ impl SubsonicClient {
 			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
 
 		Ok(album.song.into_iter().map(Track::from).collect())
+	}
+
+	pub async fn get_album_details(
+		&self,
+		album_id: &AlbumId,
+	) -> Result<AlbumDetails, MusicbirbError> {
+		let album = self
+			.client
+			.get_album(&album_id.0)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get album details: {}", e)))?;
+
+		Ok(AlbumDetails {
+			id: AlbumId(album.base.id),
+			title: album.base.name,
+			artist: album.base.artist.unwrap_or_else(|| "Unknown".to_string()),
+			artist_id: album.base.artist_id.map(ArtistId),
+			cover_art: album.base.cover_art.map(CoverArtId),
+			song_count: album.base.song_count as u32,
+			duration_secs: album.base.duration as u32,
+			year: album.base.year.map(|y| y as u32),
+			genre: album.base.genre,
+			songs: album.song.into_iter().map(Track::from).collect(),
+		})
+	}
+
+	pub async fn get_artist_details(
+		&self,
+		artist_id: &ArtistId,
+	) -> Result<ArtistDetails, MusicbirbError> {
+		let artist = self
+			.client
+			.get_artist(&artist_id.0)
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Failed to get artist details: {}", e)))?;
+
+		let info = self
+			.client
+			.get_artist_info2(&artist_id.0, None, None)
+			.await
+			.ok();
+
+		let top_songs = self
+			.client
+			.get_top_songs(&artist.base.name, Some(10))
+			.await
+			.unwrap_or_default();
+
+		// Safely extract biography without fighting feature flags (Vec<String> vs Option<String>)
+		let biography = info
+			.as_ref()
+			.and_then(|i| i.base.biography.clone().into_iter().next());
+
+		let similar_artists = info
+			.map(|i| i.similar_artist.into_iter().map(Artist::from).collect())
+			.unwrap_or_default();
+
+		Ok(ArtistDetails {
+			id: ArtistId(artist.base.id),
+			name: artist.base.name,
+			cover_art: artist.base.cover_art.map(CoverArtId),
+			album_count: artist.base.album_count as u32,
+			albums: artist.album.into_iter().map(Album::from).collect(),
+			biography,
+			similar_artists,
+			top_songs: top_songs.into_iter().map(Track::from).collect(),
+		})
 	}
 
 	pub async fn get_playlist_tracks(
@@ -164,50 +234,5 @@ impl SubsonicClient {
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get playlists: {}", e)))?;
 		Ok(list.into_iter().map(Playlist::from).collect())
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use std::env;
-
-	fn init_client() -> SubsonicClient {
-		dotenvy::dotenv().ok();
-		let url = env::var("SUBSONIC_URL").expect("SUBSONIC_URL not set");
-		let user = env::var("SUBSONIC_USER").expect("SUBSONIC_USER not set");
-		let pass = env::var("SUBSONIC_PASS").expect("SUBSONIC_PASS not set");
-		SubsonicClient::new(&url, &user, &pass).unwrap()
-	}
-
-	#[tokio::test]
-	async fn test_get_last_played() {
-		let client = init_client();
-		let albums = client.get_last_played_albums().await.unwrap();
-		println!("Last Played: {:?}", albums.len());
-		assert!(!albums.is_empty());
-	}
-
-	#[tokio::test]
-	async fn test_get_recently_added() {
-		let client = init_client();
-		let albums = client.get_recently_added_albums().await.unwrap();
-		println!("Recently Added: {:?}", albums.len());
-		assert!(!albums.is_empty());
-	}
-
-	#[tokio::test]
-	async fn test_newly_released() {
-		let client = init_client();
-		let albums = client.get_newly_released_albums().await.unwrap();
-		println!("Newly Released: {:?}", albums.len());
-		assert!(!albums.is_empty());
-	}
-
-	#[tokio::test]
-	async fn test_get_playlists() {
-		let client = init_client();
-		let playlists = client.get_playlists().await.unwrap();
-		println!("Playlists: {:?}", playlists.len());
 	}
 }

@@ -44,6 +44,7 @@ export function CurrentlyPlayingBar() {
 						coverUrl ? { uri: coverUrl } : require("../../assets/icon.png")
 					}
 					style={styles.art}
+					cachePolicy="memory-disk"
 				/>
 				<View style={styles.info}>
 					<Text numberOfLines={1} style={styles.title}>

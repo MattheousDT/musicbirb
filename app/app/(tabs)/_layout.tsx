@@ -13,12 +13,12 @@ export default function TabsLayout() {
 				tintColor={Platform.OS === "ios" ? "#3b82f6" : undefined}
 				labelVisibilityMode="labeled"
 			>
-				<NativeTabs.Trigger name="index">
+				<NativeTabs.Trigger name="(home)">
 					<NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
 					<NativeTabs.Trigger.Icon sf="house.fill" md="home" />
 				</NativeTabs.Trigger>
 
-				<NativeTabs.Trigger name="library">
+				<NativeTabs.Trigger name="(library)">
 					<NativeTabs.Trigger.Label>Library</NativeTabs.Trigger.Label>
 					<NativeTabs.Trigger.Icon sf="music.note.list" md="library_music" />
 				</NativeTabs.Trigger>

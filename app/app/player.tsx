@@ -4,6 +4,7 @@ import { QueueList } from "@/components/QueueList";
 import { useMusicbirb } from "@/context/MusicbirbContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { Stack } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
 	Animated,
@@ -19,7 +20,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function PlayerScreen() {
 	const { uiState } = useMusicbirb();
 	const [isQueueOpen, setQueueOpen] = useState(false);
-	const [scaleAnim] = useState(new Animated.Value(1));
 
 	const currentTrack = useMemo(
 		() => uiState?.queue[uiState.queuePosition],
@@ -36,9 +36,13 @@ export default function PlayerScreen() {
 
 	return (
 		<View style={styles.root}>
-			<Animated.View
-				style={[styles.container, { transform: [{ scale: scaleAnim }] }]}
-			>
+			<Stack.Screen
+				options={{
+					presentation: "pageSheet",
+					animation: "slide_from_bottom",
+				}}
+			/>
+			<Animated.View style={styles.container}>
 				<SafeAreaView style={{ flex: 1 }}>
 					<View style={styles.header}>
 						<Pressable
@@ -59,6 +63,7 @@ export default function PlayerScreen() {
 									style={styles.artwork}
 									contentFit="cover"
 									transition={500}
+									cachePolicy="memory-disk"
 								/>
 							</View>
 						</View>

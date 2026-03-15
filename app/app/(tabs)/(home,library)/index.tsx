@@ -2,6 +2,7 @@ import { PaginatedList } from "@/components/PaginatedList";
 import { useMusicbirb } from "@/context/MusicbirbContext";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import { Link, Stack, useRouter } from "expo-router";
 import { Album } from "musicbirb-ffi";
 import React from "react";
 import {
@@ -15,7 +16,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-	const { core, playAlbum, playPlaylist } = useMusicbirb();
+	const router = useRouter();
+	const { core, playPlaylist } = useMusicbirb();
 
 	const { data: lastPlayed, isLoading: lastPlayedLoading } = useQuery({
 		queryKey: ["lastPlayed"],
@@ -60,20 +62,32 @@ export default function HomeScreen() {
 			: null;
 
 		return (
-			<Pressable style={styles.albumCard} onPress={() => playAlbum(item.id)}>
-				<Image
-					source={
-						coverUrl ? { uri: coverUrl } : require("../../assets/icon.png")
-					}
-					style={styles.albumArt}
-				/>
-				<Text numberOfLines={1} style={styles.albumTitle}>
-					{item.title}
-				</Text>
-				<Text numberOfLines={1} style={styles.albumArtist}>
-					{item.artist}
-				</Text>
-			</Pressable>
+			<Link
+				href={{
+					pathname: "/albums/[id]",
+					params: { id: item.id },
+				}}
+				asChild
+			>
+				<Pressable style={styles.albumCard}>
+					<Link.AppleZoom>
+						<Image
+							key={item.coverArt}
+							source={
+								coverUrl ? { uri: coverUrl } : require("@assets/icon.png")
+							}
+							style={styles.albumArt}
+							cachePolicy="memory-disk"
+						/>
+					</Link.AppleZoom>
+					<Text numberOfLines={1} style={styles.albumTitle}>
+						{item.title}
+					</Text>
+					<Text numberOfLines={1} style={styles.albumArtist}>
+						{item.artist}
+					</Text>
+				</Pressable>
+			</Link>
 		);
 	};
 
@@ -97,28 +111,41 @@ export default function HomeScreen() {
 			: null;
 
 		return (
-			<Pressable
+			<Link
 				key={item.id}
-				style={styles.playlistRow}
-				onPress={() => (isAlbum ? playAlbum(item.id) : playPlaylist(item.id))}
+				href={{
+					pathname: "/albums/[id]",
+					params: { id: item.id },
+				}}
+				asChild
 			>
-				<Image
-					source={
-						coverUrl ? { uri: coverUrl } : require("../../assets/icon.png")
+				<Pressable
+					style={styles.playlistRow}
+					onPress={() =>
+						isAlbum ? router.push(`/albums/${item.id}`) : playPlaylist(item.id)
 					}
-					style={styles.playlistArt}
-				/>
-				<View style={styles.playlistInfo}>
-					<Text numberOfLines={1} style={styles.playlistName}>
-						{isAlbum ? item.title : item.name}
-					</Text>
-					<Text numberOfLines={1} style={styles.playlistMeta}>
-						{isAlbum
-							? item.artist
-							: `${item.songCount} tracks • ${Math.floor(item.durationSecs / 60)} mins`}
-					</Text>
-				</View>
-			</Pressable>
+				>
+					<Link.AppleZoom>
+						<Image
+							source={
+								coverUrl ? { uri: coverUrl } : require("@assets/icon.png")
+							}
+							style={styles.playlistArt}
+							cachePolicy="memory-disk"
+						/>
+					</Link.AppleZoom>
+					<View style={styles.playlistInfo}>
+						<Text numberOfLines={1} style={styles.playlistName}>
+							{isAlbum ? item.title : item.name}
+						</Text>
+						<Text numberOfLines={1} style={styles.playlistMeta}>
+							{isAlbum
+								? item.artist
+								: `${item.songCount} tracks • ${Math.floor(item.durationSecs / 60)} mins`}
+						</Text>
+					</View>
+				</Pressable>
+			</Link>
 		);
 	};
 
@@ -128,6 +155,7 @@ export default function HomeScreen() {
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={styles.scroll}
 		>
+			<Stack.Screen options={{ title: "Home", headerShown: false }} />
 			<SafeAreaView>
 				<Text style={styles.header}>Home</Text>
 
