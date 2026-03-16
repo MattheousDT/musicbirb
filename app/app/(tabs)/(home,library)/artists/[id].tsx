@@ -10,6 +10,7 @@ import React, { useMemo } from "react";
 import {
   Dimensions,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,7 +27,12 @@ export default function ArtistScreen() {
   const { core, clearQueue, playIndex } = useMusicbirb();
   const insets = useSafeAreaInsets();
 
-  const { data: artist, isLoading } = api.getArtistDetails.useQuery([id], {
+  const {
+    data: artist,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = api.getArtistDetails.useQuery([id], {
     enabled: !!id,
   });
 
@@ -71,11 +77,12 @@ export default function ArtistScreen() {
     <ScrollView
       style={styles.root}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+      }
       {...(Platform.OS === "ios"
         ? {
             contentInsetAdjustmentBehavior: "always",
-            contentInset: { top: -(insets.top + 54) },
-            bounces: false,
           }
         : {})}
     >
@@ -87,7 +94,11 @@ export default function ArtistScreen() {
               ? { uri: getCoverUrl(artist.coverArt)! }
               : require("@assets/icon.png")
           }
-          style={[styles.heroImage, { height: 300 + insets.top }]}
+          style={[
+            styles.heroImage,
+            { height: 300 + insets.top },
+            Platform.OS === "ios" ? { marginTop: -(insets.top + 54) } : {},
+          ]}
           contentFit="cover"
           transition={500}
           cachePolicy="memory-disk"

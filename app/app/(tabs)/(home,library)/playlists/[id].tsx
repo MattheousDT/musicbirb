@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useMemo } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function PlaylistScreen() {
@@ -16,7 +16,12 @@ export default function PlaylistScreen() {
   const api = useApi();
   const { playPlaylist, playIndex, queuePlaylist, clearQueue } = useMusicbirb();
 
-  const { data: playlist, isLoading } = api.getPlaylistDetails.useQuery([id], {
+  const {
+    data: playlist,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = api.getPlaylistDetails.useQuery([id], {
     enabled: !!id,
   });
 
@@ -67,6 +72,9 @@ export default function PlaylistScreen() {
           paddingTop: insets.top,
           paddingBottom: insets.bottom + 120,
         }}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+        }
         ListHeaderComponent={
           <View style={styles.info}>
             <Image

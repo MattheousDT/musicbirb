@@ -5,34 +5,65 @@ import { PlaceholderAlbumItem } from "@/components/entities/PlaceholderAlbumItem
 import { PlaylistItem } from "@/components/entities/PlaylistItem";
 import { PaginatedList } from "@/components/layout/PaginatedList";
 import { Stack } from "expo-router";
-import React from "react";
-import { FlatList, ScrollView, StyleSheet, Text } from "react-native";
+import React, { useMemo } from "react";
+import {
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const api = useApi();
 
-  const { data: lastPlayed, isLoading: lastPlayedLoading } =
-    api.getLastPlayedAlbums.useQuery([], { throwOnError: true });
+  const lastPlayedAlbums = api.getLastPlayedAlbums.useQuery([]);
+  const recentlyAddedAlbums = api.getRecentlyAddedAlbums.useQuery([]);
+  const newlyReleasedAlbums = api.getNewlyReleasedAlbums.useQuery([]);
+  const playlists = api.getPlaylists.useQuery([]);
 
-  const { data: recentlyAdded, isLoading: recentlyAddedLoading } =
-    api.getRecentlyAddedAlbums.useQuery([]);
-
-  const { data: newReleases } = api.getNewlyReleasedAlbums.useQuery([]);
-  const { data: playlists } = api.getPlaylists.useQuery([]);
+  const refreshing = useMemo(
+    () =>
+      [
+        lastPlayedAlbums.isRefetching,
+        recentlyAddedAlbums.isRefetching,
+        newlyReleasedAlbums.isRefetching,
+        playlists.isRefetching,
+      ].some(Boolean),
+    [
+      lastPlayedAlbums.isRefetching,
+      recentlyAddedAlbums.isRefetching,
+      newlyReleasedAlbums.isRefetching,
+      playlists.isRefetching,
+    ],
+  );
 
   return (
     <ScrollView
       style={styles.root}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            await Promise.all([
+              lastPlayedAlbums.refetch(),
+              recentlyAddedAlbums.refetch(),
+              newlyReleasedAlbums.refetch(),
+              playlists.refetch(),
+            ]);
+          }}
+        />
+      }
     >
       <Stack.Screen options={{ title: "Home", headerShown: false }} />
       <SafeAreaView>
         <Text style={styles.header}>Home</Text>
 
         <Text style={styles.sectionTitle}>Last Played</Text>
-        {lastPlayedLoading ? (
+        {lastPlayedAlbums.isLoading ? (
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -48,7 +79,7 @@ export default function HomeScreen() {
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={lastPlayed}
+            data={lastPlayedAlbums.data}
             keyExtractor={(item) => `lp-${item.id}`}
             renderItem={({ item }) => (
               <AlbumGridItem
@@ -66,7 +97,7 @@ export default function HomeScreen() {
         )}
 
         <Text style={styles.sectionTitle}>Recently Added</Text>
-        {recentlyAddedLoading ? (
+        {recentlyAddedAlbums.isLoading ? (
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -82,7 +113,7 @@ export default function HomeScreen() {
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={recentlyAdded}
+            data={recentlyAddedAlbums.data}
             keyExtractor={(item) => `ra-${item.id}`}
             renderItem={({ item }) => (
               <AlbumGridItem
@@ -101,7 +132,7 @@ export default function HomeScreen() {
 
         <Text style={styles.sectionTitle}>New Releases</Text>
         <PaginatedList
-          data={newReleases ?? []}
+          data={newlyReleasedAlbums.data ?? []}
           perPage={5}
           keyExtractor={(_, idx) => `nr-${idx}`}
           renderItem={({ item }) => (
@@ -119,7 +150,7 @@ export default function HomeScreen() {
 
         <Text style={styles.sectionTitle}>Playlists</Text>
         <PaginatedList
-          data={playlists ?? []}
+          data={playlists.data ?? []}
           perPage={5}
           keyExtractor={(_, idx) => `pl-${idx}`}
           renderItem={({ item }) => (

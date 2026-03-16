@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function AlbumScreen() {
@@ -17,7 +17,12 @@ export default function AlbumScreen() {
   const api = useApi();
   const { playAlbum, playIndex, queueAlbum, clearQueue } = useMusicbirb();
 
-  const { data: album, isLoading } = api.getAlbumDetails.useQuery([id], {
+  const {
+    data: album,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = api.getAlbumDetails.useQuery([id], {
     enabled: !!id,
   });
 
@@ -68,6 +73,9 @@ export default function AlbumScreen() {
           paddingTop: insets.top,
           paddingBottom: insets.bottom + 120,
         }}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+        }
         ListHeaderComponent={
           <View style={styles.info}>
             <Link.AppleZoomTarget>
