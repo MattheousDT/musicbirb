@@ -1,5 +1,5 @@
 #[cfg(feature = "ffi")]
-uniffi::setup_scaffolding!("musicbirb_ffi");
+uniffi::setup_scaffolding!("musicbirb");
 #[cfg(feature = "ffi")]
 use lazy_static::lazy_static;
 #[cfg(feature = "ffi")]

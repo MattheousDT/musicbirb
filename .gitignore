@@ -4,26 +4,18 @@ node_modules/
 # env
 .env*
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# Swift
+*.xcodeproj
+*.ipa
+*.dSYM.zip
+*.dSYM
+xcuserdata/
+*.hmap
+ios/build
+ios/Bindings
 
 # Rust
 target
-
-# Metro
-.metro-health-check*
 
 # debug
 npm-debug.*
@@ -46,6 +38,3 @@ yarn-error.*
 app-ffi/*
 !app-ffi/package.json
 !app-ffi/*.yaml
-
-# Expo CLI keeps creating this
-app/.gitignore

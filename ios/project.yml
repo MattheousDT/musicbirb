@@ -1,0 +1,20 @@
+name: Musicbirb
+options:
+  bundleIdPrefix: com.musicbirb
+targets:
+  Musicbirb:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Musicbirb
+      - path: Bindings/musicbirb.swift
+    info:
+      path: Musicbirb/Info.plist
+    settings:
+      SWIFT_OBJC_BRIDGING_HEADER: Bindings/musicbirbFFI.h
+      LIBRARY_SEARCH_PATHS: $(inherited)
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+    dependencies:
+      - framework: Bindings/musicbirb.xcframework
+        embed: true
