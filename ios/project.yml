@@ -11,6 +11,12 @@ targets:
       - path: Bindings/musicbirb.swift
     info:
       path: Musicbirb/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIBackgroundModes:
+          - audio
     settings:
       SWIFT_OBJC_BRIDGING_HEADER: Bindings/musicbirbFFI.h
       LIBRARY_SEARCH_PATHS: $(inherited)

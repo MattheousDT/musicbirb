@@ -7,17 +7,20 @@ struct CurrentlyPlayingBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: Config.getCoverUrl(id: track.coverArt)) { image in
-                image.resizable().aspectRatio(contentMode: .fit)
-            } placeholder: {
-                Color.gray.opacity(0.3)
-            }
-            .frame(width: 48, height: 48)
-            .cornerRadius(8)
+            SmoothImage(url: Config.getCoverUrl(id: track.coverArt, size: 100), placeholderColor: Color(UIColor.systemGray5))
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.title).font(.subheadline).bold().lineLimit(1)
-                Text(track.artist).font(.caption).foregroundColor(.blue).lineLimit(1)
+                Text(track.title)
+                    .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
+                Text(track.artist)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
@@ -25,6 +28,7 @@ struct CurrentlyPlayingBar: View {
             Button(action: { try? viewModel.core?.togglePause() }) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.title2)
+                    .symbolEffect(.bounce, value: isPlaying)
                     .foregroundColor(.primary)
             }
             .padding(.trailing, 8)
@@ -35,10 +39,9 @@ struct CurrentlyPlayingBar: View {
                     .foregroundColor(.primary)
             }
         }
-        .padding(8)
-        .background(.regularMaterial)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(.bar) // Matches Tab Bar material intrinsically
+        .overlay(Rectangle().frame(height: 0.3).foregroundColor(Color(UIColor.separator)), alignment: .top)
     }
 }
