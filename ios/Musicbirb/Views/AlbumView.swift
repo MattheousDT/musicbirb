@@ -10,16 +10,13 @@ struct AlbumView: View {
 			if let album = albumDetails {
 				VStack(spacing: 0) {
 					ZStack(alignment: .bottom) {
-						// 1. Underlying Gradient Placeholder (prevents visual jump)
-						LinearGradient(
-							colors: [Color(UIColor.systemGray4), Color(UIColor.systemGray6)],
-							startPoint: .topLeading,
-							endPoint: .bottomTrailing
-						)
-						.frame(height: 360)
+						// 1. Underlying Placeholder
+						Rectangle()
+							.fill(Color(UIColor.systemGray))
+							.frame(height: 360)
 
 						// 2. Blurred Background Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 768))
+						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 480))
 							.aspectRatio(contentMode: .fill)
 							.frame(height: 360)
 							.clipped()
@@ -32,7 +29,7 @@ struct AlbumView: View {
 							startPoint: .top,
 							endPoint: .bottom
 						)
-						.frame(height: 180)
+						.frame(height: 360)
 
 						// 4. Main Artwork Placeholder underneath
 						RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -42,7 +39,7 @@ struct AlbumView: View {
 							.offset(y: 40)
 
 						// 5. Main Artwork Smooth Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 768))
+						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 480))
 							.aspectRatio(contentMode: .fit)
 							.frame(width: 240, height: 240)
 							.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -57,10 +54,19 @@ struct AlbumView: View {
 							.padding(.top, 50)
 							.padding(.horizontal)
 
-						Text(album.artist)
-							.font(.system(size: 18, weight: .bold))
-							.multilineTextAlignment(.center)
-							.foregroundColor(.blue)
+						if let artistId = album.artistId {
+							NavigationLink(destination: ArtistView(artistId: artistId)) {
+								Text(album.artist)
+									.font(.system(size: 18, weight: .bold))
+									.multilineTextAlignment(.center)
+									.foregroundColor(.blue)
+							}
+						} else {
+							Text(album.artist)
+								.font(.system(size: 18, weight: .bold))
+								.multilineTextAlignment(.center)
+								.foregroundColor(.blue)
+						}
 
 						let meta = [
 							album.year.map(String.init), "\(album.songCount) tracks",

@@ -95,7 +95,6 @@ struct HomeView: View {
 			}
 			.background(Color(UIColor.systemGroupedBackground))
 			.navigationTitle("Home")
-			.navigationBarTitleDisplayMode(.large)
 			.refreshable {
 				await loadData()
 			}

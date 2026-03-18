@@ -5,25 +5,19 @@ struct ArtistSkeletonView: View {
 		VStack(spacing: 0) {
 			// Header Area
 			ZStack(alignment: .bottom) {
-				// Base color for the blurred area
-				Rectangle()
-					.fill(Color(UIColor.systemGray6))
-					.frame(height: 320)
-
 				LinearGradient(
 					gradient: Gradient(colors: [
-						Color(UIColor.systemGray6).opacity(0),
-						Color(UIColor.systemGray6).opacity(0.5),
+						Color(UIColor.systemGray),
 						Color(UIColor.systemBackground),
 					]),
 					startPoint: .top,
 					endPoint: .bottom
 				)
-				.frame(height: 200)
+				.frame(height: 320)
 
 				Circle()
 					.fill(Color(UIColor.systemGray6))
-					.frame(width: 180, height: 180)
+					.frame(width: 200, height: 200)
 					.offset(y: 40)
 			}
 

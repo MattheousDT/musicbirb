@@ -57,26 +57,31 @@ struct ArtistView: View {
 	@ViewBuilder
 	private func headerSection(_ artist: ArtistDetails) -> some View {
 		ZStack(alignment: .bottom) {
+			Rectangle()
+				.fill(Color(UIColor.systemGray))
+				.frame(height: 320)
+
 			SmoothImage(url: Config.getCoverUrl(id: artist.coverArt, size: 768))
+				.backgroundStyle(Color(UIColor.systemGray6))
 				.aspectRatio(contentMode: .fill)
 				.frame(height: 320)
+				.rotationEffect(.degrees(180))
 				.clipped()
 				.blur(radius: 20, opaque: true)
-				.overlay(Color.black.opacity(0.2))
 
 			LinearGradient(
 				gradient: Gradient(colors: [.clear, Color(UIColor.systemBackground)]),
 				startPoint: .top,
 				endPoint: .bottom
 			)
-			.frame(height: 160)
+			.frame(height: 320)
 
 			SmoothImage(
-				url: Config.getCoverUrl(id: artist.coverArt, size: 500),
+				url: Config.getCoverUrl(id: artist.coverArt, size: 400),
 				placeholderColor: Color(UIColor.systemGray6)
 			)
 			.aspectRatio(contentMode: .fill)
-			.frame(width: 180, height: 180)
+			.frame(width: 200, height: 200)
 			.clipShape(Circle())
 			.shadow(color: .black.opacity(0.15), radius: 20, y: 10)
 			.offset(y: 40)
