@@ -30,7 +30,6 @@ struct ContentView: View {
 	}
 }
 
-// Safely implements the new iOS 18 (user referred to as 26) tabViewBottomAccessory while avoiding compiler errors
 struct BottomAccessoryModifier: ViewModifier {
 	let currentTrack: Track?
 	let isPlaying: Bool

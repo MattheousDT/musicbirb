@@ -13,6 +13,7 @@ xcuserdata/
 *.hmap
 ios/build
 ios/Bindings
+buildServer.json
 
 # Rust
 target

@@ -1,13 +1,13 @@
 import SwiftUI
 
-struct AlbumView: View {
+struct PlaylistView: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
-	let albumId: AlbumId
-	@State private var albumDetails: AlbumDetails?
+	let playlistId: PlaylistId
+	@State private var playlistDetails: PlaylistDetails?
 
 	var body: some View {
 		ScrollView {
-			if let album = albumDetails {
+			if let playlist = playlistDetails {
 				VStack(spacing: 0) {
 					ZStack(alignment: .bottom) {
 						// 1. Underlying Gradient Placeholder (prevents visual jump)
@@ -19,7 +19,7 @@ struct AlbumView: View {
 						.frame(height: 360)
 
 						// 2. Blurred Background Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 768))
+						SmoothImage(url: Config.getCoverUrl(id: playlist.coverArt, size: 768))
 							.aspectRatio(contentMode: .fill)
 							.frame(height: 360)
 							.clipped()
@@ -42,7 +42,7 @@ struct AlbumView: View {
 							.offset(y: 40)
 
 						// 5. Main Artwork Smooth Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 768))
+						SmoothImage(url: Config.getCoverUrl(id: playlist.coverArt, size: 768))
 							.aspectRatio(contentMode: .fit)
 							.frame(width: 240, height: 240)
 							.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -51,36 +51,46 @@ struct AlbumView: View {
 					.zIndex(1)
 
 					VStack(spacing: 8) {
-						Text(album.title)
+						Text(playlist.name)
 							.font(.system(size: 28, weight: .heavy))
 							.multilineTextAlignment(.center)
 							.padding(.top, 50)
 							.padding(.horizontal)
 
-						Text(album.artist)
-							.font(.system(size: 18, weight: .bold))
-							.multilineTextAlignment(.center)
-							.foregroundColor(.blue)
+						if let owner = playlist.owner, !owner.isEmpty {
+							Text("Created by \(owner)")
+								.font(.system(size: 18, weight: .bold))
+								.multilineTextAlignment(.center)
+								.foregroundColor(.accentColor)
+						}
 
 						let meta = [
-							album.year.map(String.init), "\(album.songCount) tracks",
-							"\(album.durationSecs / 60) mins",
+							"\(playlist.songCount) tracks",
+							"\(playlist.durationSecs / 60) mins",
 						]
-						.compactMap { $0 }
 						.joined(separator: " • ")
 
 						Text(meta)
 							.font(.system(size: 14, weight: .semibold))
 							.foregroundColor(.secondary)
+
+						if let comment = playlist.comment, !comment.isEmpty {
+							Text(comment)
+								.font(.system(size: 14))
+								.foregroundColor(.secondary)
+								.multilineTextAlignment(.center)
+								.padding(.horizontal, 32)
+								.padding(.top, 4)
+						}
 					}
 					.padding(.bottom, 24)
 					.zIndex(2)
 
 					HStack(spacing: 16) {
-						Button(action: { playAlbum() }) {
+						Button(action: { playPlaylist() }) {
 							HStack {
 								Image(systemName: "play.fill")
-								Text("Play Album")
+								Text("Play Playlist")
 							}
 							.font(.system(size: 16, weight: .heavy))
 							.foregroundColor(.white)
@@ -94,7 +104,7 @@ struct AlbumView: View {
 					.padding(.bottom, 32)
 
 					LazyVStack(spacing: 0) {
-						ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
+						ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, track in
 							TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
 								playTrack(index: index)
 							}
@@ -114,9 +124,9 @@ struct AlbumView: View {
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.task {
 			do {
-				albumDetails = try await viewModel.core?.getAlbumDetails(albumId: albumId)
+				playlistDetails = try await viewModel.core?.getPlaylistDetails(playlistId: playlistId)
 			} catch {
-				Log.app.error("Album error: \(error)")
+				Log.app.error("Playlist error: \(error)")
 			}
 		}
 	}
@@ -125,10 +135,10 @@ struct AlbumView: View {
 		return viewModel.currentTrack?.id == track.id
 	}
 
-	private func playAlbum() {
+	private func playPlaylist() {
 		Task {
 			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queueAlbum(id: albumId)
+			_ = try? await viewModel.core?.queuePlaylist(id: playlistId)
 			_ = try? viewModel.core?.playIndex(index: 0)
 		}
 	}
@@ -136,7 +146,7 @@ struct AlbumView: View {
 	private func playTrack(index: Int) {
 		Task {
 			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queueAlbum(id: albumId)
+			_ = try? await viewModel.core?.queuePlaylist(id: playlistId)
 			_ = try? viewModel.core?.playIndex(index: UInt32(index))
 		}
 	}

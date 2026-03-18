@@ -23,6 +23,7 @@ struct HomeView: View {
 									ForEach(lastPlayedAlbums, id: \.id) { album in
 										NavigationLink(destination: AlbumView(albumId: album.id)) {
 											AlbumGridItem(album: album)
+												.frame(width: 140)  // Constrain width in carousel
 										}
 										.buttonStyle(.plain)
 									}
@@ -46,6 +47,7 @@ struct HomeView: View {
 									ForEach(recentAlbums, id: \.id) { album in
 										NavigationLink(destination: AlbumView(albumId: album.id)) {
 											AlbumGridItem(album: album)
+												.frame(width: 140)  // Constrain width in carousel
 										}
 										.buttonStyle(.plain)
 									}
@@ -81,7 +83,7 @@ struct HomeView: View {
 								.padding(.horizontal, 16)
 
 							PaginatedList(items: playlists, itemsPerPage: 5, rowHeight: 72) { playlist in
-								NavigationLink(destination: Text("PlaylistView coming soon!")) {
+								NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
 									PlaylistItem(playlist: playlist)
 								}
 								.buttonStyle(RowButtonStyle())
@@ -93,6 +95,7 @@ struct HomeView: View {
 			}
 			.background(Color(UIColor.systemGroupedBackground))
 			.navigationTitle("Home")
+			.navigationBarTitleDisplayMode(.large)
 			.refreshable {
 				await loadData()
 			}

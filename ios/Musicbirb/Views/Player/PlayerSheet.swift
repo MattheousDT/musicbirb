@@ -38,7 +38,7 @@ struct PlayerSheet: View {
 
 						Text(currentTrack.artist)
 							.font(.system(size: 18, weight: .bold))
-							.foregroundColor(.blue)
+							.foregroundColor(.accentColor)
 							.lineLimit(1)
 					}
 					.padding(.horizontal, 24)
