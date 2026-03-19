@@ -1,9 +1,6 @@
 use crate::{
 	Playlist,
-	models::{
-		Album, AlbumDetails, AlbumId, Artist, ArtistId, CoverArtId, PlaylistDetails, PlaylistId,
-		Track, TrackId,
-	},
+	models::{Album, AlbumDetails, AlbumId, Artist, ArtistId, CoverArtId, PlaylistDetails, PlaylistId, Track, TrackId},
 };
 
 impl From<submarine::data::Child> for Track {

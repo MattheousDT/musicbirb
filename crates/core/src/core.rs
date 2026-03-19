@@ -2,8 +2,7 @@ use crate::actor::CoreActor;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
 use crate::models::{
-	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId,
-	TrackId,
+	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId, TrackId,
 };
 use crate::providers::Provider;
 use crate::state::{CoreMessage, CoreState};
@@ -42,10 +41,7 @@ pub fn init_client(
 	let _guard = crate::RUNTIME.enter();
 
 	let shared_tx = Arc::new(std::sync::Mutex::new(None));
-	let backend = Arc::new(crate::ffi::MobileBackend::new(
-		delegate,
-		Arc::clone(&shared_tx),
-	));
+	let backend = Arc::new(crate::ffi::MobileBackend::new(delegate, Arc::clone(&shared_tx)));
 	let event_target = Arc::new(crate::ffi::AudioEventTarget::new(Arc::clone(&shared_tx)));
 
 	let data_dir_opt = if data_dir.is_empty() {
@@ -195,17 +191,11 @@ impl Musicbirb {
 		run_async!(async move { self.api.get_newly_released_albums().await })
 	}
 
-	pub async fn get_album_details(
-		self: Arc<Self>,
-		album_id: AlbumId,
-	) -> Result<AlbumDetails, MusicbirbError> {
+	pub async fn get_album_details(self: Arc<Self>, album_id: AlbumId) -> Result<AlbumDetails, MusicbirbError> {
 		run_async!(async move { self.api.get_album_details(&album_id).await })
 	}
 
-	pub async fn get_artist_details(
-		self: Arc<Self>,
-		artist_id: ArtistId,
-	) -> Result<ArtistDetails, MusicbirbError> {
+	pub async fn get_artist_details(self: Arc<Self>, artist_id: ArtistId) -> Result<ArtistDetails, MusicbirbError> {
 		run_async!(async move { self.api.get_artist_details(&artist_id).await })
 	}
 

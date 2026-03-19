@@ -78,14 +78,9 @@ async fn main() -> Result<()> {
 		let mut prot_lock = image_protocol.lock().unwrap();
 
 		terminal.draw(|f| {
-			let main = Layout::vertical([
-				Constraint::Min(0),
-				Constraint::Length(6),
-				Constraint::Length(3),
-			])
-			.split(f.area());
-			let top = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
-				.split(main[0]);
+			let main =
+				Layout::vertical([Constraint::Min(0), Constraint::Length(6), Constraint::Length(3)]).split(f.area());
+			let top = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)]).split(main[0]);
 
 			let art_area = Block::bordered().title(" Album Art ").inner(top[0]);
 			f.render_widget(Block::bordered().title(" Album Art "), top[0]);
@@ -93,35 +88,21 @@ async fn main() -> Result<()> {
 			if let Some(p) = prot_lock.as_mut() {
 				f.render_stateful_widget(StatefulImage::default(), art_area, p);
 			} else {
-				let txt = if last_art_arc.is_some() {
-					"Loading..."
-				} else {
-					"No Art"
-				};
+				let txt = if last_art_arc.is_some() { "Loading..." } else { "No Art" };
 				f.render_widget(Paragraph::new(txt).alignment(Alignment::Center), art_area);
 			}
 
 			render_queue(f, top[1], &queue, pos);
-			render_now_playing(
-				f,
-				main[1],
-				current_track.as_ref(),
-				&state.sync,
-				state.scrobble_mark_pos,
-			);
+			render_now_playing(f, main[1], current_track.as_ref(), &state.sync, state.scrobble_mark_pos);
 
 			if let Some(e) = current_err {
 				f.render_widget(
-					Paragraph::new(e)
-						.red()
-						.block(Block::bordered().title(" Error ")),
+					Paragraph::new(e).red().block(Block::bordered().title(" Error ")),
 					main[2],
 				);
 			} else if let Some(i) = current_info {
 				f.render_widget(
-					Paragraph::new(i)
-						.blue()
-						.block(Block::bordered().title(" Info ")),
+					Paragraph::new(i).blue().block(Block::bordered().title(" Info ")),
 					main[2],
 				);
 			} else {
@@ -168,21 +149,15 @@ async fn main() -> Result<()> {
 								tokio::spawn(async move {
 									*i_m.lock().unwrap() = Some("Fetching...".into());
 									let res = if raw.starts_with("al:") {
-										c.queue_album(AlbumId(
-											raw.strip_prefix("al:").unwrap().to_string(),
-										))
-										.await
-										.map(|count| format!("Added {} tracks", count))
-									} else if raw.starts_with("pl:") {
-										c.queue_playlist(PlaylistId(
-											raw.strip_prefix("pl:").unwrap().to_string(),
-										))
-										.await
-										.map(|count| format!("Added {} tracks", count))
-									} else {
-										c.queue_track(TrackId(raw.clone()))
+										c.queue_album(AlbumId(raw.strip_prefix("al:").unwrap().to_string()))
 											.await
-											.map(|_| "Added track".into())
+											.map(|count| format!("Added {} tracks", count))
+									} else if raw.starts_with("pl:") {
+										c.queue_playlist(PlaylistId(raw.strip_prefix("pl:").unwrap().to_string()))
+											.await
+											.map(|count| format!("Added {} tracks", count))
+									} else {
+										c.queue_track(TrackId(raw.clone())).await.map(|_| "Added track".into())
 									};
 									match res {
 										Ok(m) => *i_m.lock().unwrap() = Some(m),

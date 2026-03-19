@@ -15,8 +15,7 @@ pub struct MpvBackend {
 
 impl MpvBackend {
 	pub fn new() -> Result<Self, MusicbirbError> {
-		let mpv =
-			Mpv::new().map_err(|e| MusicbirbError::Player(format!("Init failed: {:?}", e)))?;
+		let mpv = Mpv::new().map_err(|e| MusicbirbError::Player(format!("Init failed: {:?}", e)))?;
 		mpv.set_property("vo", "null")
 			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 		// Make MPV go into idle state at the end of the playlist rather than quitting or pausing at EOF
@@ -56,19 +55,14 @@ impl AudioBackend for MpvBackend {
 					Some(Ok(Event::PropertyChange { name, change, .. })) => match name {
 						"pause" => {
 							if let PropertyData::Flag(p) = change {
-								let status = if p {
-									PlayerStatus::Paused
-								} else {
-									PlayerStatus::Playing
-								};
+								let status = if p { PlayerStatus::Paused } else { PlayerStatus::Playing };
 								let _ = tx.send(BackendEvent::StatusUpdate(status));
 							}
 						}
 						"idle-active" => {
 							if let PropertyData::Flag(idle) = change {
 								if idle {
-									let _ =
-										tx.send(BackendEvent::StatusUpdate(PlayerStatus::Stopped));
+									let _ = tx.send(BackendEvent::StatusUpdate(PlayerStatus::Stopped));
 								}
 							}
 						}
@@ -145,10 +139,7 @@ impl AudioBackend for MpvBackend {
 		let count: i64 = self.mpv.get_property("playlist-count").unwrap_or(0);
 		if count > 0 {
 			self.mpv
-				.command(
-					"playlist-move",
-					&[&(count - 1).to_string(), &index.to_string()],
-				)
+				.command("playlist-move", &[&(count - 1).to_string(), &index.to_string()])
 				.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 		}
 		Ok(())

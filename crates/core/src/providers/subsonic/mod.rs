@@ -1,7 +1,7 @@
 use crate::error::MusicbirbError;
 use crate::models::{
-	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist,
-	PlaylistDetails, PlaylistId, Track, TrackId, TrackScrobble,
+	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist, PlaylistDetails, PlaylistId,
+	Track, TrackId, TrackScrobble,
 };
 use crate::providers::Provider;
 use async_trait::async_trait;
@@ -54,15 +54,7 @@ impl Provider for SubsonicProvider {
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
 		let url = self
 			.client
-			.stream_url(
-				&track_id.0,
-				None,
-				None::<String>,
-				None,
-				None::<String>,
-				None,
-				None,
-			)
+			.stream_url(&track_id.0, None, None::<String>, None, None::<String>, None, None)
 			.map_err(|e| MusicbirbError::Api(format!("Failed to build stream URL: {}", e)))?;
 		Ok(url.to_string())
 	}
@@ -97,21 +89,14 @@ impl Provider for SubsonicProvider {
 		Ok(AlbumDetails::from(album))
 	}
 
-	async fn get_artist_details(
-		&self,
-		artist_id: &ArtistId,
-	) -> Result<ArtistDetails, MusicbirbError> {
+	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError> {
 		let mut artist = self
 			.client
 			.get_artist(&artist_id.0)
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get artist details: {}", e)))?;
 
-		let info = self
-			.client
-			.get_artist_info2(&artist_id.0, None, None)
-			.await
-			.ok();
+		let info = self.client.get_artist_info2(&artist_id.0, None, None).await.ok();
 
 		let top_songs = self
 			.client
@@ -119,9 +104,7 @@ impl Provider for SubsonicProvider {
 			.await
 			.unwrap_or_default();
 
-		let biography = info
-			.as_ref()
-			.and_then(|i| i.base.biography.clone().into_iter().next());
+		let biography = info.as_ref().and_then(|i| i.base.biography.clone().into_iter().next());
 
 		let similar_artists = info
 			.map(|i| i.similar_artist.into_iter().map(Artist::from).collect())
@@ -141,10 +124,7 @@ impl Provider for SubsonicProvider {
 		})
 	}
 
-	async fn get_playlist_tracks(
-		&self,
-		playlist_id: &PlaylistId,
-	) -> Result<Vec<Track>, MusicbirbError> {
+	async fn get_playlist_tracks(&self, playlist_id: &PlaylistId) -> Result<Vec<Track>, MusicbirbError> {
 		let playlist = self
 			.client
 			.get_playlist(&playlist_id.0)
@@ -154,10 +134,7 @@ impl Provider for SubsonicProvider {
 		Ok(playlist.entry.into_iter().map(Track::from).collect())
 	}
 
-	async fn get_playlist_details(
-		&self,
-		playlist_id: &PlaylistId,
-	) -> Result<PlaylistDetails, MusicbirbError> {
+	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError> {
 		let pl_data = self
 			.client
 			.get_playlist(&playlist_id.0)
@@ -181,16 +158,10 @@ impl Provider for SubsonicProvider {
 			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 
 		if resp.status() != StatusCode::OK {
-			return Err(MusicbirbError::Api(format!(
-				"Image download failed: {}",
-				resp.status()
-			)));
+			return Err(MusicbirbError::Api(format!("Image download failed: {}", resp.status())));
 		}
 
-		let bytes = resp
-			.bytes()
-			.await
-			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+		let bytes = resp.bytes().await.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 		Ok(bytes.to_vec())
 	}
 

@@ -12,9 +12,7 @@ impl ArtCache {
 	pub fn new(cache_dir: Option<PathBuf>) -> Self {
 		let artwork_dir = if let Some(dir) = cache_dir {
 			dir.join("artwork")
-		} else if let Some(proj_dirs) =
-			directories::ProjectDirs::from("com", "musicbirb", "musicbirb")
-		{
+		} else if let Some(proj_dirs) = directories::ProjectDirs::from("com", "musicbirb", "musicbirb") {
 			proj_dirs.cache_dir().join("artwork")
 		} else {
 			std::env::temp_dir().join("musicbirb").join("artwork")

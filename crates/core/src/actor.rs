@@ -143,9 +143,7 @@ impl CoreActor {
 				self.sync_scrobble_duration(&current_sync);
 				// If the backend has moved to the second item in its internal playlist,
 				// and that item matches what we preloaded, we treat it as a gapless transition.
-				if p_state.playlist_index > 0
-					&& self.preloading_index == Some(self.queue_position + 1)
-				{
+				if p_state.playlist_index > 0 && self.preloading_index == Some(self.queue_position + 1) {
 					self.advance_queue_gapless(player, api, state_tx).await;
 				} else {
 					self.dispatch_state(&p_state, state_tx);
@@ -177,9 +175,7 @@ impl CoreActor {
 				self.sync_scrobble_duration(&current_sync);
 				self.scrobble_tracker.sync_position(seconds);
 
-				if p_state.playlist_index > 0
-					&& self.preloading_index == Some(self.queue_position + 1)
-				{
+				if p_state.playlist_index > 0 && self.preloading_index == Some(self.queue_position + 1) {
 					self.advance_queue_gapless(player, api, state_tx).await;
 				}
 
@@ -191,8 +187,7 @@ impl CoreActor {
 			BackendEvent::EndOfTrack => {
 				self.scrobble_timer = None;
 
-				if self.active_index.is_some() && self.last_track_start_time.elapsed().as_secs() > 2
-				{
+				if self.active_index.is_some() && self.last_track_start_time.elapsed().as_secs() > 2 {
 					if self.queue_position + 1 < self.queue.len() {
 						self.advance_queue(player, api, tx, state_tx).await;
 					} else {
@@ -409,11 +404,7 @@ impl CoreActor {
 			CoreMessage::TogglePause => {
 				let _ = player.toggle_pause().await;
 			}
-			CoreMessage::UrlReady {
-				url,
-				index,
-				is_preload,
-			} => {
+			CoreMessage::UrlReady { url, index, is_preload } => {
 				if is_preload && Some(index) == self.preloading_index {
 					let _ = player.add(&url).await;
 				} else if !is_preload && Some(index) == self.fetching_index {
@@ -450,10 +441,7 @@ impl CoreActor {
 		}
 
 		if let Some(track) = self.queue.get(self.queue_position) {
-			if let Some(rem) = self
-				.scrobble_tracker
-				.get_remaining_duration(track.duration_secs)
-			{
+			if let Some(rem) = self.scrobble_tracker.get_remaining_duration(track.duration_secs) {
 				self.scrobble_timer = Some(Box::pin(sleep(rem)));
 			}
 		}
@@ -478,10 +466,7 @@ impl CoreActor {
 
 		#[cfg(feature = "os-media-controls")]
 		if let Some(mpris) = &mut self.mpris {
-			let art_path = self
-				.current_art_id
-				.as_ref()
-				.map(|id| self.art_cache.get_path(id));
+			let art_path = self.current_art_id.as_ref().map(|id| self.art_cache.get_path(id));
 			mpris.sync(track, p_state.status, art_path.as_deref());
 		}
 
@@ -523,9 +508,7 @@ impl CoreActor {
 		}
 
 		// Fetch current track URL if not active or currently being fetched
-		if self.active_index != Some(self.queue_position)
-			&& self.fetching_index != Some(self.queue_position)
-		{
+		if self.active_index != Some(self.queue_position) && self.fetching_index != Some(self.queue_position) {
 			self.fetching_index = Some(self.queue_position);
 			self.spawn_url_fetch(api, tx, self.queue_position, false);
 		} else if self.active_index == Some(self.queue_position)
@@ -538,10 +521,7 @@ impl CoreActor {
 			self.spawn_url_fetch(api, tx, next, true);
 		}
 
-		let art_id = self
-			.queue
-			.get(self.queue_position)
-			.and_then(|t| t.cover_art.clone());
+		let art_id = self.queue.get(self.queue_position).and_then(|t| t.cover_art.clone());
 		self.update_art_state(art_id, api, tx);
 	}
 
@@ -576,22 +556,13 @@ impl CoreActor {
 		let (api_c, tx_c) = (Arc::clone(api), tx.clone());
 		tokio::spawn(async move {
 			if let Ok(url) = api_c.get_stream_url(&track_id).await {
-				let _ = tx_c.send(CoreMessage::UrlReady {
-					url,
-					index,
-					is_preload,
-				});
+				let _ = tx_c.send(CoreMessage::UrlReady { url, index, is_preload });
 			}
 		});
 	}
 
 	/// Spawns an async task to download cover art bytes.
-	fn spawn_art_fetch(
-		&self,
-		id: &CoverArtId,
-		api: &Arc<dyn Provider>,
-		tx: &mpsc::UnboundedSender<CoreMessage>,
-	) {
+	fn spawn_art_fetch(&self, id: &CoverArtId, api: &Arc<dyn Provider>, tx: &mpsc::UnboundedSender<CoreMessage>) {
 		let (api_c, tx_c, id_c) = (Arc::clone(api), tx.clone(), id.clone());
 		tokio::spawn(async move {
 			if let Ok(bytes) = api_c.get_cover_art_bytes(&id_c).await {
