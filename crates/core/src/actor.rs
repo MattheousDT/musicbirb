@@ -1,7 +1,7 @@
-use crate::api::subsonic::SubsonicClient;
 use crate::art_cache::ArtCache;
 use crate::backend::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
 use crate::models::{CoverArtId, Track};
+use crate::providers::Provider;
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
 use crate::state::{CoreMessage, CoreState, PlaybackSync};
 use image::DynamicImage;
@@ -72,7 +72,7 @@ impl CoreActor {
 		mut rx: mpsc::UnboundedReceiver<CoreMessage>,
 		tx: mpsc::UnboundedSender<CoreMessage>,
 		state_tx: watch::Sender<CoreState>,
-		api: Arc<SubsonicClient>,
+		api: Arc<dyn Provider>,
 		player: Arc<dyn AudioBackend>,
 	) {
 		#[cfg(feature = "os-media-controls")]
@@ -131,7 +131,7 @@ impl CoreActor {
 		&mut self,
 		event: BackendEvent,
 		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
@@ -208,7 +208,7 @@ impl CoreActor {
 	async fn advance_queue(
 		&mut self,
 		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
@@ -230,7 +230,7 @@ impl CoreActor {
 	async fn advance_queue_gapless(
 		&mut self,
 		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
 		self.queue_position += 1;
@@ -249,7 +249,7 @@ impl CoreActor {
 	async fn reset_to_start(
 		&mut self,
 		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
@@ -273,7 +273,7 @@ impl CoreActor {
 		&mut self,
 		msg: CoreMessage,
 		player: &Arc<dyn AudioBackend>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		state_tx: &watch::Sender<CoreState>,
 	) {
@@ -460,7 +460,7 @@ impl CoreActor {
 	}
 
 	/// Pushes a scrobble entry to the manager and attempts to flush.
-	fn trigger_scrobble(&mut self, api: &Arc<SubsonicClient>) {
+	fn trigger_scrobble(&mut self, api: &Arc<dyn Provider>) {
 		if let Some(track) = self.queue.get(self.queue_position) {
 			self.scrobble_tracker.has_scrobbled = true;
 			self.scrobble_manager
@@ -499,7 +499,7 @@ impl CoreActor {
 	}
 
 	/// Handles initialization tasks when a track begins playback.
-	fn on_track_start(&mut self, api: &Arc<SubsonicClient>) {
+	fn on_track_start(&mut self, api: &Arc<dyn Provider>) {
 		self.scrobble_tracker.reset();
 		if let Some(track) = self.queue.get(self.queue_position) {
 			let id = track.id.clone();
@@ -514,7 +514,7 @@ impl CoreActor {
 	/// Ensures the backend and actor have the necessary URLs and metadata for the current and next track.
 	fn sync_resources(
 		&mut self,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		p_state: &PlayerState,
 	) {
@@ -549,7 +549,7 @@ impl CoreActor {
 	fn update_art_state(
 		&mut self,
 		art_id: Option<CoverArtId>,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 	) {
 		if art_id != self.current_art_id {
@@ -567,7 +567,7 @@ impl CoreActor {
 	/// Spawns an async task to resolve a Subsonic stream URL.
 	fn spawn_url_fetch(
 		&self,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 		index: usize,
 		is_preload: bool,
@@ -589,7 +589,7 @@ impl CoreActor {
 	fn spawn_art_fetch(
 		&self,
 		id: &CoverArtId,
-		api: &Arc<SubsonicClient>,
+		api: &Arc<dyn Provider>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 	) {
 		let (api_c, tx_c, id_c) = (Arc::clone(api), tx.clone(), id.clone());
@@ -601,11 +601,11 @@ impl CoreActor {
 	}
 
 	/// Spawns an async task to send pending scrobbles to the server.
-	fn spawn_scrobble_flush(&self, api: &Arc<SubsonicClient>) {
+	fn spawn_scrobble_flush(&self, api: &Arc<dyn Provider>) {
 		let (sm, api_c) = (Arc::clone(&self.scrobble_manager), Arc::clone(api));
 		tokio::spawn(async move {
 			let items = sm.lock().unwrap().get_all();
-			if !items.is_empty() && api_c.scrobble(&items).await.is_ok() {
+			if !items.is_empty() && api_c.scrobble(items.clone()).await.is_ok() {
 				sm.lock().unwrap().remove_flushed(items.len());
 			}
 		});

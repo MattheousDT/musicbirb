@@ -1,4 +1,4 @@
-use crate::models::TrackId;
+use crate::models::{TrackId, TrackScrobble};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -46,10 +46,13 @@ impl ScrobbleManager {
 		self.save();
 	}
 
-	pub fn get_all(&self) -> Vec<(TrackId, u64)> {
+	pub fn get_all(&self) -> Vec<TrackScrobble> {
 		self.queue
 			.iter()
-			.map(|e| (TrackId(e.id.clone()), e.timestamp))
+			.map(|e| TrackScrobble {
+				id: TrackId(e.id.clone()),
+				timestamp: e.timestamp,
+			})
 			.collect()
 	}
 

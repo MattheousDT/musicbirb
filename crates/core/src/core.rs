@@ -1,11 +1,11 @@
 use crate::actor::CoreActor;
-use crate::api::subsonic::SubsonicClient;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
 use crate::models::{
 	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId,
 	TrackId,
 };
+use crate::providers::Provider;
 use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -33,18 +33,13 @@ macro_rules! run_async {
 #[cfg(feature = "ffi")]
 #[uniffi::export]
 pub fn init_client(
-	url: String,
-	user: String,
-	pass: String,
+	provider: Arc<dyn crate::Provider>,
 	data_dir: String,
 	cache_dir: String,
 	delegate: Box<dyn crate::ffi::AudioEngineDelegate>,
 	observer: Box<dyn crate::ffi::StateObserver>,
 ) -> Result<Arc<Musicbirb>, MusicbirbError> {
-	// The magic bullet: Synchronous init forces the Tokio context to exist instantly
 	let _guard = crate::RUNTIME.enter();
-
-	let api = SubsonicClient::new(&url, &user, &pass)?;
 
 	let shared_tx = Arc::new(std::sync::Mutex::new(None));
 	let backend = Arc::new(crate::ffi::MobileBackend::new(
@@ -68,7 +63,7 @@ pub fn init_client(
 	let (state_tx, mut state_rx) = watch::channel(CoreState::default());
 
 	let core = Arc::new(Musicbirb {
-		api: Arc::new(api),
+		api: provider,
 		tx: tx.clone(),
 		state_rx: state_rx.clone(),
 		event_target: Some(Arc::clone(&event_target)),
@@ -96,7 +91,7 @@ pub fn init_client(
 
 #[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct Musicbirb {
-	api: Arc<SubsonicClient>,
+	api: Arc<dyn Provider>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
 	#[cfg(feature = "ffi")]
@@ -276,22 +271,21 @@ impl Musicbirb {
 
 // Pure Rust Methods
 impl Musicbirb {
-	pub fn new(api: SubsonicClient, player: Arc<dyn AudioBackend>) -> Arc<Self> {
+	pub fn new(api: Arc<dyn Provider>, player: Arc<dyn AudioBackend>) -> Arc<Self> {
 		Self::with_paths(api, player, None, None)
 	}
 
 	pub fn with_paths(
-		api: SubsonicClient,
+		api: Arc<dyn Provider>,
 		player: Arc<dyn AudioBackend>,
 		data_dir: Option<PathBuf>,
 		cache_dir: Option<PathBuf>,
 	) -> Arc<Self> {
 		let (tx, rx) = mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(CoreState::default());
-		let api_arc = Arc::new(api);
 
 		let core = Arc::new(Self {
-			api: Arc::clone(&api_arc),
+			api: Arc::clone(&api),
 			tx: tx.clone(),
 			state_rx,
 			#[cfg(feature = "ffi")]
@@ -299,11 +293,9 @@ impl Musicbirb {
 		});
 
 		let actor = CoreActor::new(data_dir, cache_dir);
-		let api_clone = Arc::clone(&api_arc);
+		let api_clone = Arc::clone(&api);
 		let tx_clone = tx.clone();
 
-		// Update this to use the same logic as our macro:
-		// Use the background RUNTIME for FFI, but standard tokio::spawn for everything else.
 		#[cfg(feature = "ffi")]
 		crate::RUNTIME.spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_clone, player).await;

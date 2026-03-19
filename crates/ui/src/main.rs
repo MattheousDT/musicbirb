@@ -7,8 +7,8 @@ use crossterm::{
 	event::{self, Event, KeyCode},
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use musicbirb::mpv::MpvBackend;
-use musicbirb::{AlbumId, Musicbirb, PlaylistId, SubsonicClient, TrackId};
+use musicbirb::{AlbumId, Musicbirb, PlaylistId, TrackId};
+use musicbirb::{SubsonicProvider, mpv::MpvBackend};
 use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use std::{
@@ -25,9 +25,9 @@ async fn main() -> Result<()> {
 	let user = env::var("SUBSONIC_USER")?;
 	let pass = env::var("SUBSONIC_PASS")?;
 
-	let api = SubsonicClient::new(&url, &user, &pass)?;
+	let subsonic = Arc::new(SubsonicProvider::new(&url, &user, &pass)?);
 	let player = Arc::new(MpvBackend::new()?);
-	let core = Musicbirb::new(api, player);
+	let core = Musicbirb::new(subsonic, player);
 	let state_rx = core.subscribe();
 
 	enable_raw_mode()?;
