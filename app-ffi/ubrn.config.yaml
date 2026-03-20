@@ -1,3 +1,0 @@
-rust:
-  directory: ../crates/ffi
-  manifestPath: Cargo.toml

@@ -1,4 +1,0 @@
-nodeLinker: hoisted
-packages:
-  - app
-  - app-ffi
