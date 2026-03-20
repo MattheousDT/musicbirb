@@ -55,20 +55,13 @@ impl MprisManager {
 	pub fn set_playback_status(&mut self, status: PlayerStatus) {
 		let pb = match status {
 			PlayerStatus::Playing => MediaPlayback::Playing { progress: None },
-			PlayerStatus::Paused | PlayerStatus::Buffering => {
-				MediaPlayback::Paused { progress: None }
-			}
+			PlayerStatus::Paused | PlayerStatus::Buffering => MediaPlayback::Paused { progress: None },
 			PlayerStatus::Stopped => MediaPlayback::Stopped,
 		};
 		let _ = self.controls.set_playback(pb);
 	}
 
-	pub fn sync(
-		&mut self,
-		track: Option<&Track>,
-		status: PlayerStatus,
-		art_path: Option<&std::path::Path>,
-	) {
+	pub fn sync(&mut self, track: Option<&Track>, status: PlayerStatus, art_path: Option<&std::path::Path>) {
 		self.set_playback_status(status);
 		if let Some(t) = track {
 			self.update_metadata(t, art_path);

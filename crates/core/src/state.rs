@@ -48,8 +48,8 @@ pub struct UiState {
 
 pub enum CoreMessage {
 	Shutdown,
-	AddTracks(Vec<Track>),
-	ReplaceTracks(Vec<Track>),
+	AddTracks(Vec<Track>, bool),
+	ReplaceTracks(Vec<Track>, usize),
 	ClearQueue,
 	RemoveIndex(usize),
 	Next,

@@ -1,11 +1,10 @@
 use crate::actor::CoreActor;
-use crate::api::subsonic::SubsonicClient;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
 use crate::models::{
-	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId,
-	TrackId,
+	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId, TrackId,
 };
+use crate::providers::Provider;
 use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -33,24 +32,16 @@ macro_rules! run_async {
 #[cfg(feature = "ffi")]
 #[uniffi::export]
 pub fn init_client(
-	url: String,
-	user: String,
-	pass: String,
+	provider: Arc<dyn crate::Provider>,
 	data_dir: String,
 	cache_dir: String,
 	delegate: Box<dyn crate::ffi::AudioEngineDelegate>,
 	observer: Box<dyn crate::ffi::StateObserver>,
 ) -> Result<Arc<Musicbirb>, MusicbirbError> {
-	// The magic bullet: Synchronous init forces the Tokio context to exist instantly
 	let _guard = crate::RUNTIME.enter();
 
-	let api = SubsonicClient::new(&url, &user, &pass)?;
-
 	let shared_tx = Arc::new(std::sync::Mutex::new(None));
-	let backend = Arc::new(crate::ffi::MobileBackend::new(
-		delegate,
-		Arc::clone(&shared_tx),
-	));
+	let backend = Arc::new(crate::ffi::MobileBackend::new(delegate, Arc::clone(&shared_tx)));
 	let event_target = Arc::new(crate::ffi::AudioEventTarget::new(Arc::clone(&shared_tx)));
 
 	let data_dir_opt = if data_dir.is_empty() {
@@ -68,7 +59,7 @@ pub fn init_client(
 	let (state_tx, mut state_rx) = watch::channel(CoreState::default());
 
 	let core = Arc::new(Musicbirb {
-		api: Arc::new(api),
+		api: provider,
 		tx: tx.clone(),
 		state_rx: state_rx.clone(),
 		event_target: Some(Arc::clone(&event_target)),
@@ -96,7 +87,7 @@ pub fn init_client(
 
 #[cfg_attr(feature = "ffi", derive(uniffi::Object))]
 pub struct Musicbirb {
-	api: Arc<SubsonicClient>,
+	api: Arc<dyn Provider>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
 	#[cfg(feature = "ffi")]
@@ -124,65 +115,76 @@ impl Musicbirb {
 
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
 
-	pub async fn queue_track(self: Arc<Self>, id: TrackId) -> Result<(), MusicbirbError> {
+	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
 		run_async!(async move {
 			let track = self.api.get_track(&id).await?;
 			self.tx
-				.send(CoreMessage::AddTracks(vec![track]))
+				.send(CoreMessage::AddTracks(vec![track], next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(())
 		})
 	}
 
-	pub async fn queue_album(self: Arc<Self>, id: AlbumId) -> Result<u32, MusicbirbError> {
+	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::AddTracks(tracks))
+				.send(CoreMessage::AddTracks(tracks, next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId) -> Result<u32, MusicbirbError> {
+	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::AddTracks(tracks))
+				.send(CoreMessage::AddTracks(tracks, next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn play_track(self: Arc<Self>, id: TrackId) -> Result<(), MusicbirbError> {
+	pub async fn play_tracks(
+		self: Arc<Self>,
+		ids: Vec<TrackId>,
+		start_index: Option<u32>,
+	) -> Result<(), MusicbirbError> {
 		run_async!(async move {
-			let track = self.api.get_track(&id).await?;
+			let mut tracks = Vec::with_capacity(ids.len());
+			for id in ids {
+				tracks.push(self.api.get_track(&id).await?);
+			}
 			self.tx
-				.send(CoreMessage::ReplaceTracks(vec![track]))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(())
 		})
 	}
 
-	pub async fn play_album(self: Arc<Self>, id: AlbumId) -> Result<u32, MusicbirbError> {
+	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn play_playlist(self: Arc<Self>, id: PlaylistId) -> Result<u32, MusicbirbError> {
+	pub async fn play_playlist(
+		self: Arc<Self>,
+		id: PlaylistId,
+		start_index: Option<u32>,
+	) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
@@ -200,17 +202,11 @@ impl Musicbirb {
 		run_async!(async move { self.api.get_newly_released_albums().await })
 	}
 
-	pub async fn get_album_details(
-		self: Arc<Self>,
-		album_id: AlbumId,
-	) -> Result<AlbumDetails, MusicbirbError> {
+	pub async fn get_album_details(self: Arc<Self>, album_id: AlbumId) -> Result<AlbumDetails, MusicbirbError> {
 		run_async!(async move { self.api.get_album_details(&album_id).await })
 	}
 
-	pub async fn get_artist_details(
-		self: Arc<Self>,
-		artist_id: ArtistId,
-	) -> Result<ArtistDetails, MusicbirbError> {
+	pub async fn get_artist_details(self: Arc<Self>, artist_id: ArtistId) -> Result<ArtistDetails, MusicbirbError> {
 		run_async!(async move { self.api.get_artist_details(&artist_id).await })
 	}
 
@@ -276,22 +272,21 @@ impl Musicbirb {
 
 // Pure Rust Methods
 impl Musicbirb {
-	pub fn new(api: SubsonicClient, player: Arc<dyn AudioBackend>) -> Arc<Self> {
+	pub fn new(api: Arc<dyn Provider>, player: Arc<dyn AudioBackend>) -> Arc<Self> {
 		Self::with_paths(api, player, None, None)
 	}
 
 	pub fn with_paths(
-		api: SubsonicClient,
+		api: Arc<dyn Provider>,
 		player: Arc<dyn AudioBackend>,
 		data_dir: Option<PathBuf>,
 		cache_dir: Option<PathBuf>,
 	) -> Arc<Self> {
 		let (tx, rx) = mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(CoreState::default());
-		let api_arc = Arc::new(api);
 
 		let core = Arc::new(Self {
-			api: Arc::clone(&api_arc),
+			api: Arc::clone(&api),
 			tx: tx.clone(),
 			state_rx,
 			#[cfg(feature = "ffi")]
@@ -299,11 +294,9 @@ impl Musicbirb {
 		});
 
 		let actor = CoreActor::new(data_dir, cache_dir);
-		let api_clone = Arc::clone(&api_arc);
+		let api_clone = Arc::clone(&api);
 		let tx_clone = tx.clone();
 
-		// Update this to use the same logic as our macro:
-		// Use the background RUNTIME for FFI, but standard tokio::spawn for everything else.
 		#[cfg(feature = "ffi")]
 		crate::RUNTIME.spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_clone, player).await;

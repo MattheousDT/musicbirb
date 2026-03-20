@@ -15,4 +15,3 @@ pub enum MusicbirbError {
 	#[error("Internal core error: {0}")]
 	Internal(String),
 }
-

@@ -1,19 +1,26 @@
 use crate::error::MusicbirbError;
 use crate::models::{
-	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist,
-	PlaylistDetails, PlaylistId, Track, TrackId,
+	Album, AlbumDetails, AlbumId, Artist, ArtistDetails, ArtistId, CoverArtId, Playlist, PlaylistDetails, PlaylistId,
+	Track, TrackId, TrackScrobble,
 };
+use crate::providers::Provider;
+use async_trait::async_trait;
 use reqwest::StatusCode;
 use submarine::api::get_album_list::Order;
 use submarine::{Client, auth::AuthBuilder};
 
-pub struct SubsonicClient {
+#[cfg(feature = "ffi")]
+use std::sync::Arc;
+
+pub mod models;
+
+pub struct SubsonicProvider {
 	client: Client,
 	http_client: reqwest::Client,
 	username: String,
 }
 
-impl SubsonicClient {
+impl SubsonicProvider {
 	pub fn new(url: &str, username: &str, password: &str) -> Result<Self, MusicbirbError> {
 		let auth = AuthBuilder::new(username, env!("CARGO_PKG_VERSION"))
 			.client_name("musicbirb")
@@ -31,24 +38,30 @@ impl SubsonicClient {
 			username: username.to_string(),
 		})
 	}
+}
 
-	pub async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
+#[cfg(feature = "ffi")]
+#[uniffi::export]
+pub fn create_subsonic_provider(
+	url: String,
+	username: String,
+	password: String,
+) -> Result<Arc<dyn Provider>, MusicbirbError> {
+	let provider = SubsonicProvider::new(&url, &username, &password)?;
+	Ok(Arc::new(provider))
+}
+
+#[async_trait]
+impl Provider for SubsonicProvider {
+	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
 		let url = self
 			.client
-			.stream_url(
-				&track_id.0,
-				None,
-				None::<String>,
-				None,
-				None::<String>,
-				None,
-				None,
-			)
+			.stream_url(&track_id.0, None, None::<String>, None, None::<String>, None, None)
 			.map_err(|e| MusicbirbError::Api(format!("Failed to build stream URL: {}", e)))?;
 		Ok(url.to_string())
 	}
 
-	pub async fn get_track(&self, track_id: &TrackId) -> Result<Track, MusicbirbError> {
+	async fn get_track(&self, track_id: &TrackId) -> Result<Track, MusicbirbError> {
 		let data = self
 			.client
 			.get_song(&track_id.0)
@@ -58,7 +71,7 @@ impl SubsonicClient {
 		Ok(Track::from(data))
 	}
 
-	pub async fn get_album_tracks(&self, album_id: &AlbumId) -> Result<Vec<Track>, MusicbirbError> {
+	async fn get_album_tracks(&self, album_id: &AlbumId) -> Result<Vec<Track>, MusicbirbError> {
 		let album = self
 			.client
 			.get_album(&album_id.0)
@@ -68,48 +81,24 @@ impl SubsonicClient {
 		Ok(album.song.into_iter().map(Track::from).collect())
 	}
 
-	pub async fn get_album_details(
-		&self,
-		album_id: &AlbumId,
-	) -> Result<AlbumDetails, MusicbirbError> {
+	async fn get_album_details(&self, album_id: &AlbumId) -> Result<AlbumDetails, MusicbirbError> {
 		let album = self
 			.client
 			.get_album(&album_id.0)
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get album details: {}", e)))?;
 
-		Ok(AlbumDetails {
-			id: AlbumId(album.base.id),
-			title: album.base.name,
-			artist: album.base.artist.unwrap_or_else(|| "Unknown".to_string()),
-			artist_id: album.base.artist_id.map(ArtistId),
-			cover_art: album.base.cover_art.map(CoverArtId),
-			song_count: album.base.song_count as u32,
-			duration_secs: album.base.duration as u32,
-			year: album.base.year.map(|y| y as u32),
-			genre: album.base.genre,
-			play_count: album.base.play_count.map(|c| c as u64),
-			created_timestamp: Some(album.base.created.timestamp()),
-			starred_timestamp: album.base.starred.map(|d| d.timestamp()),
-			songs: album.song.into_iter().map(Track::from).collect(),
-		})
+		Ok(AlbumDetails::from(album))
 	}
 
-	pub async fn get_artist_details(
-		&self,
-		artist_id: &ArtistId,
-	) -> Result<ArtistDetails, MusicbirbError> {
+	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError> {
 		let mut artist = self
 			.client
 			.get_artist(&artist_id.0)
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get artist details: {}", e)))?;
 
-		let info = self
-			.client
-			.get_artist_info2(&artist_id.0, None, None)
-			.await
-			.ok();
+		let info = self.client.get_artist_info2(&artist_id.0, None, None).await.ok();
 
 		let top_songs = self
 			.client
@@ -117,9 +106,7 @@ impl SubsonicClient {
 			.await
 			.unwrap_or_default();
 
-		let biography = info
-			.as_ref()
-			.and_then(|i| i.base.biography.clone().into_iter().next());
+		let biography = info.as_ref().and_then(|i| i.base.biography.clone().into_iter().next());
 
 		let similar_artists = info
 			.map(|i| i.similar_artist.into_iter().map(Artist::from).collect())
@@ -139,10 +126,7 @@ impl SubsonicClient {
 		})
 	}
 
-	pub async fn get_playlist_tracks(
-		&self,
-		playlist_id: &PlaylistId,
-	) -> Result<Vec<Track>, MusicbirbError> {
+	async fn get_playlist_tracks(&self, playlist_id: &PlaylistId) -> Result<Vec<Track>, MusicbirbError> {
 		let playlist = self
 			.client
 			.get_playlist(&playlist_id.0)
@@ -152,35 +136,17 @@ impl SubsonicClient {
 		Ok(playlist.entry.into_iter().map(Track::from).collect())
 	}
 
-	pub async fn get_playlist_details(
-		&self,
-		playlist_id: &PlaylistId,
-	) -> Result<PlaylistDetails, MusicbirbError> {
+	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError> {
 		let pl_data = self
 			.client
 			.get_playlist(&playlist_id.0)
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
 
-		Ok(PlaylistDetails {
-			id: PlaylistId(pl_data.base.id.clone()),
-			name: pl_data.base.name.clone(),
-			song_count: pl_data.base.song_count as u32,
-			duration_secs: pl_data.base.duration as u32,
-			cover_art: pl_data.base.cover_art.clone().map(CoverArtId),
-			owner: pl_data.base.owner.clone(),
-			public: pl_data.base.public,
-			created_timestamp: pl_data.base.created.timestamp(),
-			changed_timestamp: pl_data.base.changed.timestamp(),
-			comment: pl_data.base.comment.clone(),
-			songs: pl_data.entry.into_iter().map(Track::from).collect(),
-		})
+		Ok(PlaylistDetails::from(pl_data))
 	}
 
-	pub async fn get_cover_art_bytes(
-		&self,
-		cover_id: &CoverArtId,
-	) -> Result<Vec<u8>, MusicbirbError> {
+	async fn get_cover_art_bytes(&self, cover_id: &CoverArtId) -> Result<Vec<u8>, MusicbirbError> {
 		let url = self
 			.client
 			.get_cover_art_url(&cover_id.0, Some(600))
@@ -194,20 +160,14 @@ impl SubsonicClient {
 			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 
 		if resp.status() != StatusCode::OK {
-			return Err(MusicbirbError::Api(format!(
-				"Image download failed: {}",
-				resp.status()
-			)));
+			return Err(MusicbirbError::Api(format!("Image download failed: {}", resp.status())));
 		}
 
-		let bytes = resp
-			.bytes()
-			.await
-			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+		let bytes = resp.bytes().await.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 		Ok(bytes.to_vec())
 	}
 
-	pub async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
+	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
 		self.client
 			.scrobble(vec![(track_id.0.clone(), None::<usize>)], Some(false))
 			.await
@@ -215,10 +175,10 @@ impl SubsonicClient {
 		Ok(())
 	}
 
-	pub async fn scrobble(&self, tracks: &[(TrackId, u64)]) -> Result<(), MusicbirbError> {
+	async fn scrobble(&self, tracks: Vec<TrackScrobble>) -> Result<(), MusicbirbError> {
 		let id_at_time: Vec<(String, Option<usize>)> = tracks
-			.iter()
-			.map(|(id, time)| (id.0.clone(), Some(*time as usize)))
+			.into_iter()
+			.map(|t| (t.id.0, Some(t.timestamp as usize)))
 			.collect();
 
 		self.client
@@ -228,7 +188,7 @@ impl SubsonicClient {
 		Ok(())
 	}
 
-	pub async fn get_last_played_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+	async fn get_last_played_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
 		let list = self
 			.client
 			.get_album_list2(Order::Recent, Some(20), None, None::<String>)
@@ -238,7 +198,7 @@ impl SubsonicClient {
 		Ok(list.into_iter().map(Album::from).collect())
 	}
 
-	pub async fn get_recently_added_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+	async fn get_recently_added_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
 		let list = self
 			.client
 			.get_album_list2(Order::Newest, Some(20), None, None::<String>)
@@ -247,7 +207,7 @@ impl SubsonicClient {
 		Ok(list.into_iter().map(Album::from).collect())
 	}
 
-	pub async fn get_newly_released_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
+	async fn get_newly_released_albums(&self) -> Result<Vec<Album>, MusicbirbError> {
 		let list = self
 			.client
 			.get_album_list2_by_year(Some(9999), Some(0), Some(20), None, None::<String>)
@@ -256,7 +216,7 @@ impl SubsonicClient {
 		Ok(list.into_iter().map(Album::from).collect())
 	}
 
-	pub async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
+	async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
 		let list = self
 			.client
 			.get_playlists(Some(&self.username))

@@ -24,13 +24,7 @@ pub fn render_now_playing(
 		} else {
 			0.0
 		};
-		let s_r = scrobble_mark_pos.and_then(|m| {
-			if m <= duration {
-				Some(m / duration)
-			} else {
-				None
-			}
-		});
+		let s_r = scrobble_mark_pos.and_then(|m| if m <= duration { Some(m / duration) } else { None });
 		(
 			t.title.clone(),
 			t.artist.clone(),
@@ -40,14 +34,7 @@ pub fn render_now_playing(
 			s_r,
 		)
 	} else {
-		(
-			"Idle".into(),
-			"".into(),
-			"".into(),
-			0.0,
-			"--/--".into(),
-			None,
-		)
+		("Idle".into(), "".into(), "".into(), 0.0, "--/--".into(), None)
 	};
 
 	let bar = Block::bordered().title(" Now Playing ").inner(area);
