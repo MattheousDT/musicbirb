@@ -115,65 +115,76 @@ impl Musicbirb {
 
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
 
-	pub async fn queue_track(self: Arc<Self>, id: TrackId) -> Result<(), MusicbirbError> {
+	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
 		run_async!(async move {
 			let track = self.api.get_track(&id).await?;
 			self.tx
-				.send(CoreMessage::AddTracks(vec![track]))
+				.send(CoreMessage::AddTracks(vec![track], next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(())
 		})
 	}
 
-	pub async fn queue_album(self: Arc<Self>, id: AlbumId) -> Result<u32, MusicbirbError> {
+	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::AddTracks(tracks))
+				.send(CoreMessage::AddTracks(tracks, next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId) -> Result<u32, MusicbirbError> {
+	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::AddTracks(tracks))
+				.send(CoreMessage::AddTracks(tracks, next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn play_track(self: Arc<Self>, id: TrackId) -> Result<(), MusicbirbError> {
+	pub async fn play_tracks(
+		self: Arc<Self>,
+		ids: Vec<TrackId>,
+		start_index: Option<u32>,
+	) -> Result<(), MusicbirbError> {
 		run_async!(async move {
-			let track = self.api.get_track(&id).await?;
+			let mut tracks = Vec::with_capacity(ids.len());
+			for id in ids {
+				tracks.push(self.api.get_track(&id).await?);
+			}
 			self.tx
-				.send(CoreMessage::ReplaceTracks(vec![track]))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(())
 		})
 	}
 
-	pub async fn play_album(self: Arc<Self>, id: AlbumId) -> Result<u32, MusicbirbError> {
+	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})
 	}
 
-	pub async fn play_playlist(self: Arc<Self>, id: PlaylistId) -> Result<u32, MusicbirbError> {
+	pub async fn play_playlist(
+		self: Arc<Self>,
+		id: PlaylistId,
+		start_index: Option<u32>,
+	) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let tracks = self.api.get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks))
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
 		})

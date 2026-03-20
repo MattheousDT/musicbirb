@@ -203,19 +203,37 @@ impl CoreActor {
 
 		match msg {
 			CoreMessage::Shutdown => {}
-			CoreMessage::AddTracks(tracks) => {
+			CoreMessage::AddTracks(tracks, next) => {
 				let was_empty = self.queue.is_empty();
-				self.queue.extend(tracks);
 				if was_empty {
+					self.queue.extend(tracks);
 					self.play_track_at(0, player, api, tx, state_tx).await;
 				} else {
+					if next {
+						let insert_pos = self.queue_position + 1;
+
+						// Evict the currently preloaded next track if we're interrupting it
+						if self.player_has_next {
+							let _ = player.remove_index(1).await;
+							self.player_has_next = false;
+							self.fetching_preload_for = None;
+						}
+
+						let tail = self.queue.split_off(insert_pos);
+						self.queue.extend(tracks);
+						self.queue.extend(tail);
+					} else {
+						self.queue.extend(tracks);
+					}
+
 					self.check_preload(api, tx);
 					self.dispatch_state(&player.get_state(), state_tx);
 				}
 			}
-			CoreMessage::ReplaceTracks(tracks) => {
+			CoreMessage::ReplaceTracks(tracks, start_index) => {
 				self.queue = tracks;
-				self.play_track_at(0, player, api, tx, state_tx).await;
+				let idx = if start_index < self.queue.len() { start_index } else { 0 };
+				self.play_track_at(idx, player, api, tx, state_tx).await;
 			}
 			CoreMessage::ClearQueue => {
 				self.queue.clear();

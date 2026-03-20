@@ -6,9 +6,11 @@ use crate::models::{
 use crate::providers::Provider;
 use async_trait::async_trait;
 use reqwest::StatusCode;
-use std::sync::Arc;
 use submarine::api::get_album_list::Order;
 use submarine::{Client, auth::AuthBuilder};
+
+#[cfg(feature = "ffi")]
+use std::sync::Arc;
 
 pub mod models;
 

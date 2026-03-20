@@ -149,15 +149,20 @@ async fn main() -> Result<()> {
 								tokio::spawn(async move {
 									*i_m.lock().unwrap() = Some("Fetching...".into());
 									let res = if raw.starts_with("al:") {
-										c.queue_album(AlbumId(raw.strip_prefix("al:").unwrap().to_string()))
+										c.queue_album(AlbumId(raw.strip_prefix("al:").unwrap().to_string()), false)
 											.await
 											.map(|count| format!("Added {} tracks", count))
 									} else if raw.starts_with("pl:") {
-										c.queue_playlist(PlaylistId(raw.strip_prefix("pl:").unwrap().to_string()))
-											.await
-											.map(|count| format!("Added {} tracks", count))
+										c.queue_playlist(
+											PlaylistId(raw.strip_prefix("pl:").unwrap().to_string()),
+											false,
+										)
+										.await
+										.map(|count| format!("Added {} tracks", count))
 									} else {
-										c.queue_track(TrackId(raw.clone())).await.map(|_| "Added track".into())
+										c.queue_track(TrackId(raw.clone()), false)
+											.await
+											.map(|_| "Added track".into())
 									};
 									match res {
 										Ok(m) => *i_m.lock().unwrap() = Some(m),
