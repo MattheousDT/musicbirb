@@ -48,6 +48,7 @@ pub struct UiState {
 
 pub enum CoreMessage {
 	Shutdown,
+	ProviderChanged,
 	AddTracks(Vec<Track>, bool),
 	ReplaceTracks(Vec<Track>, usize),
 	ClearQueue,

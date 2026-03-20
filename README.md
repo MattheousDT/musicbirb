@@ -20,16 +20,7 @@ You need `mpv` / `libmpv` installed on your system. (at the minute)
 
 ## Quick Start
 
-1. **Configure Environment**
-   Create a `.env` file in the root:
-
+1. **Run the UI**
    ```sh
-   SUBSONIC_URL = "https://music.example.com"
-   SUBSONIC_USER = "your_username"
-   SUBSONIC_PASS = "your_password"
-   ```
-
-2. **Run the UI**
-   ```sh
-   cargo run
+   cargo -p ui run
    ```

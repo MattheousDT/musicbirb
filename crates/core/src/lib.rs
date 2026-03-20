@@ -18,9 +18,11 @@ pub mod error;
 pub mod models;
 pub mod providers;
 pub mod scrobble;
+pub mod settings;
 pub mod state;
 
 pub use crate::core::Musicbirb;
+pub use settings::*;
 pub use backend::*;
 pub use error::MusicbirbError;
 pub use models::*;

@@ -25,4 +25,5 @@ pub trait Provider: Send + Sync {
 	async fn get_recently_added_albums(&self) -> Result<Vec<Album>, MusicbirbError>;
 	async fn get_newly_released_albums(&self) -> Result<Vec<Album>, MusicbirbError>;
 	async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError>;
+	async fn ping(&self) -> Result<(), MusicbirbError>;
 }

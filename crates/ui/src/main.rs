@@ -7,28 +7,84 @@ use crossterm::{
 	event::{self, Event, KeyCode},
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use musicbirb::{AlbumId, Musicbirb, PlaylistId, TrackId};
-use musicbirb::{SubsonicProvider, mpv::MpvBackend};
+use musicbirb::{AlbumId, AppSettings, Musicbirb, PlaylistId, TrackId};
+use musicbirb::{Provider, SubsonicProvider, mpv::MpvBackend};
 use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use std::{
-	env,
 	io::stdout,
 	sync::{Arc, Mutex},
 	time::Duration,
 };
 
+#[derive(PartialEq)]
+enum UiMode {
+	Login,
+	Main,
+}
+
+enum AppEvent {
+	LoginSuccess(musicbirb::settings::AccountConfig, Arc<dyn musicbirb::Provider>),
+	LoginFailed(String),
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-	dotenvy::dotenv().ok();
-	let url = env::var("SUBSONIC_URL")?;
-	let user = env::var("SUBSONIC_USER")?;
-	let pass = env::var("SUBSONIC_PASS")?;
+	let mut settings = AppSettings::load(None);
+	let mut mode = UiMode::Login;
+	let mut login_state = components::login::LoginState::default();
+	if settings.accounts.is_empty() {
+		login_state.focus = components::login::LoginFocus::Url;
+	}
 
-	let subsonic = Arc::new(SubsonicProvider::new(&url, &user, &pass)?);
 	let player = Arc::new(MpvBackend::new()?);
-	let core = Musicbirb::new(subsonic, player);
+	let core = Musicbirb::new(None, player);
 	let state_rx = core.subscribe();
+
+	let (app_tx, mut app_rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
+	let error_msg = Arc::new(Mutex::new(None::<String>));
+	let info_msg = Arc::new(Mutex::new(None::<String>));
+
+	// Initial load auto-connect logic
+	// Only auto-connect if there is exactly one account saved.
+	// If there are 0 or >1, we stay in Login mode to let the user choose or add.
+	if settings.accounts.len() == 1 {
+		if let Some(acc) = settings.accounts.first() {
+			*info_msg.lock().unwrap() = Some(format!("Auto-connecting to {}...", acc.username));
+			let acc_c = acc.clone();
+			let tx_c = app_tx.clone();
+			tokio::spawn(async move {
+				let entry = match keyring::Entry::new("musicbirb_subsonic", &acc_c.id) {
+					Ok(e) => e,
+					Err(e) => {
+						let _ = tx_c.send(AppEvent::LoginFailed(format!("Keyring init error: {}", e)));
+						return;
+					}
+				};
+				let pass = match entry.get_password() {
+					Ok(p) => p,
+					Err(e) => {
+						let _ = tx_c.send(AppEvent::LoginFailed(format!("Keychain retrieval failed: {}", e)));
+						return;
+					}
+				};
+				let provider = match SubsonicProvider::new(&acc_c.url, &acc_c.username, &pass) {
+					Ok(p) => p,
+					Err(e) => {
+						let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider error: {}", e)));
+						return;
+					}
+				};
+				if let Err(e) = provider.ping().await {
+					let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
+					return;
+				}
+				let _ = tx_c.send(AppEvent::LoginSuccess(acc_c, Arc::new(provider)));
+			});
+		}
+	} else if settings.accounts.len() > 1 {
+		*info_msg.lock().unwrap() = Some("Select an account to continue".into());
+	}
 
 	enable_raw_mode()?;
 	stdout().execute(EnterAlternateScreen)?;
@@ -37,13 +93,30 @@ async fn main() -> Result<()> {
 	let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
 	let mut input = String::new();
 	let mut input_mode = false;
-	let error_msg = Arc::new(Mutex::new(None::<String>));
-	let info_msg = Arc::new(Mutex::new(None::<String>));
 
 	let mut last_art_arc = None;
 	let image_protocol = Arc::new(Mutex::new(None::<StatefulProtocol>));
 
 	loop {
+		if let Ok(event) = app_rx.try_recv() {
+			match event {
+				AppEvent::LoginSuccess(acc, provider) => {
+					settings.active_account_id = Some(acc.id.clone());
+					if !settings.accounts.iter().any(|a| a.id == acc.id) {
+						settings.accounts.push(acc);
+					}
+					let _ = settings.save(None);
+					core.clone().set_provider(Some(provider)).await;
+					*info_msg.lock().unwrap() = None;
+					mode = UiMode::Main;
+				}
+				AppEvent::LoginFailed(err) => {
+					*info_msg.lock().unwrap() = None;
+					*error_msg.lock().unwrap() = Some(err);
+				}
+			}
+		}
+
 		let state = state_rx.borrow().clone();
 
 		let current_track = state.queue.get(state.queue_position).cloned();
@@ -78,6 +151,18 @@ async fn main() -> Result<()> {
 		let mut prot_lock = image_protocol.lock().unwrap();
 
 		terminal.draw(|f| {
+			if mode == UiMode::Login {
+				components::login::render_login(
+					f,
+					f.area(),
+					&login_state,
+					&settings.accounts,
+					current_err.as_ref(),
+					current_info.as_ref(),
+				);
+				return;
+			}
+
 			let main =
 				Layout::vertical([Constraint::Min(0), Constraint::Length(6), Constraint::Length(3)]).split(f.area());
 			let top = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)]).split(main[0]);
@@ -129,7 +214,111 @@ async fn main() -> Result<()> {
 					}
 				}
 
-				if input_mode {
+				if mode == UiMode::Login {
+					match components::login::handle_login_input(key, &mut login_state, &settings.accounts) {
+						components::login::LoginAction::Connect(acc) => {
+							*info_msg.lock().unwrap() = Some(format!("Connecting to {}...", acc.url));
+							*error_msg.lock().unwrap() = None;
+							let tx_c = app_tx.clone();
+							tokio::spawn(async move {
+								let entry = match keyring::Entry::new("musicbirb_subsonic", &acc.id) {
+									Ok(e) => e,
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!("Keyring init error: {}", e)));
+										return;
+									}
+								};
+								let pass = match entry.get_password() {
+									Ok(p) => p,
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!(
+											"Keychain error (did you save it?): {}",
+											e
+										)));
+										return;
+									}
+								};
+								let provider = match SubsonicProvider::new(&acc.url, &acc.username, &pass) {
+									Ok(p) => p,
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider error: {}", e)));
+										return;
+									}
+								};
+								if let Err(e) = provider.ping().await {
+									let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
+									return;
+								}
+								let _ = tx_c.send(AppEvent::LoginSuccess(acc, Arc::new(provider)));
+							});
+						}
+						components::login::LoginAction::ConnectNew(url, user, pass) => {
+							*info_msg.lock().unwrap() = Some("Validating...".into());
+							*error_msg.lock().unwrap() = None;
+							let tx_c = app_tx.clone();
+							tokio::spawn(async move {
+								let provider = match SubsonicProvider::new(&url, &user, &pass) {
+									Ok(p) => p,
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider init error: {}", e)));
+										return;
+									}
+								};
+								if let Err(e) = provider.ping().await {
+									let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
+									return;
+								}
+
+								// Safe ID generation replacing non-alphanumeric chars for keychain compatibility
+								let safe_id: String = format!("{}@{}", user, url)
+									.chars()
+									.map(|c| if c.is_alphanumeric() { c } else { '_' })
+									.collect();
+
+								let acc = musicbirb::settings::AccountConfig {
+									id: safe_id,
+									provider: "subsonic".into(),
+									url: url.clone(),
+									username: user.clone(),
+								};
+
+								match keyring::Entry::new("musicbirb_subsonic", &acc.id) {
+									Ok(entry) => {
+										if let Err(e) = entry.set_password(&pass) {
+											let _ = tx_c.send(AppEvent::LoginFailed(format!(
+												"Warning: keychain save failed: {}",
+												e
+											)));
+										}
+									}
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!(
+											"Warning: keyring init failed: {}",
+											e
+										)));
+									}
+								}
+
+								let _ = tx_c.send(AppEvent::LoginSuccess(acc, Arc::new(provider)));
+							});
+						}
+						components::login::LoginAction::Delete(acc) => {
+							if let Ok(entry) = keyring::Entry::new("musicbirb_subsonic", &acc.id) {
+								let _ = entry.delete_credential();
+							}
+							settings.accounts.retain(|a| a.id != acc.id);
+							if settings.active_account_id.as_ref() == Some(&acc.id) {
+								settings.active_account_id = None;
+							}
+							let _ = settings.save(None);
+							if login_state.selected_idx >= settings.accounts.len() {
+								login_state.selected_idx = settings.accounts.len().saturating_sub(1);
+							}
+						}
+						components::login::LoginAction::Quit => break,
+						components::login::LoginAction::None => {}
+					}
+				} else if input_mode {
 					match key.code {
 						KeyCode::Esc => input_mode = false,
 						KeyCode::Backspace => {
@@ -143,6 +332,21 @@ async fn main() -> Result<()> {
 							input.clear();
 							input_mode = false;
 							if !raw.trim().is_empty() {
+								if raw.trim() == "/logout" {
+									settings.active_account_id = None;
+									let _ = settings.save(None);
+									let _ = core.clear_queue();
+									tokio::spawn({
+										let c = Arc::clone(&core);
+										async move {
+											c.set_provider(None).await;
+										}
+									});
+									mode = UiMode::Login;
+									login_state.focus = components::login::LoginFocus::List;
+									continue;
+								}
+
 								let c = Arc::clone(&core);
 								let i_m = Arc::clone(&info_msg);
 								let e_m = Arc::clone(&error_msg);

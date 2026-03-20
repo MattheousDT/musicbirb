@@ -224,4 +224,12 @@ impl Provider for SubsonicProvider {
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get playlists: {}", e)))?;
 		Ok(list.into_iter().map(Playlist::from).collect())
 	}
+
+	async fn ping(&self) -> Result<(), MusicbirbError> {
+		self.client
+			.get_user(self.username.clone())
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Validation failed: {}", e)))?;
+		Ok(())
+	}
 }
