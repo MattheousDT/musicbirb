@@ -14,6 +14,10 @@ struct MusicbirbApp: App {
 		WindowGroup {
 			ContentView()
 				.environment(viewModel)
+				.onAppear {
+					// Inject the view model into the static config helper
+					Config.viewModel = viewModel
+				}
 		}
 	}
 

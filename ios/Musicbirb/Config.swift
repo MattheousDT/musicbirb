@@ -1,18 +1,17 @@
 import Foundation
 
 struct Config {
-	static let subsonicUrl = "https://your.subsonic.server"
-	static let subsonicUser = "username"
-	static let subsonicPass = "password"
+	static var viewModel: MusicbirbViewModel?
 
-	// Added a size parameter to fetch optimized images from Subsonic
-	static func getCoverUrl(id: String?, size: Int? = nil) -> URL? {
-		guard let id = id else { return nil }
-		var urlString =
-			"\(subsonicUrl)/rest/getCoverArt?id=\(id)&u=\(subsonicUser)&p=\(subsonicPass)&v=1.16.1&c=musicbirb"
-		if let size = size {
-			urlString += "&size=\(size)"
+	// Ths is basically just backwards compat so I don't need to change it in a bunch of places for now
+	static func getCoverUrl(id: CoverArtId?, size: Int? = nil) -> URL? {
+		guard let id = id, let core = viewModel?.core else { return nil }
+
+		if let urlString = core.getCoverArtUrl(id: id, size: size.map { UInt32($0) }),
+			let url = URL(string: urlString)
+		{
+			return url
 		}
-		return URL(string: urlString)
+		return nil
 	}
 }

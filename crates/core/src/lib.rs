@@ -21,12 +21,12 @@ pub mod scrobble;
 pub mod settings;
 pub mod state;
 
-pub use crate::core::Musicbirb;
-pub use settings::*;
 pub use backend::*;
+pub use core::Musicbirb;
 pub use error::MusicbirbError;
 pub use models::*;
 pub use providers::Provider;
+pub use settings::*;
 pub use state::{CoreMessage, CoreState};
 
 #[cfg(feature = "os-media-controls")]

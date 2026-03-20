@@ -18,6 +18,7 @@ pub trait Provider: Send + Sync {
 	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError>;
 	async fn get_playlist_tracks(&self, playlist_id: &PlaylistId) -> Result<Vec<Track>, MusicbirbError>;
 	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError>;
+	fn get_cover_art_url(&self, cover_id: &CoverArtId, size: Option<u32>) -> Result<String, MusicbirbError>;
 	async fn get_cover_art_bytes(&self, cover_id: &CoverArtId) -> Result<Vec<u8>, MusicbirbError>;
 	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError>;
 	async fn scrobble(&self, tracks: Vec<TrackScrobble>) -> Result<(), MusicbirbError>;

@@ -146,6 +146,14 @@ impl Provider for SubsonicProvider {
 		Ok(PlaylistDetails::from(pl_data))
 	}
 
+	fn get_cover_art_url(&self, cover_id: &CoverArtId, size: Option<u32>) -> Result<String, MusicbirbError> {
+		let url = self
+			.client
+			.get_cover_art_url(&cover_id.0, size.map(|s| s as i32))
+			.map_err(|e| MusicbirbError::Api(e.to_string()))?;
+		Ok(url.to_string())
+	}
+
 	async fn get_cover_art_bytes(&self, cover_id: &CoverArtId) -> Result<Vec<u8>, MusicbirbError> {
 		let url = self
 			.client

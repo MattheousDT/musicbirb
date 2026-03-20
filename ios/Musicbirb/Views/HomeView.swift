@@ -6,6 +6,7 @@ struct HomeView: View {
 	@State private var recentAlbums: [Album] = []
 	@State private var newAlbums: [Album] = []
 	@State private var playlists: [Playlist] = []
+	@State private var showAccountSwitcher = false
 
 	var body: some View {
 		NavigationStack {
@@ -95,6 +96,15 @@ struct HomeView: View {
 			}
 			.background(Color(UIColor.systemGroupedBackground))
 			.navigationTitle("Home")
+			.toolbar {
+				ToolbarItem(placement: .navigationBarTrailing) {
+					Button {
+						showAccountSwitcher = true
+					} label: {
+						Image(systemName: "person.crop.circle")
+					}
+				}
+			}
 			.refreshable {
 				await loadData()
 			}
@@ -103,11 +113,24 @@ struct HomeView: View {
 					await loadData()
 				}
 			}
+			.onChange(of: viewModel.activeAccount?.id) { _, _ in
+				Task { await loadData() }
+			}
+			.sheet(isPresented: $showAccountSwitcher) {
+				AccountSwitcherView()
+			}
 		}
 	}
 
 	private func loadData() async {
-		guard let core = viewModel.core else { return }
+		guard let core = viewModel.core, viewModel.activeAccount != nil else {
+			lastPlayedAlbums = []
+			recentAlbums = []
+			newAlbums = []
+			playlists = []
+			return
+		}
+
 		do {
 			async let lastPlayedReq = core.getLastPlayedAlbums()
 			async let recentReq = core.getRecentlyAddedAlbums()

@@ -1,3 +1,4 @@
+use crate::CoverArtId;
 use crate::actor::CoreActor;
 use crate::backend::AudioBackend;
 use crate::error::MusicbirbError;
@@ -116,7 +117,11 @@ impl Musicbirb {
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
 
 	async fn get_provider(&self) -> Result<Arc<dyn Provider>, MusicbirbError> {
-		self.api.read().await.clone().ok_or_else(|| MusicbirbError::Internal("No active provider".into()))
+		self.api
+			.read()
+			.await
+			.clone()
+			.ok_or_else(|| MusicbirbError::Internal("No active provider".into()))
 	}
 
 	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
@@ -231,6 +236,13 @@ impl Musicbirb {
 		run_async!(async move { self.get_provider().await?.get_playlist_details(&playlist_id).await })
 	}
 
+	pub async fn validate_external_provider(
+		self: Arc<Self>,
+		provider: Arc<dyn Provider>,
+	) -> Result<(), MusicbirbError> {
+		run_async!(async move { provider.ping().await })
+	}
+
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------
 
 	pub fn clear_queue(&self) -> Result<(), MusicbirbError> {
@@ -249,6 +261,11 @@ impl Musicbirb {
 		self.tx
 			.send(CoreMessage::Next)
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn get_cover_art_url(&self, id: CoverArtId, size: Option<u32>) -> Option<String> {
+		let api = self.api.try_read().ok()?;
+		api.as_ref()?.get_cover_art_url(&id, size).ok()
 	}
 
 	pub fn prev(&self) -> Result<(), MusicbirbError> {
@@ -284,7 +301,8 @@ impl Musicbirb {
 			*self.api.write().await = provider;
 			let _ = self.tx.send(CoreMessage::ProviderChanged);
 			Ok::<(), MusicbirbError>(())
-		}).unwrap();
+		})
+		.unwrap();
 	}
 }
 

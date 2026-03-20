@@ -27,6 +27,9 @@ struct ContentView: View {
 		.sheet(isPresented: $isPlayerPresented) {
 			PlayerSheet()
 		}
+		.fullScreenCover(isPresented: Bindable(viewModel).showLogin) {
+			LoginView()
+		}
 	}
 }
 
