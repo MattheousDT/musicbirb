@@ -128,7 +128,7 @@ struct ArtistView: View {
 			LazyVStack(spacing: 0) {
 				ForEach(Array(artist.topSongs.prefix(5).enumerated()), id: \.element.id) { index, track in
 					TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-						playTrack(track)
+						playTopTrack(index)
 					}
 					.environment(\.trackRowSubtitle, .album)
 				}
@@ -197,10 +197,10 @@ struct ArtistView: View {
 		return viewModel.currentTrack?.id == track.id
 	}
 
-	private func playTrack(_ track: Track) {
+	private func playTopTrack(_ index: Int) {
 		Task {
-			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.playTrack(id: track.id)
+			_ = try? await viewModel.core?.playTracks(
+				ids: artistDetails!.topSongs.map { $0.id }, startIndex: UInt32(index))
 		}
 	}
 }

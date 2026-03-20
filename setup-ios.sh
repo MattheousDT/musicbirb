@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # Configuration
 LIB_NAME="musicbirb"      # The name in [lib] name = "..."

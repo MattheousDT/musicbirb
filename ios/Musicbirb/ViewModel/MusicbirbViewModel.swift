@@ -2,9 +2,11 @@ import Foundation
 import SwiftUI
 
 @Observable
-class MusicbirbViewModel: StateObserver {
+class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	var core: Musicbirb?
 	var uiState: UiState?
+
+	private let delegate = NativeAudioDelegate()
 
 	var currentTrack: Track? {
 		guard let uiState = uiState,
@@ -22,23 +24,28 @@ class MusicbirbViewModel: StateObserver {
 	}
 
 	init() {
-		let delegate = NativeAudioDelegate()
-
 		let docsDir =
 			FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? ""
 		let cacheDir =
 			FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.path ?? ""
 
 		do {
-			self.core = try initClient(
+			let subsonicProvider = try createSubsonicProvider(
 				url: Config.subsonicUrl,
-				user: Config.subsonicUser,
-				pass: Config.subsonicPass,
+				username: Config.subsonicUser,
+				password: Config.subsonicPass,
+			)
+			let initializedCore = try initClient(
+				provider: subsonicProvider,
 				dataDir: docsDir,
 				cacheDir: cacheDir,
 				delegate: delegate,
 				observer: self
 			)
+
+			self.core = initializedCore
+			self.delegate.eventTarget = initializedCore.getEventTarget()
+
 		} catch {
 			Log.rust.error("Failed to initialize Rust Core: \(error)")
 		}

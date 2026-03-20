@@ -133,17 +133,14 @@ struct AlbumView: View {
 
 	private func playAlbum() {
 		Task {
-			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queueAlbum(id: albumId)
-			_ = try? viewModel.core?.playIndex(index: 0)
+			_ = try? await viewModel.core?.playAlbum(id: albumId, startIndex: 0)
 		}
 	}
 
 	private func playTrack(index: Int) {
 		Task {
-			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queueAlbum(id: albumId)
-			_ = try? viewModel.core?.playIndex(index: UInt32(index))
+			_ = try? await viewModel.core?.playAlbum(id: albumId, startIndex: UInt32(index))
+
 		}
 	}
 }

@@ -135,17 +135,13 @@ struct PlaylistView: View {
 
 	private func playPlaylist() {
 		Task {
-			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queuePlaylist(id: playlistId)
-			_ = try? viewModel.core?.playIndex(index: 0)
+			_ = try? await viewModel.core?.playPlaylist(id: playlistId, startIndex: 0)
 		}
 	}
 
 	private func playTrack(index: Int) {
 		Task {
-			_ = try? viewModel.core?.clearQueue()
-			_ = try? await viewModel.core?.queuePlaylist(id: playlistId)
-			_ = try? viewModel.core?.playIndex(index: UInt32(index))
+			_ = try? await viewModel.core?.playPlaylist(id: playlistId, startIndex: UInt32(index))
 		}
 	}
 }
