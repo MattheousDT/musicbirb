@@ -5,11 +5,6 @@ struct AlbumGridItem: View {
 	var showYear: Bool = false
 
 	var body: some View {
-		let image = SmoothImage(
-			url: Config.getCoverUrl(id: album.coverArt, size: 300),
-			contentMode: .fill,
-			placeholderColor: Color(UIColor.systemGray5)
-		)
 		VStack(alignment: .leading, spacing: 8) {
 			Color.clear
 				.aspectRatio(1, contentMode: .fill)

@@ -18,14 +18,10 @@ struct AccountSwitcherView: View {
 							}
 						} label: {
 							HStack(spacing: 16) {
-								Circle()
-									.fill(Color(UIColor.systemGray5))
-									.frame(width: 36, height: 36)
-									.overlay(
-										Text(String(account.username.prefix(1).uppercased()))
-											.font(.headline)
-											.foregroundColor(.primary)
-									)
+								Image(account.provider)
+									.resizable()
+									.aspectRatio(contentMode: .fit)
+									.frame(width: 32, height: 32)
 
 								VStack(alignment: .leading, spacing: 2) {
 									Text(account.username)

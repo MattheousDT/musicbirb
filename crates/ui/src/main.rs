@@ -7,8 +7,9 @@ use crossterm::{
 	event::{self, Event, KeyCode},
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use musicbirb::mpv::MpvBackend;
 use musicbirb::{AlbumId, AppSettings, Musicbirb, PlaylistId, TrackId};
-use musicbirb::{Provider, SubsonicProvider, mpv::MpvBackend};
+use musicbirb::{AuthCredential, AuthStep, Authenticator};
 use ratatui::{prelude::*, widgets::*};
 use ratatui_image::{StatefulImage, picker::Picker, protocol::StatefulProtocol};
 use std::{
@@ -61,25 +62,35 @@ async fn main() -> Result<()> {
 						return;
 					}
 				};
-				let pass = match entry.get_password() {
+				let cred_str = match entry.get_password() {
 					Ok(p) => p,
 					Err(e) => {
 						let _ = tx_c.send(AppEvent::LoginFailed(format!("Keychain retrieval failed: {}", e)));
 						return;
 					}
 				};
-				let provider = match SubsonicProvider::new(&acc_c.url, &acc_c.username, &pass) {
-					Ok(p) => p,
+				let credential = match serde_json::from_str::<AuthCredential>(&cred_str) {
+					Ok(c) => c,
+					Err(_) => AuthCredential::Password(cred_str),
+				};
+
+				let authenticator = Authenticator::new();
+				match authenticator
+					.connect_with_credential(
+						acc_c.provider.clone(),
+						acc_c.url.clone(),
+						acc_c.username.clone(),
+						credential,
+					)
+					.await
+				{
+					Ok(provider) => {
+						let _ = tx_c.send(AppEvent::LoginSuccess(acc_c, provider));
+					}
 					Err(e) => {
 						let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider error: {}", e)));
-						return;
 					}
-				};
-				if let Err(e) = provider.ping().await {
-					let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
-					return;
 				}
-				let _ = tx_c.send(AppEvent::LoginSuccess(acc_c, Arc::new(provider)));
 			});
 		}
 	} else if settings.accounts.len() > 1 {
@@ -228,7 +239,7 @@ async fn main() -> Result<()> {
 										return;
 									}
 								};
-								let pass = match entry.get_password() {
+								let cred_str = match entry.get_password() {
 									Ok(p) => p,
 									Err(e) => {
 										let _ = tx_c.send(AppEvent::LoginFailed(format!(
@@ -238,68 +249,86 @@ async fn main() -> Result<()> {
 										return;
 									}
 								};
-								let provider = match SubsonicProvider::new(&acc.url, &acc.username, &pass) {
-									Ok(p) => p,
+								let credential = match serde_json::from_str::<AuthCredential>(&cred_str) {
+									Ok(c) => c,
+									Err(_) => AuthCredential::Password(cred_str),
+								};
+								let authenticator = Authenticator::new();
+								match authenticator
+									.connect_with_credential(
+										acc.provider.clone(),
+										acc.url.clone(),
+										acc.username.clone(),
+										credential,
+									)
+									.await
+								{
+									Ok(provider) => {
+										let _ = tx_c.send(AppEvent::LoginSuccess(acc, provider));
+									}
 									Err(e) => {
 										let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider error: {}", e)));
-										return;
 									}
-								};
-								if let Err(e) = provider.ping().await {
-									let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
-									return;
 								}
-								let _ = tx_c.send(AppEvent::LoginSuccess(acc, Arc::new(provider)));
 							});
 						}
-						components::login::LoginAction::ConnectNew(url, user, pass) => {
+						components::login::LoginAction::ConnectNew(provider_id, url, user, pass) => {
 							*info_msg.lock().unwrap() = Some("Validating...".into());
 							*error_msg.lock().unwrap() = None;
 							let tx_c = app_tx.clone();
+
 							tokio::spawn(async move {
-								let provider = match SubsonicProvider::new(&url, &user, &pass) {
-									Ok(p) => p,
-									Err(e) => {
-										let _ = tx_c.send(AppEvent::LoginFailed(format!("Provider init error: {}", e)));
-										return;
-									}
-								};
-								if let Err(e) = provider.ping().await {
-									let _ = tx_c.send(AppEvent::LoginFailed(format!("Validation failed: {}", e)));
-									return;
-								}
+								let authenticator = Authenticator::new();
 
-								// Safe ID generation replacing non-alphanumeric chars for keychain compatibility
-								let safe_id: String = format!("{}@{}", user, url)
-									.chars()
-									.map(|c| if c.is_alphanumeric() { c } else { '_' })
-									.collect();
+								match authenticator.init_auth(provider_id.clone(), url.clone()).await {
+									Ok(AuthStep::UserPass) => {
+										match authenticator
+											.login_with_password(provider_id.clone(), url.clone(), user.clone(), pass)
+											.await
+										{
+											Ok(result) => {
+												let safe_id: String = format!("{}@{}", user, url)
+													.chars()
+													.map(|c| if c.is_alphanumeric() { c } else { '_' })
+													.collect();
 
-								let acc = musicbirb::settings::AccountConfig {
-									id: safe_id,
-									provider: "subsonic".into(),
-									url: url.clone(),
-									username: user.clone(),
-								};
+												let acc = musicbirb::settings::AccountConfig {
+													id: safe_id,
+													provider: provider_id.clone(),
+													url: url.clone(),
+													username: user.clone(),
+												};
 
-								match keyring::Entry::new("musicbirb_subsonic", &acc.id) {
-									Ok(entry) => {
-										if let Err(e) = entry.set_password(&pass) {
-											let _ = tx_c.send(AppEvent::LoginFailed(format!(
-												"Warning: keychain save failed: {}",
-												e
-											)));
+												if let Ok(cred_json) = serde_json::to_string(&result.credential) {
+													if let Ok(entry) =
+														keyring::Entry::new("musicbirb_subsonic", &acc.id)
+													{
+														let _ = entry.set_password(&cred_json);
+													}
+												}
+
+												let _ = tx_c.send(AppEvent::LoginSuccess(acc, result.provider));
+											}
+											Err(e) => {
+												let _ = tx_c.send(AppEvent::LoginFailed(e.to_string()));
+											}
 										}
 									}
-									Err(e) => {
+									Ok(AuthStep::BrowserAuth {
+										auth_url,
+										display_code: _,
+										polling_id: _,
+									}) => {
+										// Needs UI logic (open browser window, poll backend), leaving placeholder
 										let _ = tx_c.send(AppEvent::LoginFailed(format!(
-											"Warning: keyring init failed: {}",
-											e
+											"Browser auth not fully implemented in TUI. Open: {}",
+											auth_url
 										)));
 									}
+									Err(e) => {
+										let _ = tx_c.send(AppEvent::LoginFailed(format!("Init auth error: {}", e)));
+									}
 								}
-
-								let _ = tx_c.send(AppEvent::LoginSuccess(acc, Arc::new(provider)));
 							});
 						}
 						components::login::LoginAction::Delete(acc) => {

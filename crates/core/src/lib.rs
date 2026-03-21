@@ -22,7 +22,7 @@ pub mod settings;
 pub mod state;
 
 pub use backend::*;
-pub use core::Musicbirb;
+pub use core::*;
 pub use error::MusicbirbError;
 pub use models::*;
 pub use providers::Provider;

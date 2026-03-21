@@ -5,30 +5,41 @@ struct ContentView: View {
 	@State private var isPlayerPresented = false
 
 	var body: some View {
-		TabView {
-			HomeView()
-				.tabItem { Label("Home", systemImage: "house.fill") }
+		ZStack {
+			if viewModel.isAuthenticating {
+				ProgressView("Connecting...")
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
+					.background(Color(.systemBackground))
+			} else {
 
-			LibraryView()
-				.tabItem { Label("Library", systemImage: "music.note.list") }
+				TabView {
+					HomeView()
+						.tabItem { Label("Home", systemImage: "house.fill") }
 
-			Text("Downloads")
-				.tabItem { Label("Downloads", systemImage: "square.and.arrow.down") }
+					LibraryView()
+						.tabItem { Label("Library", systemImage: "music.note.list") }
 
-			SearchView()
-				.tabItem { Label("Search", systemImage: "magnifyingglass") }
-		}
-		.modifier(
-			BottomAccessoryModifier(
-				currentTrack: viewModel.currentTrack, isPlaying: viewModel.isPlaying,
-				isPlayerPresented: $isPlayerPresented)
-		)
-		.animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.currentTrack != nil)
-		.sheet(isPresented: $isPlayerPresented) {
-			PlayerSheet()
-		}
-		.fullScreenCover(isPresented: Bindable(viewModel).showLogin) {
-			LoginView()
+					Text("Downloads")
+						.tabItem { Label("Downloads", systemImage: "square.and.arrow.down") }
+
+					SearchView()
+						.tabItem { Label("Search", systemImage: "magnifyingglass") }
+				}
+				.modifier(
+					BottomAccessoryModifier(
+						currentTrack: viewModel.currentTrack, isPlaying: viewModel.isPlaying,
+						isPlayerPresented: $isPlayerPresented)
+				)
+				.animation(
+					.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.currentTrack != nil
+				)
+				.sheet(isPresented: $isPlayerPresented) {
+					PlayerSheet()
+				}
+				.fullScreenCover(isPresented: Bindable(viewModel).showLogin) {
+					LoginView()
+				}
+			}
 		}
 	}
 }

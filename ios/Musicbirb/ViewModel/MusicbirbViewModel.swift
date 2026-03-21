@@ -30,6 +30,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	var accounts: [AccountConfig] = []
 	var activeAccount: AccountConfig?
 	var showLogin: Bool = false
+	var isAuthenticating: Bool = false
 	var loginError: String?
 
 	private let delegate = NativeAudioDelegate()
@@ -57,27 +58,11 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 
 		loadAccounts()
 
+		let authenticator = Authenticator()
+
 		do {
-			var provider: Provider? = nil
-
-			// Try auto-login if exactly one account or an active account is selected
-			if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {
-				if let passData = KeychainHelper.shared.read(
-					service: "musicbirb_subsonic", account: acc.id),
-					let pass = String(data: passData, encoding: .utf8)
-				{
-					do {
-						let p = try createSubsonicProvider(url: acc.url, username: acc.username, password: pass)
-						provider = p
-						activeAccount = acc
-					} catch {
-						Log.app.error("Auto-login failed: \(error)")
-					}
-				}
-			}
-
 			let initializedCore = try initClient(
-				provider: provider,
+				provider: nil,
 				dataDir: docsDir,
 				cacheDir: cacheDir,
 				delegate: delegate,
@@ -87,10 +72,43 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 			self.core = initializedCore
 			self.delegate.eventTarget = initializedCore.getEventTarget()
 
-			if provider == nil {
+			// Check for saved accounts to attempt auto-login
+			if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {
+				if let passData = KeychainHelper.shared.read(
+					service: "musicbirb_subsonic", account: acc.id),
+					let passString = String(data: passData, encoding: .utf8)
+				{
+					self.isAuthenticating = true
+					Task {
+						do {
+							let cred =
+								authenticator.credentialFromJson(json: passString)
+								?? AuthCredential.password(passString)
+							let p = try await authenticator.connectWithCredential(
+								provider: acc.provider, serverUrl: acc.url, username: acc.username, credential: cred
+							)
+
+							await initializedCore.setProvider(provider: p)
+
+							await MainActor.run {
+								self.activeAccount = acc
+								self.isAuthenticating = false
+								self.showLogin = false
+							}
+						} catch {
+							Log.app.error("Auto-login failed: \(error)")
+							await MainActor.run {
+								self.isAuthenticating = false
+								self.showLogin = true
+							}
+						}
+					}
+				} else {
+					self.showLogin = true
+				}
+				// No accounts saved at all, go straight to login
 				self.showLogin = true
 			}
-
 		} catch {
 			Log.rust.error("Failed to initialize Rust Core: \(error)")
 		}
@@ -121,21 +139,37 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	}
 
 	@MainActor
-	func login(url: String, user: String, pass: String) async {
+	func login(providerId: String, url: String, user: String, pass: String) async {
 		self.loginError = nil
 		guard let core = self.core else { return }
+		let authenticator = Authenticator()
 
 		do {
-			let provider = try createSubsonicProvider(url: url, username: user, password: pass)
-			try await core.validateExternalProvider(provider: provider)
+			let step = try await authenticator.initAuth(provider: providerId, serverUrl: url)
+
+			let p: Provider
+			let credentialToSave: AuthCredential
+
+			switch step {
+			case .userPass:
+				let result = try await authenticator.loginWithPassword(
+					provider: providerId, serverUrl: url, username: user, password: pass)
+				p = result.provider
+				credentialToSave = result.credential
+			case .browserAuth(let authUrl, _, _):
+				// In a complete implementation, open ASWebAuthenticationSession and call `authenticator.pollBrowserAuth` here
+				self.loginError = "Browser Auth via \(authUrl) not yet fully implemented on iOS"
+				return
+			}
 
 			// Safe ID generation mapping to the rust backend
 			let safeUrlUser = "\(user)@\(url)"
 			let safeId = String(safeUrlUser.map { $0.isLetter || $0.isNumber ? $0 : "_" })
 
-			let newAccount = AccountConfig(id: safeId, provider: "subsonic", url: url, username: user)
+			let newAccount = AccountConfig(id: safeId, provider: providerId, url: url, username: user)
 
-			if let passData = pass.data(using: .utf8) {
+			let credJson = authenticator.credentialToJson(cred: credentialToSave)
+			if let passData = credJson.data(using: .utf8) {
 				KeychainHelper.shared.save(passData, service: "musicbirb_subsonic", account: safeId)
 			}
 
@@ -145,7 +179,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 			activeAccount = newAccount
 			saveAccounts()
 
-			await core.setProvider(provider: provider)
+			await core.setProvider(provider: p)
 			self.showLogin = false
 		} catch {
 			self.loginError = error.localizedDescription
@@ -154,13 +188,18 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 
 	@MainActor
 	func switchAccount(_ account: AccountConfig) async {
+		let authenticator = Authenticator()
+
 		if let passData = KeychainHelper.shared.read(
 			service: "musicbirb_subsonic", account: account.id),
-			let pass = String(data: passData, encoding: .utf8)
+			let passString = String(data: passData, encoding: .utf8)
 		{
 			do {
-				let provider = try createSubsonicProvider(
-					url: account.url, username: account.username, password: pass)
+				let cred =
+					authenticator.credentialFromJson(json: passString) ?? AuthCredential.password(passString)
+				let provider = try await authenticator.connectWithCredential(
+					provider: account.provider, serverUrl: account.url, username: account.username,
+					credential: cred)
 				activeAccount = account
 				saveAccounts()
 				await core?.setProvider(provider: provider)

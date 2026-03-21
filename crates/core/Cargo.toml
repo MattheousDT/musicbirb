@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["subsonic"]
+default = ["subsonic", "jellyfin"]
 ffi =["dep:uniffi", "dep:lazy_static"]
+jellyfin = []
 mpv =["dep:libmpv"]
 os-media-controls = ["dep:souvlaki"]
 subsonic = ["dep:submarine"]

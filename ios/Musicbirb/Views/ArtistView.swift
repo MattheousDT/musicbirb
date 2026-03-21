@@ -98,7 +98,7 @@ struct ArtistView: View {
 				.padding(.top, 50)
 				.padding(.horizontal)
 
-			Text("\(artist.albumCount) Releases")
+			Text("\(artist.albumCount) Release\(artist.albumCount == 1 ? "" : "s")")
 				.font(.system(size: 16, weight: .semibold))
 				.foregroundColor(.secondary)
 
