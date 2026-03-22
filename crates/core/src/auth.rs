@@ -83,13 +83,12 @@ impl Authenticator {
 			#[cfg(feature = "jellyfin")]
 			"jellyfin" => {
 				let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
-				let auth = ctx.login(&username, &password).await?;
-				let token = auth.access_token.clone();
+				ctx.login(&username, &password).await?;
 
 				let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
 				Ok(AuthResult {
 					provider: p,
-					credential: AuthCredential::Token(token),
+					credential: AuthCredential::Password(password),
 				})
 			}
 			_ => Err(MusicbirbError::Internal(format!(
@@ -120,7 +119,7 @@ impl Authenticator {
 		&self,
 		provider: String,
 		server_url: String,
-		_username: String,
+		username: String,
 		credential: AuthCredential,
 	) -> Result<Arc<dyn Provider>, MusicbirbError> {
 		match provider.as_str() {
@@ -129,7 +128,7 @@ impl Authenticator {
 				if let AuthCredential::Password(pass) = credential {
 					let p: Arc<dyn Provider> = Arc::new(crate::providers::subsonic::SubsonicProvider::new(
 						&server_url,
-						&_username,
+						&username,
 						&pass,
 					)?);
 					p.ping().await?;
@@ -140,16 +139,24 @@ impl Authenticator {
 			}
 			#[cfg(feature = "jellyfin")]
 			"jellyfin" => {
-				if let AuthCredential::Token(token) = credential {
-					let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
-					ctx.set_token(token);
+				match credential {
+					AuthCredential::Password(pass) => {
+						let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
+						ctx.login(&username, &pass).await?;
 
-					ctx.fetch_me().await?;
+						let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
+						Ok(p)
+					}
+					AuthCredential::Token(token) => {
+						// Fallback for older saves that still have a token cached
+						let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
+						ctx.set_token(token);
 
-					let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
-					Ok(p)
-				} else {
-					Err(MusicbirbError::Auth("Jellyfin requires a token credential".into()))
+						ctx.fetch_me().await?;
+
+						let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
+						Ok(p)
+					}
 				}
 			}
 			_ => Err(MusicbirbError::Internal("Unknown provider".into())),

@@ -99,6 +99,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 							Log.app.error("Auto-login failed: \(error)")
 							await MainActor.run {
 								self.isAuthenticating = false
+								self.loginError = error.localizedDescription
 								self.showLogin = true
 							}
 						}
@@ -206,9 +207,14 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 				self.showLogin = false
 			} catch {
 				Log.app.error("Failed to switch account: \(error)")
+				activeAccount = account
+				saveAccounts()
+				self.loginError = error.localizedDescription
+				self.showLogin = true
 			}
 		} else {
-			activeAccount = nil
+			activeAccount = account
+			saveAccounts()
 			self.showLogin = true
 		}
 	}
