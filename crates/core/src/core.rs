@@ -1,6 +1,5 @@
 use crate::{
-	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, AudioBackend, CoreMessage, CoreState, CoverArtId,
-	MusicbirbError, Playlist, PlaylistDetails, PlaylistId, Provider, SearchPreset, SearchQuery, TrackId,
+	AlbumId, AudioBackend, CoreMessage, CoreState, CoverArtId, MusicbirbError, PlaylistId, Provider, TrackId,
 	actor::CoreActor, run_async,
 };
 use std::path::PathBuf;
@@ -103,7 +102,7 @@ impl Musicbirb {
 
 	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
 		run_async!(async move {
-			let provider = self.get_provider().await?;
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
 			let track = provider.track().get_track(&id).await?;
 			self.tx
 				.send(CoreMessage::AddTracks(vec![track], next))
@@ -114,7 +113,7 @@ impl Musicbirb {
 
 	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
-			let provider = self.get_provider().await?;
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
 			let tracks = provider.album().get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
@@ -126,7 +125,7 @@ impl Musicbirb {
 
 	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
-			let provider = self.get_provider().await?;
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
 			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
@@ -136,9 +135,27 @@ impl Musicbirb {
 		})
 	}
 
+	pub async fn play_tracks(
+		self: Arc<Self>,
+		ids: Vec<TrackId>,
+		start_index: Option<u32>,
+	) -> Result<(), MusicbirbError> {
+		run_async!(async move {
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
+			let mut tracks = Vec::with_capacity(ids.len());
+			for id in ids {
+				tracks.push(provider.track().get_track(&id).await?);
+			}
+			self.tx
+				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
+				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+			Ok(())
+		})
+	}
+
 	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
-			let provider = self.get_provider().await?;
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
 			let tracks = provider.album().get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
@@ -154,74 +171,13 @@ impl Musicbirb {
 		start_index: Option<u32>,
 	) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
-			let provider = self.get_provider().await?;
+			let provider: Arc<dyn Provider> = self.get_provider().await?;
 			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
 				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 			Ok(count as u32)
-		})
-	}
-
-	pub async fn get_last_played_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move {
-			let query = SearchQuery {
-				keyword: None,
-				preset: Some(SearchPreset::LastPlayedAlbums),
-				limit: Some(20),
-				offset: None,
-			};
-			Ok(self.get_provider().await?.search().search(query).await?.albums)
-		})
-	}
-
-	pub async fn get_recently_added_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move {
-			let query = SearchQuery {
-				keyword: None,
-				preset: Some(SearchPreset::RecentlyAddedAlbums),
-				limit: Some(20),
-				offset: None,
-			};
-			Ok(self.get_provider().await?.search().search(query).await?.albums)
-		})
-	}
-
-	pub async fn get_newly_released_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move {
-			let query = SearchQuery {
-				keyword: None,
-				preset: Some(SearchPreset::NewlyReleasedAlbums),
-				limit: Some(20),
-				offset: None,
-			};
-			Ok(self.get_provider().await?.search().search(query).await?.albums)
-		})
-	}
-
-	pub async fn get_album_details(self: Arc<Self>, album_id: AlbumId) -> Result<AlbumDetails, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.album().get_album_details(&album_id).await })
-	}
-
-	pub async fn get_artist_details(self: Arc<Self>, artist_id: ArtistId) -> Result<ArtistDetails, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.artist().get_artist_details(&artist_id).await })
-	}
-
-	pub async fn get_playlists(self: Arc<Self>) -> Result<Vec<Playlist>, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.playlist().get_playlists().await })
-	}
-
-	pub async fn get_playlist_details(
-		self: Arc<Self>,
-		playlist_id: PlaylistId,
-	) -> Result<PlaylistDetails, MusicbirbError> {
-		run_async!(async move {
-			self.get_provider()
-				.await?
-				.playlist()
-				.get_playlist_details(&playlist_id)
-				.await
 		})
 	}
 
