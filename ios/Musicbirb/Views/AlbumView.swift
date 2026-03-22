@@ -120,7 +120,8 @@ struct AlbumView: View {
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.task {
 			do {
-				albumDetails = try await viewModel.core?.getAlbumDetails(albumId: albumId)
+				albumDetails = try await viewModel.core?.getProvider()
+					.album().getAlbumDetails(albumId: albumId)
 			} catch {
 				Log.app.error("Album error: \(error)")
 			}

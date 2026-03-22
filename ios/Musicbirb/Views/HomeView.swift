@@ -132,18 +132,33 @@ struct HomeView: View {
 		}
 
 		do {
-			async let lastPlayedReq = core.getLastPlayedAlbums()
-			async let recentReq = core.getRecentlyAddedAlbums()
-			async let newReq = core.getNewlyReleasedAlbums()
-			async let playlistsReq = core.getPlaylists()
+			async let lastPlayedReq = core.getProvider()
+				.search().search(
+					query: SearchQuery(
+						keyword: nil, preset: SearchPreset.lastPlayedAlbums, limit: nil, offset: nil
+					)
+				)
+			async let recentReq = core.getProvider()
+				.search().search(
+					query: SearchQuery(
+						keyword: nil, preset: SearchPreset.recentlyAddedAlbums, limit: nil, offset: nil
+					)
+				)
+			async let newReq = core.getProvider()
+				.search().search(
+					query: SearchQuery(
+						keyword: nil, preset: SearchPreset.newlyReleasedAlbums, limit: nil, offset: nil
+					)
+				)
+			async let playlistsReq = core.getProvider().playlist().getPlaylists()
 
 			let (lastPlayed, recent, newRel, pl) = try await (
 				lastPlayedReq, recentReq, newReq, playlistsReq
 			)
 
-			lastPlayedAlbums = lastPlayed
-			recentAlbums = recent
-			newAlbums = newRel
+			lastPlayedAlbums = lastPlayed.albums
+			recentAlbums = recent.albums
+			newAlbums = newRel.albums
 			playlists = pl
 		} catch {
 			Log.app.error("Failed to load home data: \(error)")

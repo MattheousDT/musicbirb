@@ -122,7 +122,8 @@ struct PlaylistView: View {
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.task {
 			do {
-				playlistDetails = try await viewModel.core?.getPlaylistDetails(playlistId: playlistId)
+				playlistDetails = try await viewModel.core?.getProvider()
+					.playlist().getPlaylistDetails(playlistId: playlistId)
 			} catch {
 				Log.app.error("Playlist error: \(error)")
 			}

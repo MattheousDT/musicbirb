@@ -40,7 +40,8 @@ struct ArtistView: View {
 		.navigationBarTitleDisplayMode(.inline)
 		.task {
 			do {
-				let details = try await viewModel.core?.getArtistDetails(artistId: artistId)
+				let details = try await viewModel.core?.getProvider()
+					.artist().getArtistDetails(artistId: artistId)
 				// Small delay to ensure smooth transition from skeleton
 				try? await Task.sleep(nanoseconds: 100_000_000)
 				withAnimation(.easeOut(duration: 0.3)) {
