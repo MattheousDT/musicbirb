@@ -1,6 +1,6 @@
 use crate::{
 	AlbumId, AudioBackend, CoreMessage, CoreState, CoverArtId, MusicbirbError, PlaylistId, Provider, TrackId,
-	actor::CoreActor, run_async,
+	actor::CoreActor,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -72,6 +72,7 @@ pub struct Musicbirb {
 }
 
 #[cfg_attr(feature = "ffi", uniffi::export)]
+#[macros::async_ffi]
 impl Musicbirb {
 	#[cfg(feature = "ffi")]
 	pub fn get_event_target(&self) -> Arc<crate::ffi::AudioEventTarget> {
@@ -101,38 +102,32 @@ impl Musicbirb {
 	}
 
 	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let track = provider.track().get_track(&id).await?;
-			self.tx
-				.send(CoreMessage::AddTracks(vec![track], next))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(())
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let track = provider.track().get_track(&id).await?;
+		self.tx
+			.send(CoreMessage::AddTracks(vec![track], next))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(())
 	}
 
 	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let tracks = provider.album().get_album_tracks(&id).await?;
-			let count = tracks.len();
-			self.tx
-				.send(CoreMessage::AddTracks(tracks, next))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(count as u32)
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let tracks = provider.album().get_album_tracks(&id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::AddTracks(tracks, next))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(count as u32)
 	}
 
 	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
-			let count = tracks.len();
-			self.tx
-				.send(CoreMessage::AddTracks(tracks, next))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(count as u32)
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::AddTracks(tracks, next))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(count as u32)
 	}
 
 	pub async fn play_tracks(
@@ -140,29 +135,25 @@ impl Musicbirb {
 		ids: Vec<TrackId>,
 		start_index: Option<u32>,
 	) -> Result<(), MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let mut tracks = Vec::with_capacity(ids.len());
-			for id in ids {
-				tracks.push(provider.track().get_track(&id).await?);
-			}
-			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(())
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let mut tracks = Vec::with_capacity(ids.len());
+		for id in ids {
+			tracks.push(provider.track().get_track(&id).await?);
+		}
+		self.tx
+			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(())
 	}
 
 	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let tracks = provider.album().get_album_tracks(&id).await?;
-			let count = tracks.len();
-			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(count as u32)
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let tracks = provider.album().get_album_tracks(&id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(count as u32)
 	}
 
 	pub async fn play_playlist(
@@ -170,15 +161,13 @@ impl Musicbirb {
 		id: PlaylistId,
 		start_index: Option<u32>,
 	) -> Result<u32, MusicbirbError> {
-		run_async!(async move {
-			let provider: Arc<dyn Provider> = self.get_provider().await?;
-			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
-			let count = tracks.len();
-			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(count as u32)
-		})
+		let provider: Arc<dyn Provider> = self.get_provider().await?;
+		let tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		let count = tracks.len();
+		self.tx
+			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
+		Ok(count as u32)
 	}
 
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------
@@ -235,12 +224,9 @@ impl Musicbirb {
 	}
 
 	pub async fn set_provider(self: Arc<Self>, provider: Option<Arc<dyn Provider>>) {
-		run_async!(async move {
-			*self.api.write().await = provider;
-			let _ = self.tx.send(CoreMessage::ProviderChanged);
-			Ok::<(), MusicbirbError>(())
-		})
-		.unwrap();
+		*self.api.write().await = provider;
+		let _ = self.tx.send(CoreMessage::ProviderChanged);
+		Ok::<(), MusicbirbError>(()).unwrap();
 	}
 }
 

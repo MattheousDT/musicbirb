@@ -1,6 +1,5 @@
 use crate::error::MusicbirbError;
 use crate::providers::*;
-use async_trait::async_trait;
 use dto::*;
 use reqwest::Client;
 use std::sync::Arc;
@@ -32,6 +31,7 @@ pub struct JellyfinContext {
 	pub http: Client,
 }
 
+#[macros::async_ffi]
 impl JellyfinContext {
 	pub fn new(base_url: &str) -> Self {
 		Self {
@@ -117,7 +117,7 @@ impl JellyfinProvider {
 	}
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl Provider for JellyfinProvider {
 	async fn ping(&self) -> Result<(), MusicbirbError> {
 		let _: () = self.ctx.fetch("/System/Ping").await?;

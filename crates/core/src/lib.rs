@@ -21,7 +21,6 @@ pub mod providers;
 pub mod scrobble;
 pub mod settings;
 pub mod state;
-pub mod utils;
 
 pub use auth::*;
 pub use backend::*;

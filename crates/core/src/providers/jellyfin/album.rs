@@ -3,14 +3,13 @@ use crate::error::MusicbirbError;
 use crate::models::{AlbumDetails, AlbumId, ArtistId, CoverArtId, Track};
 use crate::providers::AlbumProvider;
 use crate::providers::jellyfin::dto::{BaseItemDto, QueryResult};
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct JellyfinAlbum {
 	pub ctx: Arc<JellyfinContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl AlbumProvider for JellyfinAlbum {
 	async fn get_album_tracks(&self, album_id: &AlbumId) -> Result<Vec<Track>, MusicbirbError> {
 		let user_id = self.ctx.get_user_id()?;

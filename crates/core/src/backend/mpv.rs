@@ -1,6 +1,5 @@
 use super::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
 use crate::MusicbirbError;
-use async_trait::async_trait;
 use libmpv::{
 	Format, Mpv,
 	events::{Event, PropertyData},
@@ -28,7 +27,7 @@ impl MpvBackend {
 	}
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl AudioBackend for MpvBackend {
 	fn set_event_sender(&self, tx: mpsc::UnboundedSender<BackendEvent>) {
 		let mpv_handle = Arc::clone(&self.mpv);

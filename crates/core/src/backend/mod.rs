@@ -1,5 +1,4 @@
 use crate::error::MusicbirbError;
-use async_trait::async_trait;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
@@ -54,7 +53,7 @@ pub struct PlayerState {
 }
 
 /// Defines the interface for audio playback engines.
-#[async_trait]
+#[macros::async_ffi]
 pub trait AudioBackend: Send + Sync {
 	/// Provides the backend with a channel to emit events.
 	///

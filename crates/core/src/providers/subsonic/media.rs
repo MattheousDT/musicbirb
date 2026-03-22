@@ -2,7 +2,6 @@ use super::SubsonicContext;
 use crate::error::MusicbirbError;
 use crate::models::{CoverArtId, TrackId};
 use crate::providers::MediaProvider;
-use async_trait::async_trait;
 use reqwest::StatusCode;
 use std::sync::Arc;
 
@@ -10,7 +9,7 @@ pub struct SubsonicMedia {
 	pub ctx: Arc<SubsonicContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl MediaProvider for SubsonicMedia {
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
 		let url = self

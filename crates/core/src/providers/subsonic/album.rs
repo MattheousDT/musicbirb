@@ -2,14 +2,13 @@ use super::SubsonicContext;
 use crate::error::MusicbirbError;
 use crate::models::{AlbumDetails, AlbumId, Track};
 use crate::providers::AlbumProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct SubsonicAlbum {
 	pub ctx: Arc<SubsonicContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl AlbumProvider for SubsonicAlbum {
 	async fn get_album_tracks(&self, album_id: &AlbumId) -> Result<Vec<Track>, MusicbirbError> {
 		let album = self

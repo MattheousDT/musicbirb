@@ -1,6 +1,32 @@
 use crate::backend::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 use tokio::sync::mpsc;
+
+/// Transparently wraps any future and ensures that the Tokio runtime context is active
+/// while it is being polled across the FFI boundaries.
+pub struct WithTokio<F> {
+	future: F,
+}
+
+impl<F> WithTokio<F> {
+	pub fn new(future: F) -> Self {
+		Self { future }
+	}
+}
+
+impl<F: Future> Future for WithTokio<F> {
+	type Output = F::Output;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let _guard = crate::RUNTIME.enter();
+
+		// SAFETY: We never move the inner future out, so we can safely pin project it.
+		unsafe { self.map_unchecked_mut(|s| &mut s.future).poll(cx) }
+	}
+}
 
 #[derive(uniffi::Record, Clone, Debug)]
 pub struct FfiPlayerState {

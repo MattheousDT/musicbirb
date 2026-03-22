@@ -3,7 +3,6 @@ use crate::models::{
 	AlbumDetails, AlbumId, ArtistDetails, ArtistId, CoverArtId, Playlist, PlaylistDetails, PlaylistId, SearchQuery,
 	SearchResults, Track, TrackId, TrackScrobble,
 };
-use async_trait::async_trait;
 use std::sync::Arc;
 
 #[cfg(feature = "jellyfin")]
@@ -14,7 +13,7 @@ pub mod subsonic;
 /// The primary gateway to backend APIs.
 /// Providers return Arc-wrapped domain sub-providers to keep logic modular.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait Provider: Send + Sync {
 	/// Validates that the provider's connection and tokens are still active.
 	async fn ping(&self) -> Result<(), MusicbirbError>;
@@ -37,7 +36,7 @@ pub trait Provider: Send + Sync {
 
 /// Handles low-level stream URLs and fetching raw image bytes.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait MediaProvider: Send + Sync {
 	/// Retrieves the direct streaming URL for a given track, attaching necessary auth tokens.
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError>;
@@ -51,7 +50,7 @@ pub trait MediaProvider: Send + Sync {
 
 /// Handles fetching and modifying specific tracks.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait TrackProvider: Send + Sync {
 	/// Fetches a single track's metadata.
 	async fn get_track(&self, track_id: &TrackId) -> Result<Track, MusicbirbError>;
@@ -74,7 +73,7 @@ pub trait TrackProvider: Send + Sync {
 
 /// Handles fetching and modifying albums.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait AlbumProvider: Send + Sync {
 	/// Fetches all tracks associated with a given album ID.
 	/// This is more lightweight than `get_album_details` when only the track list is needed.
@@ -95,7 +94,7 @@ pub trait AlbumProvider: Send + Sync {
 
 /// Handles fetching and modifying artists.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait ArtistProvider: Send + Sync {
 	/// Fetches detailed artist metadata, including their albums, top songs, and biography.
 	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError>;
@@ -112,7 +111,7 @@ pub trait ArtistProvider: Send + Sync {
 
 /// Handles fetching, browsing, and editing playlists.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait PlaylistProvider: Send + Sync {
 	/// Fetches all playlists owned by or visible to the user.
 	async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError>;
@@ -136,7 +135,7 @@ pub trait PlaylistProvider: Send + Sync {
 
 /// Handles reporting playback data back to the server.
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait ActivityProvider: Send + Sync {
 	/// Reports to the server that a track has started playing.
 	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError>;
@@ -148,7 +147,7 @@ pub trait ActivityProvider: Send + Sync {
 /// Handles searching the library, either by textual query or via explicit preset filters
 /// (like Recently Added, Newly Released, etc).
 #[cfg_attr(feature = "ffi", uniffi::export)]
-#[async_trait]
+#[macros::async_ffi]
 pub trait SearchProvider: Send + Sync {
 	/// Submits a query to the server, returning mixed tracks, albums, and artists.
 	async fn search(&self, query: SearchQuery) -> Result<SearchResults, MusicbirbError>;

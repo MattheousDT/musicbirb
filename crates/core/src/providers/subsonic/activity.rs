@@ -2,14 +2,13 @@ use super::SubsonicContext;
 use crate::error::MusicbirbError;
 use crate::models::{TrackId, TrackScrobble};
 use crate::providers::ActivityProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct SubsonicActivity {
 	pub ctx: Arc<SubsonicContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl ActivityProvider for SubsonicActivity {
 	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
 		self.ctx

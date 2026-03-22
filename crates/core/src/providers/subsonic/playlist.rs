@@ -2,14 +2,13 @@ use super::SubsonicContext;
 use crate::error::MusicbirbError;
 use crate::models::{Playlist, PlaylistDetails, PlaylistId, Track};
 use crate::providers::PlaylistProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct SubsonicPlaylist {
 	pub ctx: Arc<SubsonicContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl PlaylistProvider for SubsonicPlaylist {
 	async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
 		let list = self

@@ -1,6 +1,5 @@
 use crate::MusicbirbError;
 use crate::providers::*;
-use async_trait::async_trait;
 use std::sync::Arc;
 use submarine::{Client, auth::AuthBuilder};
 
@@ -65,7 +64,7 @@ pub fn create_subsonic_provider(
 	Ok(Arc::new(provider))
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl Provider for SubsonicProvider {
 	async fn ping(&self) -> Result<(), MusicbirbError> {
 		self.ctx

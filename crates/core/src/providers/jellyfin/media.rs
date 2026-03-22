@@ -2,14 +2,13 @@ use super::JellyfinContext;
 use crate::error::MusicbirbError;
 use crate::models::{CoverArtId, TrackId};
 use crate::providers::MediaProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct JellyfinMedia {
 	pub ctx: Arc<JellyfinContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl MediaProvider for JellyfinMedia {
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
 		let mut url = format!("{}/Audio/{}/stream?static=true", self.ctx.base_url, track_id.0);

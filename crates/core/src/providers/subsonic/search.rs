@@ -2,7 +2,6 @@ use super::SubsonicContext;
 use crate::error::MusicbirbError;
 use crate::models::{Album, Artist, SearchPreset, SearchQuery, SearchResults, Track};
 use crate::providers::SearchProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 use submarine::api::get_album_list::Order;
 
@@ -10,7 +9,7 @@ pub struct SubsonicSearch {
 	pub ctx: Arc<SubsonicContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl SearchProvider for SubsonicSearch {
 	async fn search(&self, query: SearchQuery) -> Result<SearchResults, MusicbirbError> {
 		if let Some(preset) = query.preset {

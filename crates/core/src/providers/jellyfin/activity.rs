@@ -2,14 +2,13 @@ use super::JellyfinContext;
 use crate::error::MusicbirbError;
 use crate::models::{TrackId, TrackScrobble};
 use crate::providers::ActivityProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct JellyfinActivity {
 	pub ctx: Arc<JellyfinContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl ActivityProvider for JellyfinActivity {
 	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
 		let url = format!("{}/Sessions/Playing", self.ctx.base_url);

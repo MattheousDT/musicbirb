@@ -2,14 +2,13 @@ use super::{JellyfinContext, dto::*};
 use crate::error::MusicbirbError;
 use crate::models::{Album, ArtistDetails, ArtistId, CoverArtId, Track};
 use crate::providers::ArtistProvider;
-use async_trait::async_trait;
 use std::sync::Arc;
 
 pub struct JellyfinArtist {
 	pub ctx: Arc<JellyfinContext>,
 }
 
-#[async_trait]
+#[macros::async_ffi]
 impl ArtistProvider for JellyfinArtist {
 	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError> {
 		let user_id = self.ctx.get_user_id()?;
