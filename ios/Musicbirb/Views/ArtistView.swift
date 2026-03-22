@@ -62,7 +62,7 @@ struct ArtistView: View {
 				.fill(Color(UIColor.systemGray))
 				.frame(height: 320)
 
-			SmoothImage(url: Config.getCoverUrl(id: artist.coverArt, size: 768))
+			SmoothImage(url: Config.getCoverUrl(id: artist.coverArt, size: 512))
 				.backgroundStyle(Color(UIColor.systemGray6))
 				.aspectRatio(contentMode: .fill)
 				.frame(height: 320)
@@ -78,7 +78,7 @@ struct ArtistView: View {
 			.frame(height: 320)
 
 			SmoothImage(
-				url: Config.getCoverUrl(id: artist.coverArt, size: 400),
+				url: Config.getCoverUrl(id: artist.coverArt, size: 512),
 				placeholderColor: Color(UIColor.systemGray6)
 			)
 			.aspectRatio(contentMode: .fill)
@@ -170,18 +170,7 @@ struct ArtistView: View {
 					ForEach(artist.similarArtists, id: \.id) { similar in
 						NavigationLink(destination: ArtistView(artistId: similar.id)) {
 							VStack(spacing: 8) {
-								SmoothImage(
-									url: Config.getCoverUrl(id: similar.coverArt, size: 300), contentMode: .fill
-								)
-								.aspectRatio(1, contentMode: .fill)
-								.frame(width: 120, height: 120)
-								.clipShape(Circle())
-
-								Text(similar.name)
-									.font(.system(size: 14, weight: .bold))
-									.foregroundColor(.primary)
-									.lineLimit(1)
-									.frame(width: 120)
+								ArtistGridItem(artist: similar)
 							}
 						}
 						.buttonStyle(.plain)

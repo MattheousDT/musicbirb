@@ -57,7 +57,7 @@ impl SearchProvider for SubsonicSearch {
 				}
 			}
 		}
-		let limit = query.limit.or(Some(20));
+		let limit = Some(((query.limit.or(Some(20)).unwrap() / 3) as f32).ceil() as i32);
 		let offset = query.offset;
 		let kw = query.keyword.unwrap_or_default();
 		if kw.is_empty() {
