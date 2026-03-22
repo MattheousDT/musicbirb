@@ -108,7 +108,11 @@ impl CoreActor {
 	}
 
 	/// Commits the time elapsed since the last playback sync to the scrobble tracker.
-	fn sync_scrobble_duration(&mut self, current_sync: &PlaybackSync, api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>) {
+	fn sync_scrobble_duration(
+		&mut self,
+		current_sync: &PlaybackSync,
+		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
+	) {
 		if current_sync.status == PlayerStatus::Playing {
 			let elapsed = std::time::Instant::now().duration_since(current_sync.timestamp);
 			self.scrobble_tracker.commit_played_time(elapsed);
@@ -408,7 +412,11 @@ impl CoreActor {
 	}
 
 	/// Checks to see if there is an empty index trailing the current actively playing track in the backend
-	fn check_preload(&mut self, api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>, tx: &mpsc::UnboundedSender<CoreMessage>) {
+	fn check_preload(
+		&mut self,
+		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+	) {
 		if self.player_has_current && !self.player_has_next && self.queue_position + 1 < self.queue.len() {
 			self.spawn_url_fetch(api, tx, self.queue_position + 1, true);
 		}
@@ -439,16 +447,19 @@ impl CoreActor {
 		let tx_c = tx.clone();
 
 		tokio::spawn(async move {
-			if let Some(provider) = api_c.read().await.as_ref() {
-				if let Ok(url) = provider.get_stream_url(&track_id).await {
+			if let Some(provider) = api_c.read().await.clone() {
+				if let Ok(url) = provider.media().get_stream_url(&track_id).await {
 					let _ = tx_c.send(CoreMessage::UrlReady { url, index, is_preload });
 				}
 			}
 		});
 	}
 
-	/// Checks if the requested art ID is different from current and triggers a load or fetch.
-	fn update_art_state(&mut self, api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>, tx: &mpsc::UnboundedSender<CoreMessage>) {
+	fn update_art_state(
+		&mut self,
+		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+	) {
 		let art_id = self.queue.get(self.queue_position).and_then(|t| t.cover_art.clone());
 
 		if art_id != self.current_art_id {
@@ -463,8 +474,8 @@ impl CoreActor {
 					let tx_c = tx.clone();
 					let id_c = id.clone();
 					tokio::spawn(async move {
-						if let Some(provider) = api_c.read().await.as_ref() {
-							if let Ok(bytes) = provider.get_cover_art_bytes(&id_c).await {
+						if let Some(provider) = api_c.read().await.clone() {
+							if let Ok(bytes) = provider.media().get_cover_art_bytes(&id_c).await {
 								let _ = tx_c.send(CoreMessage::ArtDownloaded { id: id_c, bytes });
 							}
 						}
@@ -482,8 +493,8 @@ impl CoreActor {
 			let id = track.id.clone();
 			let api_clone = Arc::clone(api);
 			tokio::spawn(async move {
-				if let Some(provider) = api_clone.read().await.as_ref() {
-					let _ = provider.now_playing(&id).await;
+				if let Some(provider) = api_clone.read().await.clone() {
+					let _ = provider.activity().now_playing(&id).await;
 				}
 			});
 		}
@@ -509,8 +520,8 @@ impl CoreActor {
 		tokio::spawn(async move {
 			let items = sm.lock().unwrap().get_all();
 			if !items.is_empty() {
-				if let Some(provider) = api_c.read().await.as_ref() {
-					if provider.scrobble(items.clone()).await.is_ok() {
+				if let Some(provider) = api_c.read().await.clone() {
+					if provider.activity().scrobble(items.clone()).await.is_ok() {
 						sm.lock().unwrap().remove_flushed(items.len());
 					}
 				}

@@ -12,6 +12,7 @@ pub mod ffi;
 
 pub mod actor;
 pub mod art_cache;
+pub mod auth;
 pub mod backend;
 pub mod core;
 pub mod error;
@@ -20,7 +21,9 @@ pub mod providers;
 pub mod scrobble;
 pub mod settings;
 pub mod state;
+pub mod utils;
 
+pub use auth::*;
 pub use backend::*;
 pub use core::*;
 pub use error::MusicbirbError;

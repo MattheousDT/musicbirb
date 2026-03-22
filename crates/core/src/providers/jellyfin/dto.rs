@@ -32,6 +32,8 @@ pub struct QueryResult<T> {
 pub struct BaseItemDto {
 	pub id: String,
 	pub name: Option<String>,
+	#[serde(rename = "Type")]
+	pub item_type: Option<String>,
 	pub overview: Option<String>,
 	pub child_count: Option<u32>,
 	pub run_time_ticks: Option<u64>,

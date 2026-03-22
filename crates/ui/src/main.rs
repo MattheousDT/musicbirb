@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
 				};
 				let credential = match serde_json::from_str::<AuthCredential>(&cred_str) {
 					Ok(c) => c,
-					Err(_) => AuthCredential::Password(cred_str),
+					Err(_) => AuthCredential::Password(cred_str.to_string()),
 				};
 
 				let authenticator = Authenticator::new();
@@ -251,7 +251,7 @@ async fn main() -> Result<()> {
 								};
 								let credential = match serde_json::from_str::<AuthCredential>(&cred_str) {
 									Ok(c) => c,
-									Err(_) => AuthCredential::Password(cred_str),
+									Err(_) => AuthCredential::Password(cred_str.to_string()),
 								};
 								let authenticator = Authenticator::new();
 								match authenticator

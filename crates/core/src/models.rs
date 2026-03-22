@@ -204,3 +204,28 @@ pub struct TrackScrobble {
 	pub id: TrackId,
 	pub timestamp: u64,
 }
+
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[derive(Clone, Debug, PartialEq)]
+pub enum SearchPreset {
+	LastPlayedAlbums,
+	RecentlyAddedAlbums,
+	NewlyReleasedAlbums,
+}
+
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SearchQuery {
+	pub keyword: Option<String>,
+	pub preset: Option<SearchPreset>,
+	pub limit: Option<i32>,
+	pub offset: Option<i32>,
+}
+
+#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SearchResults {
+	pub tracks: Vec<Track>,
+	pub albums: Vec<Album>,
+	pub artists: Vec<Artist>,
+}

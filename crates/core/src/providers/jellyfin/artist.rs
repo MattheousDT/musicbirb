@@ -1,0 +1,41 @@
+use super::{JellyfinContext, dto::*};
+use crate::error::MusicbirbError;
+use crate::models::{Album, ArtistDetails, ArtistId, CoverArtId, Track};
+use crate::providers::ArtistProvider;
+use async_trait::async_trait;
+use std::sync::Arc;
+
+pub struct JellyfinArtist {
+	pub ctx: Arc<JellyfinContext>,
+}
+
+#[async_trait]
+impl ArtistProvider for JellyfinArtist {
+	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError> {
+		let user_id = self.ctx.get_user_id()?;
+		let artist_dto: BaseItemDto = self
+			.ctx
+			.fetch(&format!("/Users/{}/Items/{}", user_id, artist_id.0))
+			.await?;
+
+		let albums_res: QueryResult<BaseItemDto> = self.ctx.fetch(
+			&format!("/Users/{}/Items?ArtistIds={}&IncludeItemTypes=MusicAlbum&SortBy=ProductionYear&SortOrder=Descending&Recursive=true&EnableImages=true", user_id, artist_id.0)
+		).await?;
+		let albums: Vec<Album> = albums_res.items.into_iter().map(Album::from).collect();
+
+		let top_songs_res: QueryResult<BaseItemDto> = self.ctx.fetch(
+			&format!("/Users/{}/Items?ArtistIds={}&IncludeItemTypes=Audio&SortBy=PlayCount&SortOrder=Descending&Limit=10&Recursive=true&EnableImages=true", user_id, artist_id.0)
+		).await?;
+
+		Ok(ArtistDetails {
+			id: ArtistId(artist_dto.id.clone()),
+			name: artist_dto.name.unwrap_or_else(|| "Unknown".to_string()),
+			cover_art: Some(CoverArtId(artist_dto.id)),
+			album_count: albums.len() as u32,
+			albums,
+			biography: artist_dto.overview,
+			similar_artists: vec![],
+			top_songs: top_songs_res.items.into_iter().map(Track::from).collect(),
+		})
+	}
+}

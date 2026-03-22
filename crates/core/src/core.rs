@@ -1,34 +1,11 @@
-use crate::CoverArtId;
-use crate::actor::CoreActor;
-use crate::backend::AudioBackend;
-use crate::error::MusicbirbError;
-use crate::models::{
-	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, Playlist, PlaylistDetails, PlaylistId, TrackId,
+use crate::{
+	Album, AlbumDetails, AlbumId, ArtistDetails, ArtistId, AudioBackend, CoreMessage, CoreState, CoverArtId,
+	MusicbirbError, Playlist, PlaylistDetails, PlaylistId, Provider, SearchPreset, SearchQuery, TrackId,
+	actor::CoreActor, run_async,
 };
-use crate::providers::Provider;
-use crate::state::{CoreMessage, CoreState};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
-
-/// The macro that protects React Native from missing Tokio contexts.
-/// If `ffi` is enabled, it shunts the payload into our rock-solid background runtime.
-/// If `ffi` is disabled, it behaves as a normal, zero-overhead await.
-macro_rules! run_async {
-	($future:expr) => {{
-		#[cfg(feature = "ffi")]
-		let res = crate::RUNTIME
-			.spawn($future)
-			.await
-			.map_err(|e| crate::error::MusicbirbError::Internal(e.to_string()))
-			.and_then(|r| r);
-
-		#[cfg(not(feature = "ffi"))]
-		let res = $future.await;
-
-		res
-	}};
-}
 
 #[cfg(feature = "ffi")]
 #[uniffi::export]
@@ -127,7 +104,7 @@ impl Musicbirb {
 	pub async fn queue_track(self: Arc<Self>, id: TrackId, next: bool) -> Result<(), MusicbirbError> {
 		run_async!(async move {
 			let provider = self.get_provider().await?;
-			let track = provider.get_track(&id).await?;
+			let track = provider.track().get_track(&id).await?;
 			self.tx
 				.send(CoreMessage::AddTracks(vec![track], next))
 				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
@@ -138,7 +115,7 @@ impl Musicbirb {
 	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let provider = self.get_provider().await?;
-			let tracks = provider.get_album_tracks(&id).await?;
+			let tracks = provider.album().get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
 				.send(CoreMessage::AddTracks(tracks, next))
@@ -150,7 +127,7 @@ impl Musicbirb {
 	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let provider = self.get_provider().await?;
-			let tracks = provider.get_playlist_tracks(&id).await?;
+			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
 				.send(CoreMessage::AddTracks(tracks, next))
@@ -159,28 +136,10 @@ impl Musicbirb {
 		})
 	}
 
-	pub async fn play_tracks(
-		self: Arc<Self>,
-		ids: Vec<TrackId>,
-		start_index: Option<u32>,
-	) -> Result<(), MusicbirbError> {
-		run_async!(async move {
-			let provider = self.get_provider().await?;
-			let mut tracks = Vec::with_capacity(ids.len());
-			for id in ids {
-				tracks.push(provider.get_track(&id).await?);
-			}
-			self.tx
-				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
-				.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
-			Ok(())
-		})
-	}
-
 	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let provider = self.get_provider().await?;
-			let tracks = provider.get_album_tracks(&id).await?;
+			let tracks = provider.album().get_album_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
 				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
@@ -196,7 +155,7 @@ impl Musicbirb {
 	) -> Result<u32, MusicbirbError> {
 		run_async!(async move {
 			let provider = self.get_provider().await?;
-			let tracks = provider.get_playlist_tracks(&id).await?;
+			let tracks = provider.playlist().get_playlist_tracks(&id).await?;
 			let count = tracks.len();
 			self.tx
 				.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
@@ -206,34 +165,64 @@ impl Musicbirb {
 	}
 
 	pub async fn get_last_played_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_last_played_albums().await })
+		run_async!(async move {
+			let query = SearchQuery {
+				keyword: None,
+				preset: Some(SearchPreset::LastPlayedAlbums),
+				limit: Some(20),
+				offset: None,
+			};
+			Ok(self.get_provider().await?.search().search(query).await?.albums)
+		})
 	}
 
 	pub async fn get_recently_added_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_recently_added_albums().await })
+		run_async!(async move {
+			let query = SearchQuery {
+				keyword: None,
+				preset: Some(SearchPreset::RecentlyAddedAlbums),
+				limit: Some(20),
+				offset: None,
+			};
+			Ok(self.get_provider().await?.search().search(query).await?.albums)
+		})
 	}
 
 	pub async fn get_newly_released_albums(self: Arc<Self>) -> Result<Vec<Album>, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_newly_released_albums().await })
+		run_async!(async move {
+			let query = SearchQuery {
+				keyword: None,
+				preset: Some(SearchPreset::NewlyReleasedAlbums),
+				limit: Some(20),
+				offset: None,
+			};
+			Ok(self.get_provider().await?.search().search(query).await?.albums)
+		})
 	}
 
 	pub async fn get_album_details(self: Arc<Self>, album_id: AlbumId) -> Result<AlbumDetails, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_album_details(&album_id).await })
+		run_async!(async move { self.get_provider().await?.album().get_album_details(&album_id).await })
 	}
 
 	pub async fn get_artist_details(self: Arc<Self>, artist_id: ArtistId) -> Result<ArtistDetails, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_artist_details(&artist_id).await })
+		run_async!(async move { self.get_provider().await?.artist().get_artist_details(&artist_id).await })
 	}
 
 	pub async fn get_playlists(self: Arc<Self>) -> Result<Vec<Playlist>, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_playlists().await })
+		run_async!(async move { self.get_provider().await?.playlist().get_playlists().await })
 	}
 
 	pub async fn get_playlist_details(
 		self: Arc<Self>,
 		playlist_id: PlaylistId,
 	) -> Result<PlaylistDetails, MusicbirbError> {
-		run_async!(async move { self.get_provider().await?.get_playlist_details(&playlist_id).await })
+		run_async!(async move {
+			self.get_provider()
+				.await?
+				.playlist()
+				.get_playlist_details(&playlist_id)
+				.await
+		})
 	}
 
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------
@@ -258,7 +247,7 @@ impl Musicbirb {
 
 	pub fn get_cover_art_url(&self, id: CoverArtId, size: Option<u32>) -> Option<String> {
 		let api = self.api.try_read().ok()?;
-		api.as_ref()?.get_cover_art_url(&id, size).ok()
+		api.as_ref()?.media().get_cover_art_url(&id, size).ok()
 	}
 
 	pub fn prev(&self) -> Result<(), MusicbirbError> {
@@ -296,159 +285,6 @@ impl Musicbirb {
 			Ok::<(), MusicbirbError>(())
 		})
 		.unwrap();
-	}
-}
-
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum AuthCredential {
-	Password(String),
-	Token(String),
-}
-
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
-#[derive(Clone, Debug, PartialEq)]
-pub enum AuthStep {
-	UserPass,
-	BrowserAuth {
-		auth_url: String,
-		display_code: String,
-		polling_id: String,
-	},
-}
-
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
-pub struct AuthResult {
-	pub provider: Arc<dyn Provider>,
-	pub credential: AuthCredential,
-}
-
-#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
-pub struct Authenticator;
-
-#[cfg_attr(feature = "ffi", uniffi::export)]
-impl Authenticator {
-	#[cfg_attr(feature = "ffi", uniffi::constructor)]
-	pub fn new() -> Arc<Self> {
-		Arc::new(Self)
-	}
-
-	pub fn get_supported_providers(&self) -> Vec<String> {
-		vec!["subsonic".into(), "jellyfin".into(), "plex".into()]
-	}
-
-	pub fn credential_to_json(&self, cred: AuthCredential) -> String {
-		serde_json::to_string(&cred).unwrap_or_default()
-	}
-
-	pub fn credential_from_json(&self, json: String) -> Option<AuthCredential> {
-		serde_json::from_str(&json).ok()
-	}
-
-	pub async fn init_auth(&self, provider: String, _server_url: String) -> Result<AuthStep, MusicbirbError> {
-		run_async!(async move {
-			match provider.as_str() {
-				"subsonic" | "jellyfin" => Ok(AuthStep::UserPass),
-				"plex" => {
-					// TODO: Implement Plex PIN generation via https://plex.tv/api/v2/pins
-					Err(MusicbirbError::Internal("Plex OAuth flow not yet implemented".into()))
-				}
-				_ => Err(MusicbirbError::Internal("Unknown provider".into())),
-			}
-		})
-	}
-
-	pub async fn login_with_password(
-		&self,
-		provider: String,
-		server_url: String,
-		username: String,
-		password: String,
-	) -> Result<AuthResult, MusicbirbError> {
-		run_async!(async move {
-			match provider.as_str() {
-				"subsonic" => {
-					let p = crate::providers::subsonic::SubsonicProvider::new(&server_url, &username, &password)?;
-					p.ping().await?;
-					Ok(AuthResult {
-						provider: Arc::new(p),
-						credential: AuthCredential::Password(password),
-					})
-				}
-				#[cfg(feature = "jellyfin")]
-				"jellyfin" => {
-					let mut client = crate::providers::jellyfin::JellyfinClient::new(&server_url);
-					let auth = client.login(&username, &password).await?;
-					let token = auth.access_token.clone();
-
-					let p = crate::providers::jellyfin::JellyfinProvider::new(client);
-					Ok(AuthResult {
-						provider: Arc::new(p),
-						credential: AuthCredential::Token(token),
-					})
-				}
-				_ => Err(MusicbirbError::Internal(format!(
-					"Provider '{}' does not support password login",
-					provider
-				))),
-			}
-		})
-	}
-
-	pub async fn poll_browser_auth(
-		&self,
-		provider: String,
-		_server_url: String,
-		_polling_id: String,
-	) -> Result<AuthResult, MusicbirbError> {
-		run_async!(async move {
-			match provider.as_str() {
-				"plex" => {
-					// TODO: Implement polling https://plex.tv/api/v2/pins/{polling_id}
-					Err(MusicbirbError::Internal("Plex polling not yet implemented".into()))
-				}
-				_ => Err(MusicbirbError::Internal(
-					"Provider does not support browser auth".into(),
-				)),
-			}
-		})
-	}
-
-	pub async fn connect_with_credential(
-		&self,
-		provider: String,
-		server_url: String,
-		_username: String,
-		credential: AuthCredential,
-	) -> Result<Arc<dyn Provider>, MusicbirbError> {
-		run_async!(async move {
-			match provider.as_str() {
-				"subsonic" => {
-					if let AuthCredential::Password(pass) = credential {
-						let p = crate::providers::subsonic::SubsonicProvider::new(&server_url, &_username, &pass)?;
-						p.ping().await?;
-						Ok(Arc::new(p) as Arc<dyn Provider>)
-					} else {
-						Err(MusicbirbError::Auth("Subsonic requires a password credential".into()))
-					}
-				}
-				#[cfg(feature = "jellyfin")]
-				"jellyfin" => {
-					if let AuthCredential::Token(token) = credential {
-						let mut client = crate::providers::jellyfin::JellyfinClient::new(&server_url);
-						client.set_token(token);
-
-						client.fetch_me().await?;
-
-						let p = crate::providers::jellyfin::JellyfinProvider::new(client);
-						Ok(Arc::new(p) as Arc<dyn Provider>)
-					} else {
-						Err(MusicbirbError::Auth("Jellyfin requires a token credential".into()))
-					}
-				}
-				_ => Err(MusicbirbError::Internal("Unknown provider".into())),
-			}
-		})
 	}
 }
 
