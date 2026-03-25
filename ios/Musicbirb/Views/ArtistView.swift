@@ -2,14 +2,10 @@ import SwiftUI
 
 struct ArtistView: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let artistId: ArtistId
 	@State private var artistDetails: ArtistDetails?
 	@State private var isLoading = true
-
-	private let columns = [
-		GridItem(.flexible(), spacing: 16),
-		GridItem(.flexible(), spacing: 16),
-	]
 
 	var body: some View {
 		ScrollView {
@@ -17,9 +13,15 @@ struct ArtistView: View {
 				ArtistSkeletonView()
 			} else if let artist = artistDetails {
 				VStack(spacing: 0) {
-					headerSection(artist)
-
-					artistInfoSection(artist)
+					HeroHeaderView(
+						coverArt: artist.coverArt,
+						title: artist.name,
+						subtitle: { EmptyView() },
+						meta: "\(artist.albumCount) Release\(artist.albumCount == 1 ? "" : "s")",
+						description: artist.biography,
+						imageShape: .circle,
+						actions: { EmptyView() }
+					)
 
 					if !artist.topSongs.isEmpty {
 						topSongsSection(artist)
@@ -42,7 +44,6 @@ struct ArtistView: View {
 			do {
 				let details = try await viewModel.core?.getProvider()
 					.artist().getArtistDetails(artistId: artistId)
-				// Small delay to ensure smooth transition from skeleton
 				try? await Task.sleep(nanoseconds: 100_000_000)
 				withAnimation(.easeOut(duration: 0.3)) {
 					self.artistDetails = details
@@ -56,82 +57,29 @@ struct ArtistView: View {
 	}
 
 	@ViewBuilder
-	private func headerSection(_ artist: ArtistDetails) -> some View {
-		ZStack(alignment: .bottom) {
-			Rectangle()
-				.fill(Color(UIColor.systemGray))
-				.frame(height: 320)
-
-			SmoothImage(url: Config.getCoverUrl(id: artist.coverArt, size: 512))
-				.backgroundStyle(Color(UIColor.systemGray6))
-				.aspectRatio(contentMode: .fill)
-				.frame(height: 320)
-				.rotationEffect(.degrees(180))
-				.clipped()
-				.blur(radius: 20, opaque: true)
-
-			LinearGradient(
-				gradient: Gradient(colors: [.clear, Color(UIColor.systemBackground)]),
-				startPoint: .top,
-				endPoint: .bottom
-			)
-			.frame(height: 320)
-
-			SmoothImage(
-				url: Config.getCoverUrl(id: artist.coverArt, size: 512),
-				placeholderColor: Color(UIColor.systemGray6)
-			)
-			.aspectRatio(contentMode: .fill)
-			.frame(width: 200, height: 200)
-			.clipShape(Circle())
-			.shadow(color: .black.opacity(0.15), radius: 20, y: 10)
-			.offset(y: 40)
-		}
-		.zIndex(1)
-	}
-
-	@ViewBuilder
-	private func artistInfoSection(_ artist: ArtistDetails) -> some View {
-		VStack(spacing: 12) {
-			Text(artist.name)
-				.font(.system(size: 32, weight: .heavy))
-				.multilineTextAlignment(.center)
-				.padding(.top, 50)
-				.padding(.horizontal)
-
-			Text("\(artist.albumCount) Release\(artist.albumCount == 1 ? "" : "s")")
-				.font(.system(size: 16, weight: .semibold))
-				.foregroundColor(.secondary)
-
-			if let bio = artist.biography, !bio.isEmpty {
-				Text(
-					bio.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
-				)
-				.font(.system(size: 14))
-				.foregroundColor(.secondary)
-				.lineLimit(4)
-				.multilineTextAlignment(.center)
-				.padding(.horizontal, 24)
-				.padding(.top, 8)
-			}
-		}
-		.padding(.bottom, 32)
-		.zIndex(2)
-	}
-
-	@ViewBuilder
 	private func topSongsSection(_ artist: ArtistDetails) -> some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Top Songs")
 				.font(.system(size: 22, weight: .black))
 				.padding(.horizontal, 16)
 
-			LazyVStack(spacing: 0) {
-				ForEach(Array(artist.topSongs.prefix(5).enumerated()), id: \.element.id) { index, track in
+			let columns =
+				horizontalSizeClass == .regular
+				// spacing: 0 removes the gap between columns so highlights touch
+				? [GridItem(.flexible(), spacing: 0), GridItem(.flexible(), spacing: 0)]
+				: [GridItem(.flexible())]
+
+			LazyVGrid(columns: columns, spacing: 0) {
+				ForEach(
+					Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
+					id: \.element.id
+				) { index, track in
 					TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
 						playTopTrack(index)
 					}
 					.environment(\.trackRowSubtitle, .album)
+					// Smaller padding for grid items, but larger for left/right edges on iPad
+					.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 30 : 16)
 				}
 			}
 		}
@@ -145,7 +93,11 @@ struct ArtistView: View {
 				.font(.system(size: 22, weight: .black))
 				.padding(.horizontal, 16)
 
-			LazyVGrid(columns: columns, spacing: 20) {
+			let gridCols = Array(
+				repeating: GridItem(.flexible(), spacing: 16),
+				count: horizontalSizeClass == .regular ? 4 : 2)
+
+			LazyVGrid(columns: gridCols, spacing: 20) {
 				ForEach(artist.albums, id: \.id) { album in
 					NavigationLink(destination: AlbumView(albumId: album.id)) {
 						AlbumGridItem(album: album, showYear: true)

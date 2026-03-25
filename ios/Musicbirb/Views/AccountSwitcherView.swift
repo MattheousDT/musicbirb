@@ -49,6 +49,7 @@ struct AccountSwitcherView: View {
 								Label("Delete", systemImage: "trash")
 							}
 						}
+						.disabled(isActive)
 					}
 				}
 

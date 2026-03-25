@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SearchView: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@State private var query = ""
 	@State private var searchIsActive = false
 	@State private var isSearching = false
@@ -85,7 +86,11 @@ struct SearchView: View {
 										.font(.system(size: 22, weight: .black))
 										.padding(.horizontal, 16)
 
-									LazyVStack(spacing: 0) {
+									let columns = horizontalSizeClass == .regular
+										?[GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+										: [GridItem(.flexible())]
+
+									LazyVGrid(columns: columns, spacing: 0) {
 										ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
 											TrackItemRow(
 												track: track,

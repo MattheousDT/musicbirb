@@ -18,7 +18,7 @@ impl ArtistProvider for SubsonicArtist {
 			.await
 			.map_err(|e| MusicbirbError::Api(format!("Failed to get artist details: {}", e)))?;
 
-		let info = self.ctx.client.get_artist_info2(&artist_id.0, None, None).await.ok();
+		let info = self.ctx.client.get_artist_info(&artist_id.0, None, None).await.ok();
 
 		let top_songs = self
 			.ctx

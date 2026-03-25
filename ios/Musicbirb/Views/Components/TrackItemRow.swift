@@ -9,15 +9,26 @@ private struct TrackRowSubtitleKey: EnvironmentKey {
 	static let defaultValue: TrackSubtitleMode = .artist
 }
 
+private struct TrackRowHorizontalPaddingKey: EnvironmentKey {
+	static let defaultValue: CGFloat = 24
+}
+
 extension EnvironmentValues {
 	var trackRowSubtitle: TrackSubtitleMode {
 		get { self[TrackRowSubtitleKey.self] }
 		set { self[TrackRowSubtitleKey.self] = newValue }
 	}
+
+	var trackRowHorizontalPadding: CGFloat {
+		get { self[TrackRowHorizontalPaddingKey.self] }
+		set { self[TrackRowHorizontalPaddingKey.self] = newValue }
+	}
 }
 
 struct TrackItemRow: View {
 	@Environment(\.trackRowSubtitle) private var subtitleMode
+	@Environment(\.trackRowHorizontalPadding) private var horizontalPadding
+
 	let track: Track
 	let index: Int
 	let isActive: Bool
@@ -49,15 +60,16 @@ struct TrackItemRow: View {
 						.foregroundColor(isActive ? .accentColor.opacity(0.8) : .secondary)
 						.lineLimit(1)
 				}
-
-				Spacer()
+				.frame(maxWidth: .infinity, alignment: .leading)
 
 				Text(formatDuration(track.durationSecs))
 					.font(.system(size: 13, weight: .semibold, design: .monospaced))
 					.foregroundColor(.secondary)
+					.fixedSize()
 			}
 			.padding(.vertical, 12)
-			.padding(.horizontal, 24)
+			.padding(.horizontal, horizontalPadding)
+			.frame(maxWidth: .infinity)
 		}
 		.buttonStyle(TrackItemButtonStyle(isActive: isActive))
 	}

@@ -16,12 +16,13 @@ struct PlayerSheet: View {
 					VStack(spacing: 0) {
 						Spacer()
 
+						let imageSize = min(min(geometry.size.width * 0.85, 400), geometry.size.height * 0.45)
 						SmoothImage(
 							url: Config.getCoverUrl(id: currentTrack.coverArt, size: 480), contentMode: .fill,
 							placeholderColor: Color.white.opacity(0.1)
 						)
 						.aspectRatio(1, contentMode: .fit)
-						.frame(width: min(geometry.size.width * 0.75, 320))
+						.frame(width: imageSize, height: imageSize)
 						.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
 						.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
 						.id(currentTrack.id)
@@ -149,6 +150,7 @@ struct PlayerSheet: View {
 
 						Spacer()
 					}
+					.padding(.bottom, 40)
 					.sheet(isPresented: $isQueueOpen) {
 						QueueSheet()
 					}

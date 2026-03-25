@@ -29,6 +29,8 @@ struct AlbumGridItem: View {
 					.foregroundColor(.secondary)
 					.lineLimit(1)
 			}
+			.frame(maxWidth: .infinity, alignment: .leading) // Explicitly clamps constraints so grid columns truncate instead of stretch
 		}
+		.frame(maxWidth: .infinity)
 	}
 }

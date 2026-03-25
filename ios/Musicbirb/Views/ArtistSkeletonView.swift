@@ -3,35 +3,7 @@ import SwiftUI
 struct ArtistSkeletonView: View {
 	var body: some View {
 		VStack(spacing: 0) {
-			// Header Area
-			ZStack(alignment: .bottom) {
-				LinearGradient(
-					gradient: Gradient(colors: [
-						Color(UIColor.systemGray),
-						Color(UIColor.systemBackground),
-					]),
-					startPoint: .top,
-					endPoint: .bottom
-				)
-				.frame(height: 320)
-
-				Circle()
-					.fill(Color(UIColor.systemGray6))
-					.frame(width: 200, height: 200)
-					.offset(y: 40)
-			}
-
-			VStack(spacing: 12) {
-				RoundedRectangle(cornerRadius: 6)
-					.fill(Color(UIColor.systemGray6))
-					.frame(width: 220, height: 32)
-					.padding(.top, 50)
-
-				RoundedRectangle(cornerRadius: 4)
-					.fill(Color(UIColor.systemGray6))
-					.frame(width: 100, height: 16)
-			}
-			.padding(.bottom, 40)
+			HeroHeaderSkeleton(imageShape: .circle)
 
 			VStack(alignment: .leading, spacing: 32) {
 				// Top Songs Section

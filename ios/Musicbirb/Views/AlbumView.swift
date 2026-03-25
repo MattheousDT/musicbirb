@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AlbumView: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let albumId: AlbumId
 	@State private var albumDetails: AlbumDetails?
 
@@ -9,103 +10,48 @@ struct AlbumView: View {
 		ScrollView {
 			if let album = albumDetails {
 				VStack(spacing: 0) {
-					ZStack(alignment: .bottom) {
-						// 1. Underlying Placeholder
-						Rectangle()
-							.fill(Color(UIColor.systemGray))
-							.frame(height: 360)
-
-						// 2. Blurred Background Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 480))
-							.aspectRatio(contentMode: .fill)
-							.frame(height: 360)
-							.clipped()
-							.blur(radius: 40, opaque: true)
-							.overlay(Color.black.opacity(0.1))
-
-						// 3. Fade to System Background Gradient
-						LinearGradient(
-							gradient: Gradient(colors: [.clear, Color(UIColor.systemBackground)]),
-							startPoint: .top,
-							endPoint: .bottom
-						)
-						.frame(height: 360)
-
-						// 4. Main Artwork Placeholder underneath
-						RoundedRectangle(cornerRadius: 24, style: .continuous)
-							.fill(Color(UIColor.secondarySystemBackground))
-							.frame(width: 240, height: 240)
-							.shadow(color: .black.opacity(0.15), radius: 20, y: 10)
-							.offset(y: 40)
-
-						// 5. Main Artwork Smooth Image
-						SmoothImage(url: Config.getCoverUrl(id: album.coverArt, size: 480))
-							.aspectRatio(contentMode: .fit)
-							.frame(width: 240, height: 240)
-							.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-							.offset(y: 40)
-					}
-					.zIndex(1)
-
-					VStack(spacing: 8) {
-						Text(album.title)
-							.font(.system(size: 28, weight: .heavy))
-							.multilineTextAlignment(.center)
-							.padding(.top, 50)
-							.padding(.horizontal)
-
-						if let artistId = album.artistId {
-							NavigationLink(destination: ArtistView(artistId: artistId)) {
+					HeroHeaderView(
+						coverArt: album.coverArt,
+						title: album.title,
+						subtitle: {
+							if let artistId = album.artistId {
+								NavigationLink(destination: ArtistView(artistId: artistId)) {
+									Text(album.artist)
+										.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
+										.foregroundColor(.accentColor)
+								}
+							} else {
 								Text(album.artist)
-									.font(.system(size: 18, weight: .bold))
-									.multilineTextAlignment(.center)
-									.foregroundColor(.blue)
+									.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
+									.foregroundColor(.accentColor)
 							}
-						} else {
-							Text(album.artist)
-								.font(.system(size: 18, weight: .bold))
-								.multilineTextAlignment(.center)
-								.foregroundColor(.blue)
-						}
-
-						let meta = [
-							album.year.map(String.init), "\(album.songCount) tracks",
-							"\(album.durationSecs / 60) mins",
-						]
-						.compactMap { $0 }
-						.joined(separator: " • ")
-
-						Text(meta)
-							.font(.system(size: 14, weight: .semibold))
-							.foregroundColor(.secondary)
-					}
-					.padding(.bottom, 24)
-					.zIndex(2)
-
-					HStack(spacing: 16) {
-						Button(action: { playAlbum() }) {
-							HStack {
-								Image(systemName: "play.fill")
-								Text("Play Album")
-							}
-							.font(.system(size: 16, weight: .heavy))
-							.foregroundColor(.white)
-							.frame(maxWidth: .infinity)
-							.padding(.vertical, 14)
-							.background(Color.accentColor)
-							.clipShape(Capsule())
-						}
-					}
-					.padding(.horizontal, 32)
-					.padding(.bottom, 32)
-
-					LazyVStack(spacing: 0) {
-						ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
-							TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-								playTrack(index: index)
+						},
+						meta:[
+							horizontalSizeClass != .regular ? album.year.map(String.init) : nil,
+							"\(album.songCount) tracks",
+							"\(album.durationSecs / 60) mins"
+						].compactMap { $0 }.joined(separator: " • "),
+						description: nil,
+						imageShape: .roundedRectangle,
+						actions: {
+							HStack(spacing: 16) {
+								HeroActionButton(title: "Play", icon: "play.fill", isPrimary: true, isExpanded: horizontalSizeClass != .regular, action: playAlbum)
+								HeroActionButton(title: "Play Next", icon: "text.line.first.and.arrowtriangle.forward", isPrimary: false, isExpanded: horizontalSizeClass != .regular, action: playAlbumNext)
 							}
 						}
+					)
+
+					VStack {
+						LazyVStack(spacing: 0) {
+							ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
+								TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+									playTrack(index: index)
+								}
+							}
+						}
+						.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 24)
 					}
+					.frame(maxWidth: .infinity)
 				}
 				.padding(.bottom, 120)
 			} else {
@@ -138,10 +84,15 @@ struct AlbumView: View {
 		}
 	}
 
+	private func playAlbumNext() {
+		Task {
+			_ = try? await viewModel.core?.queueAlbum(id: albumId, next: true)
+		}
+	}
+
 	private func playTrack(index: Int) {
 		Task {
 			_ = try? await viewModel.core?.playAlbum(id: albumId, startIndex: UInt32(index))
-
 		}
 	}
 }

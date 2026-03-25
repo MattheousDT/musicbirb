@@ -33,7 +33,7 @@ pub struct SubsonicProvider {
 
 impl SubsonicProvider {
 	pub fn new(url: &str, username: &str, password: &str) -> Result<Self, MusicbirbError> {
-		let auth = AuthBuilder::new(username, env!("CARGO_PKG_VERSION"))
+		let auth = AuthBuilder::new(username, "1.16.1")
 			.client_name("musicbirb")
 			.hashed(password);
 
