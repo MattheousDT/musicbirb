@@ -165,16 +165,16 @@ impl AudioBackend for MpvBackend {
 		Ok(())
 	}
 
-	async fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError> {
+	async fn seek(&self, seconds: f64) -> Result<(), MusicbirbError> {
 		self.mpv
-			.command("seek", &[&seconds.to_string(), "relative"])
+			.command("seek", &[&seconds.to_string(), "absolute"])
 			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 		Ok(())
 	}
 
-	async fn seek_absolute(&self, seconds: f64) -> Result<(), MusicbirbError> {
+	async fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError> {
 		self.mpv
-			.command("seek", &[&seconds.to_string(), "absolute"])
+			.command("seek", &[&seconds.to_string(), "relative"])
 			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 		Ok(())
 	}

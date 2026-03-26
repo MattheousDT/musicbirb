@@ -88,13 +88,13 @@ pub trait AudioBackend: Send + Sync {
 	/// Starts playback of the item at the specified index in the backend's internal playlist.
 	async fn play_index(&self, index: i64) -> Result<(), MusicbirbError>;
 
+	/// Seeks the current playback position to an absolute time in seconds.
+	async fn seek(&self, seconds: f64) -> Result<(), MusicbirbError>;
+
 	/// Seeks the current playback position by a relative offset in seconds.
 	///
 	/// Use a negative value to seek backward.
 	async fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError>;
-
-	/// Seeks the current playback position to an absolute time in seconds.
-	async fn seek_absolute(&self, seconds: f64) -> Result<(), MusicbirbError>;
 
 	/// Sets the output volume (typically 0.0 to 100.0).
 	async fn set_volume(&self, volume: f64) -> Result<(), MusicbirbError>;

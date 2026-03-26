@@ -24,7 +24,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 
 	/// Robust padding calculation to clear Status Bar + Navigation Bar + Aesthetic Space.
 	private var topPadding: CGFloat {
-		let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top : 47 // Fallback for iPhone 15+
+		let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top : 47  // Fallback for iPhone 15+
 		let navBarHeight: CGFloat = 44
 		let extraSpace: CGFloat = horizontalSizeClass == .regular ? 40 : 20
 		return safeTop + navBarHeight + extraSpace
@@ -51,12 +51,14 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 						}
 
 						if let desc = description, !desc.isEmpty {
-							Text(desc.replacingOccurrences(
-									of: "<[^>]+>", with: "", options: .regularExpression, range: nil))
-								.font(.system(size: 16))
-								.foregroundColor(.secondary)
-								.lineLimit(4)
-								.padding(.top, 4)
+							Text(
+								desc.replacingOccurrences(
+									of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
+							)
+							.font(.system(size: 16))
+							.foregroundColor(.secondary)
+							.lineLimit(4)
+							.padding(.top, 4)
 						}
 
 						actions
@@ -87,13 +89,15 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 						}
 
 						if let desc = description, !desc.isEmpty {
-							Text(desc.replacingOccurrences(
-									of: "<[^>]+>", with: "", options: .regularExpression, range: nil))
-								.font(.system(size: 14))
-								.foregroundColor(.secondary)
-								.lineLimit(3)
-								.multilineTextAlignment(.center)
-								.padding(.horizontal, 32)
+							Text(
+								desc.replacingOccurrences(
+									of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
+							)
+							.font(.system(size: 14))
+							.foregroundColor(.secondary)
+							.lineLimit(3)
+							.multilineTextAlignment(.center)
+							.padding(.horizontal, 32)
 						}
 
 						actions

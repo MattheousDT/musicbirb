@@ -86,8 +86,9 @@ struct SearchView: View {
 										.font(.system(size: 22, weight: .black))
 										.padding(.horizontal, 16)
 
-									let columns = horizontalSizeClass == .regular
-										?[GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+									let columns =
+										horizontalSizeClass == .regular
+										? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 										: [GridItem(.flexible())]
 
 									LazyVGrid(columns: columns, spacing: 0) {

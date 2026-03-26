@@ -26,17 +26,22 @@ struct AlbumView: View {
 									.foregroundColor(.accentColor)
 							}
 						},
-						meta:[
+						meta: [
 							horizontalSizeClass != .regular ? album.year.map(String.init) : nil,
 							"\(album.songCount) tracks",
-							"\(album.durationSecs / 60) mins"
+							"\(album.durationSecs / 60) mins",
 						].compactMap { $0 }.joined(separator: " • "),
 						description: nil,
 						imageShape: .roundedRectangle,
 						actions: {
 							HStack(spacing: 16) {
-								HeroActionButton(title: "Play", icon: "play.fill", isPrimary: true, isExpanded: horizontalSizeClass != .regular, action: playAlbum)
-								HeroActionButton(title: "Play Next", icon: "text.line.first.and.arrowtriangle.forward", isPrimary: false, isExpanded: horizontalSizeClass != .regular, action: playAlbumNext)
+								HeroActionButton(
+									title: "Play", icon: "play.fill", isPrimary: true,
+									isExpanded: horizontalSizeClass != .regular, action: playAlbum)
+								HeroActionButton(
+									title: "Play Next", icon: "text.line.first.and.arrowtriangle.forward",
+									isPrimary: false, isExpanded: horizontalSizeClass != .regular,
+									action: playAlbumNext)
 							}
 						}
 					)

@@ -70,11 +70,8 @@ struct PlayerSheet: View {
 										onEditingChanged: { editing in
 											self.isSeeking = editing
 											if !editing {
-												let currentPos = viewModel.uiState?.positionSecs ?? 0.0
-												let relativeOffset = self.sliderValue - currentPos
-
 												self.targetSeekTime = self.sliderValue
-												try? viewModel.core?.seek(seconds: relativeOffset)
+												try? viewModel.core?.seek(seconds: self.sliderValue)
 
 												DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
 													if self.targetSeekTime != nil {

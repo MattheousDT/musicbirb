@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PaginatedList<Item, Content: View>: View {
-	let items:[Item]
+	let items: [Item]
 	let itemsPerPage: Int
 	let rowHeight: CGFloat
 	let content: (Item) -> Content

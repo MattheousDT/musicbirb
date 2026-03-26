@@ -209,6 +209,12 @@ impl Musicbirb {
 
 	pub fn seek(&self, seconds: f64) -> Result<(), MusicbirbError> {
 		self.tx
+			.send(CoreMessage::Seek(seconds))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn seek_relative(&self, seconds: f64) -> Result<(), MusicbirbError> {
+		self.tx
 			.send(CoreMessage::SeekRelative(seconds))
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}

@@ -332,6 +332,10 @@ impl CoreActor {
 					self.play_track_at(idx, player, api, tx, state_tx).await;
 				}
 			}
+			CoreMessage::Seek(secs) => {
+				let _ = player.seek(secs).await;
+				self.dispatch_state(&player.get_state(), state_tx);
+			}
 			CoreMessage::SeekRelative(secs) => {
 				let _ = player.seek_relative(secs).await;
 				self.dispatch_state(&player.get_state(), state_tx);

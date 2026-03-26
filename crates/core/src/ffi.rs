@@ -47,8 +47,8 @@ pub trait AudioEngineDelegate: Send + Sync {
 	fn remove_index(&self, index: i32);
 	fn clear_playlist(&self);
 	fn play_index(&self, index: i32);
+	fn seek(&self, seconds: f64);
 	fn seek_relative(&self, seconds: f64);
-	fn seek_absolute(&self, seconds: f64);
 	fn set_volume(&self, volume: f64);
 	fn get_volume(&self) -> f64;
 	fn get_state(&self) -> FfiPlayerState;
@@ -115,12 +115,12 @@ impl AudioBackend for MobileBackend {
 		self.delegate.play_index(index as i32);
 		Ok(())
 	}
-	async fn seek_relative(&self, seconds: f64) -> Result<(), crate::MusicbirbError> {
-		self.delegate.seek_relative(seconds);
+	async fn seek(&self, seconds: f64) -> Result<(), crate::MusicbirbError> {
+		self.delegate.seek(seconds);
 		Ok(())
 	}
-	async fn seek_absolute(&self, seconds: f64) -> Result<(), crate::MusicbirbError> {
-		self.delegate.seek_absolute(seconds);
+	async fn seek_relative(&self, seconds: f64) -> Result<(), crate::MusicbirbError> {
+		self.delegate.seek_relative(seconds);
 		Ok(())
 	}
 	async fn set_volume(&self, volume: f64) -> Result<(), crate::MusicbirbError> {

@@ -25,8 +25,13 @@ struct PlaylistView: View {
 						imageShape: .roundedRectangle,
 						actions: {
 							HStack(spacing: 16) {
-								HeroActionButton(title: "Play", icon: "play.fill", isPrimary: true, isExpanded: horizontalSizeClass != .regular, action: playPlaylist)
-								HeroActionButton(title: "Play Next", icon: "text.line.first.and.arrowtriangle.forward", isPrimary: false, isExpanded: horizontalSizeClass != .regular, action: playPlaylistNext)
+								HeroActionButton(
+									title: "Play", icon: "play.fill", isPrimary: true,
+									isExpanded: horizontalSizeClass != .regular, action: playPlaylist)
+								HeroActionButton(
+									title: "Play Next", icon: "text.line.first.and.arrowtriangle.forward",
+									isPrimary: false, isExpanded: horizontalSizeClass != .regular,
+									action: playPlaylistNext)
 							}
 						}
 					)
@@ -75,7 +80,9 @@ struct PlaylistView: View {
 	}
 
 	private func playPlaylistNext() {
-		// Dummy play next action
+		Task {
+			_ = try? await viewModel.core?.queuePlaylist(id: playlistId, next: true)
+		}
 	}
 
 	private func playTrack(index: Int) {

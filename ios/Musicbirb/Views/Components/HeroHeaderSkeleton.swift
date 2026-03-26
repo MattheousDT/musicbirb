@@ -24,10 +24,16 @@ struct HeroHeaderSkeleton: View {
 					skeletonImage(size: imageSize)
 
 					VStack(alignment: .leading, spacing: 14) {
-						RoundedRectangle(cornerRadius: 6).fill(Color(UIColor.systemGray5)).frame(width: 300, height: 40)
-						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(width: 180, height: 20)
-						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(maxWidth: .infinity).frame(height: 14)
-						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(maxWidth: .infinity).frame(height: 14)
+						RoundedRectangle(cornerRadius: 6).fill(Color(UIColor.systemGray5)).frame(
+							width: 300, height: 40)
+						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(
+							width: 180, height: 20)
+						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(
+							maxWidth: .infinity
+						).frame(height: 14)
+						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(
+							maxWidth: .infinity
+						).frame(height: 14)
 					}
 					.frame(maxWidth: .infinity, alignment: .leading)
 				}
@@ -39,9 +45,13 @@ struct HeroHeaderSkeleton: View {
 					skeletonImage(size: imageSize)
 
 					VStack(spacing: 10) {
-						RoundedRectangle(cornerRadius: 6).fill(Color(UIColor.systemGray5)).frame(width: 240, height: 32)
-						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(width: 140, height: 16)
-						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(maxWidth: .infinity).frame(height: 14)
+						RoundedRectangle(cornerRadius: 6).fill(Color(UIColor.systemGray5)).frame(
+							width: 240, height: 32)
+						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(
+							width: 140, height: 16)
+						RoundedRectangle(cornerRadius: 4).fill(Color(UIColor.systemGray5)).frame(
+							maxWidth: .infinity
+						).frame(height: 14)
 					}
 					.padding(.horizontal, 32)
 					.padding(.bottom, 40)
@@ -70,7 +80,8 @@ struct HeroHeaderSkeleton: View {
 		if imageShape == .circle {
 			Circle().fill(Color(UIColor.systemGray5)).frame(width: size, height: size)
 		} else {
-			RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color(UIColor.systemGray5)).frame(width: size, height: size)
+			RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color(UIColor.systemGray5)).frame(
+				width: size, height: size)
 		}
 	}
 }

@@ -3,51 +3,23 @@ import Foundation
 import MediaPlayer
 import os
 
+extension Collection {
+	/// Safely accesses an element at the given index.
+	/// - Parameter index: The index to check.
+	/// - Returns: The element at `index` if valid; otherwise, `nil`.
+	subscript(safe index: Index) -> Element? {
+		// Check if the index is in the collection's valid indices
+		return indices.contains(index) ? self[index] : nil
+	}
+}
+
 final class NativeAudioDelegate: AudioEngineDelegate, @unchecked Sendable {
 	private let player = AVQueuePlayer()
-	private var internalPlaylist: [AVPlayerItem] = []
 	var eventTarget: AudioEventTarget?
 
 	private var timeObserverToken: Any?
 	private var statusObservation: NSKeyValueObservation?
 	private var itemObservation: NSKeyValueObservation?
-
-	init() {
-		setupAudioSession()
-		setupRemoteTransportControls()
-
-		player.automaticallyWaitsToMinimizeStalling = false
-
-		let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)  // 0.1s matches MPV polling
-		timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) {
-			[weak self] time in
-			guard let self = self, let target = self.eventTarget else { return }
-			target.onPositionCorrection(seconds: time.seconds)
-		}
-
-		statusObservation = player.observe(\.timeControlStatus, options: [.new]) {
-			[weak self] player, _ in
-			guard let self = self, let target = self.eventTarget else { return }
-			target.onStatusUpdate(status: self.getCurrentFfiStatus())
-		}
-
-		itemObservation = player.observe(\.currentItem, options: [.old, .new]) {
-			[weak self] player, change in
-			guard let self = self, let target = self.eventTarget else { return }
-
-			if player.currentItem != nil {
-				target.onTrackStarted()
-			} else if change.oldValue != nil && player.currentItem == nil {
-				target.onEndOfTrack()
-			}
-		}
-	}
-
-	deinit {
-		if let token = timeObserverToken {
-			player.removeTimeObserver(token)
-		}
-	}
 
 	private func setupAudioSession() {
 		do {
@@ -59,8 +31,8 @@ final class NativeAudioDelegate: AudioEngineDelegate, @unchecked Sendable {
 		}
 	}
 
-	private func getCurrentFfiStatus() -> PlayerStatus {
-		switch player.timeControlStatus {
+	private func mapAVPlayerStatus(_ timeControlStatus: AVPlayer.TimeControlStatus) -> PlayerStatus {
+		switch timeControlStatus {
 		case .playing: return .playing
 		case .waitingToPlayAtSpecifiedRate: return .buffering
 		default:
@@ -69,6 +41,49 @@ final class NativeAudioDelegate: AudioEngineDelegate, @unchecked Sendable {
 		}
 	}
 
+	init() {
+		setupAudioSession()
+		setupRemoteTransportControls()
+
+		player.automaticallyWaitsToMinimizeStalling = false
+
+		// --- Player => Rust --- //
+
+		// Periodic position correction
+		let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)  // 0.1s matches MPV polling
+		timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) {
+			[weak self] time in
+			guard let self = self, let target = self.eventTarget else { return }
+			target.onPositionCorrection(seconds: time.seconds)
+		}
+
+		// Update Rust with our current player state
+		statusObservation = player.observe(\.timeControlStatus, options: [.new]) {
+			[weak self] player, _ in
+			guard let self = self, let target = self.eventTarget else { return }
+			target.onStatusUpdate(status: mapAVPlayerStatus(player.timeControlStatus))
+		}
+
+		// Inform Rust of our current queue status
+		itemObservation = player.observe(\.currentItem, options: [.prior, .new]) {
+			[weak self] player, change in
+			guard let self = self, let target = self.eventTarget else { return }
+
+			if change.isPrior {
+				target.onEndOfTrack()
+			} else {
+				target.onTrackStarted()
+			}
+		}
+	}
+
+	deinit {
+		if let token = timeObserverToken {
+			player.removeTimeObserver(token)
+		}
+	}
+
+	// --- Rust => Player --- ///
 	func play() {
 		player.play()
 	}
@@ -87,73 +102,47 @@ final class NativeAudioDelegate: AudioEngineDelegate, @unchecked Sendable {
 
 	func stop() {
 		player.pause()
+		player.removeAllItems()
 	}
 
 	func add(url: String) {
 		guard let u = URL(string: url) else { return }
 		let item = AVPlayerItem(url: u)
 		item.preferredForwardBufferDuration = 10.0
-		internalPlaylist.append(item)
 		player.insert(item, after: nil)
 	}
 
 	func insert(url: String, index: Int32) {
 		guard let u = URL(string: url) else { return }
+		guard let afterItem = player.items()[safe: max(0, Int(index) - 1)] else { return }
+
 		let item = AVPlayerItem(url: u)
 		item.preferredForwardBufferDuration = 10.0
-		let idx = Int(index)
 
-		if idx >= 0 && idx <= internalPlaylist.count {
-			internalPlaylist.insert(item, at: idx)
-
-			if idx == internalPlaylist.count - 1 {
-				player.insert(item, after: nil)
-			} else {
-				rebuildPhysicalQueue()
-			}
-		}
+		player.insert(item, after: afterItem)
 	}
 
 	func removeIndex(index: Int32) {
-		let idx = Int(index)
-		guard idx >= 0 && idx < internalPlaylist.count else { return }
-		let removed = internalPlaylist.remove(at: idx)
-
-		if player.items().contains(removed) {
-			player.remove(removed)
-		}
+		guard let item = player.items()[safe: Int(index)] else { return }
+		player.remove(item)
 	}
 
 	func clearPlaylist() {
 		player.removeAllItems()
-		internalPlaylist.removeAll()
 	}
 
 	func playIndex(index: Int32) {
-		let idx = Int(index)
-		guard idx >= 0 && idx < internalPlaylist.count else { return }
+		// Swift AVQueuePlayer doesn't have this as a method, will remove from core.
+	}
 
-		player.removeAllItems()
-		for item in internalPlaylist[idx...] {
-			// AVPlayerItem must be reset if it had already finished previously
-			item.seek(to: .zero, completionHandler: nil)
-			if player.canInsert(item, after: nil) {
-				player.insert(item, after: nil)
-			}
-		}
+	func seek(seconds: Double) {
+		let time = CMTime(seconds: seconds, preferredTimescale: 1000)
+		player.seek(to: time)
 	}
 
 	func seekRelative(seconds: Double) {
 		let target = player.currentTime().seconds + seconds
-		seekAbsolute(seconds: target)
-	}
-
-	func seekAbsolute(seconds: Double) {
-		let time = CMTime(seconds: seconds, preferredTimescale: 1000)
-		player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-			guard let self = self else { return }
-			self.eventTarget?.onPositionCorrection(seconds: self.player.currentTime().seconds)
-		}
+		seek(seconds: target)
 	}
 
 	func setVolume(volume: Double) {
@@ -165,36 +154,16 @@ final class NativeAudioDelegate: AudioEngineDelegate, @unchecked Sendable {
 	}
 
 	func getState() -> FfiPlayerState {
-		let status = getCurrentFfiStatus()
 		let pos = player.currentTime().seconds
-
-		var currentIndex: Int32 = -1
-		if let currentItem = player.currentItem,
-			let idx = internalPlaylist.firstIndex(of: currentItem)
-		{
-			currentIndex = Int32(idx)
-		}
+		let status = mapAVPlayerStatus(player.timeControlStatus)
 
 		return FfiPlayerState(
 			positionSecs: pos.isNaN ? 0 : pos,
 			status: status,
-			playlistIndex: currentIndex,
-			playlistCount: Int32(internalPlaylist.count)
+			playlistIndex: player.currentItem != nil
+				? Int32(player.items().firstIndex(of: player.currentItem!) ?? 0) : 0,
+			playlistCount: Int32(player.items().count)
 		)
-	}
-
-	private func rebuildPhysicalQueue() {
-		guard let current = player.currentItem else { return }
-		player.removeAllItems()
-		player.insert(current, after: nil)
-
-		if let startIdx = internalPlaylist.firstIndex(of: current) {
-			for item in internalPlaylist[(startIdx + 1)...] {
-				if player.canInsert(item, after: nil) {
-					player.insert(item, after: nil)
-				}
-			}
-		}
 	}
 
 	private func setupRemoteTransportControls() {
