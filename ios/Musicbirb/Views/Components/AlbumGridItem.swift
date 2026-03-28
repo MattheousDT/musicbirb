@@ -2,7 +2,8 @@ import SwiftUI
 
 struct AlbumGridItem: View {
 	let album: Album
-	var showYear: Bool = false
+	var showArtist: Bool = true
+	var showYear: Bool = true
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
@@ -24,10 +25,16 @@ struct AlbumGridItem: View {
 					.foregroundColor(.primary)
 					.lineLimit(1)
 
-				Text(showYear ? (album.year.map(String.init) ?? "—") : album.artist)
-					.font(.system(size: 13, weight: .semibold))
-					.foregroundColor(.secondary)
-					.lineLimit(1)
+				Text(
+					[
+						showArtist ? album.artist : nil,
+						(showYear && album.year != nil) ? "\(album.year!)" : nil,
+						album.songCount != nil ? String(localized: "\(album.songCount!) tracks") : nil,
+					].compactMap { $0 }.joined(separator: " • "),
+				)
+				.font(.system(size: 13, weight: .semibold))
+				.foregroundColor(.secondary)
+				.lineLimit(1)
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)  // Explicitly clamps constraints so grid columns truncate instead of stretch
 		}

@@ -18,10 +18,15 @@ struct PlaylistItem: View {
 					.foregroundColor(.primary)
 					.lineLimit(1)
 
-				Text("\(playlist.songCount) tracks • \(playlist.durationSecs / 60) mins")
-					.font(.system(size: 13, weight: .medium))
-					.foregroundColor(.secondary)
-					.lineLimit(1)
+				Text(
+					[
+						String(localized: "\(playlist.songCount) tracks"),
+						String(localized: "\(playlist.durationSecs / 60) mins"),
+					].compactMap { $0 }.joined(separator: " • ")
+				)
+				.font(.system(size: 13, weight: .medium))
+				.foregroundColor(.secondary)
+				.lineLimit(1)
 			}
 			Spacer()
 		}

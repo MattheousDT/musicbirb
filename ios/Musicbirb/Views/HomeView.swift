@@ -23,7 +23,7 @@ struct HomeView: View {
 								LazyHStack(spacing: 16) {
 									ForEach(lastPlayedAlbums, id: \.id) { album in
 										NavigationLink(destination: AlbumView(albumId: album.id)) {
-											AlbumGridItem(album: album)
+											AlbumGridItem(album: album, showYear: false)
 												.frame(width: 140)  // Constrain width in carousel
 										}
 										.buttonStyle(.plain)
@@ -95,7 +95,7 @@ struct HomeView: View {
 				.padding(.vertical, 16)
 			}
 			.background(Color(UIColor.systemGroupedBackground))
-			.navigationTitle("Home")
+			.navigationTitle(Text("Home"))
 			.toolbar {
 				ToolbarItem(placement: .navigationBarTrailing) {
 					Button {

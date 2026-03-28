@@ -17,7 +17,7 @@ struct ArtistView: View {
 						coverArt: artist.coverArt,
 						title: artist.name,
 						subtitle: { EmptyView() },
-						meta: "\(artist.albumCount) Release\(artist.albumCount == 1 ? "" : "s")",
+						meta: String(localized: "\(artist.albumCount) releases"),
 						description: artist.biography,
 						imageShape: .circle,
 						actions: { EmptyView() }
@@ -100,7 +100,7 @@ struct ArtistView: View {
 			LazyVGrid(columns: gridCols, spacing: 20) {
 				ForEach(artist.albums, id: \.id) { album in
 					NavigationLink(destination: AlbumView(albumId: album.id)) {
-						AlbumGridItem(album: album, showYear: true)
+						AlbumGridItem(album: album, showArtist: false)
 					}
 					.buttonStyle(.plain)
 				}

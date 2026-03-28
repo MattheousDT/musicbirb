@@ -15,12 +15,15 @@ struct PlaylistView: View {
 						title: playlist.name,
 						subtitle: {
 							if let owner = playlist.owner, !owner.isEmpty {
-								Text("by \(owner)")
+								Text("Created by \(owner)")
 									.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
 									.foregroundColor(.accentColor)
 							}
 						},
-						meta: "\(playlist.songCount) tracks • \(playlist.durationSecs / 60) mins",
+						meta: [
+							String(localized: "\(playlist.songCount) tracks"),
+							String(localized: "\(playlist.durationSecs / 60) mins"),
+						].compactMap { $0 }.joined(separator: " • "),
 						description: playlist.comment,
 						imageShape: .roundedRectangle,
 						actions: {
