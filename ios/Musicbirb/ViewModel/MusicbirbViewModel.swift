@@ -33,7 +33,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	var isAuthenticating: Bool = false
 	var loginError: String?
 
-	private let delegate = NativeAudioDelegate()
+	private let remoteCommandManager = RemoteCommandManager()
 
 	var currentTrack: Track? {
 		guard let uiState = uiState,
@@ -65,12 +65,11 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 				provider: nil,
 				dataDir: docsDir,
 				cacheDir: cacheDir,
-				delegate: delegate,
 				observer: self
 			)
 
 			self.core = initializedCore
-			self.delegate.eventTarget = initializedCore.getEventTarget()
+			self.remoteCommandManager.setup(core: initializedCore)
 
 			// Check for saved accounts to attempt auto-login
 			if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {

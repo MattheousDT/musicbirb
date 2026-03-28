@@ -9,6 +9,7 @@ ffi =["dep:uniffi", "dep:lazy_static"]
 jellyfin = []
 mpv =["dep:libmpv"]
 os-media-controls = ["dep:souvlaki"]
+rodio = ["dep:rodio", "dep:stream-download"]
 subsonic = ["dep:submarine"]
 
 [dependencies]
@@ -19,9 +20,11 @@ lazy_static = { version = "1.5.0", optional = true }
 libmpv = { git = "https://github.com/ParadoxSpiral/libmpv-rs", optional = true }
 macros = { path = "../macros" }
 reqwest = { version = "0.11.14", default-features = false, features = ["json", "rustls-tls", "multipart", "stream"] }
+rodio = { version = "0.22.2", default-features = false, features = ["symphonia-all", "playback"], optional = true }
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
 souvlaki = { version = "0.8.3", optional = true, default-features = false, features = ["use_zbus"] }
+stream-download = { version = "0.4.2", optional = true, default-features = false, features = ["reqwest", "reqwest-rustls", "temp-storage"] }
 submarine = { version = "0.1.1", optional = true }
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["full"] }

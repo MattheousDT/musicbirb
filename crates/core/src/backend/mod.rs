@@ -5,6 +5,9 @@ use tokio::sync::mpsc;
 #[cfg(feature = "mpv")]
 pub mod mpv;
 
+#[cfg(feature = "rodio")]
+pub mod rodio;
+
 /// Represents the current playback status of the audio backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "ffi", derive(uniffi::Enum))]

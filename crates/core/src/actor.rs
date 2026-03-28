@@ -340,6 +340,12 @@ impl CoreActor {
 				let _ = player.seek_relative(secs).await;
 				self.dispatch_state(&player.get_state(), state_tx);
 			}
+			CoreMessage::Play => {
+				let _ = player.play().await;
+			}
+			CoreMessage::Pause => {
+				let _ = player.pause().await;
+			}
 			CoreMessage::TogglePause => {
 				let _ = player.toggle_pause().await;
 			}

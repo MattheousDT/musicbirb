@@ -160,7 +160,6 @@ struct PlayerSheet: View {
 						}
 					}
 					.presentationDragIndicator(.visible)
-					.presentationBackground(.thinMaterial)
 				}
 			}
 		}

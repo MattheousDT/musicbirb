@@ -12,14 +12,15 @@ pub fn init_client(
 	provider: Option<Arc<dyn crate::Provider>>,
 	data_dir: String,
 	cache_dir: String,
-	delegate: Box<dyn crate::ffi::AudioEngineDelegate>,
 	observer: Box<dyn crate::ffi::StateObserver>,
 ) -> Result<Arc<Musicbirb>, MusicbirbError> {
 	let _guard = crate::RUNTIME.enter();
 
-	let shared_tx = Arc::new(std::sync::Mutex::new(None));
-	let backend = Arc::new(crate::ffi::MobileBackend::new(delegate, Arc::clone(&shared_tx)));
-	let event_target = Arc::new(crate::ffi::AudioEventTarget::new(Arc::clone(&shared_tx)));
+	#[cfg(feature = "rodio")]
+	let backend = Arc::new(crate::backend::rodio::RodioBackend::new()?);
+
+	#[cfg(not(feature = "rodio"))]
+	panic!("Rodio backend feature is required for ffi!");
 
 	let data_dir_opt = if data_dir.is_empty() {
 		None
@@ -40,7 +41,6 @@ pub fn init_client(
 		api: Arc::clone(&api_lock),
 		tx: tx.clone(),
 		state_rx: state_rx.clone(),
-		event_target: Some(Arc::clone(&event_target)),
 	});
 
 	let actor = CoreActor::new(data_dir_opt, cache_dir_opt);
@@ -67,18 +67,11 @@ pub struct Musicbirb {
 	api: Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
-	#[cfg(feature = "ffi")]
-	event_target: Option<Arc<crate::ffi::AudioEventTarget>>,
 }
 
 #[cfg_attr(feature = "ffi", uniffi::export)]
 #[macros::async_ffi]
 impl Musicbirb {
-	#[cfg(feature = "ffi")]
-	pub fn get_event_target(&self) -> Arc<crate::ffi::AudioEventTarget> {
-		Arc::clone(self.event_target.as_ref().unwrap())
-	}
-
 	#[cfg(feature = "ffi")]
 	pub fn get_ui_state(&self) -> crate::state::UiState {
 		let state = self.state_rx.borrow().clone();
@@ -219,6 +212,18 @@ impl Musicbirb {
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
+	pub fn play(&self) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::Play)
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn pause(&self) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::Pause)
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
 	pub fn toggle_pause(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::TogglePause)
@@ -256,8 +261,6 @@ impl Musicbirb {
 			api: Arc::clone(&api_lock),
 			tx: tx.clone(),
 			state_rx,
-			#[cfg(feature = "ffi")]
-			event_target: None,
 		});
 
 		let actor = CoreActor::new(data_dir, cache_dir);

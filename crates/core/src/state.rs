@@ -58,6 +58,8 @@ pub enum CoreMessage {
 	PlayIndex(usize),
 	Seek(f64),
 	SeekRelative(f64),
+	Play,
+	Pause,
 	TogglePause,
 	UrlReady {
 		url: String,
