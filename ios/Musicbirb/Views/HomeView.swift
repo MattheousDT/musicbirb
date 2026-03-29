@@ -131,37 +131,46 @@ struct HomeView: View {
 			return
 		}
 
+		// We use a TaskGroup or simply individual async let with internal error handling
+		// to ensure they run in parallel but fail independently.
+
+		async let lastPlayed = safeLoad("Last Played") {
+			try await core.getProvider().search().search(
+				query: SearchQuery(keyword: nil, preset: .lastPlayedAlbums, limit: nil, offset: nil)
+			).albums
+		}
+
+		async let recent = safeLoad("Recently Added") {
+			try await core.getProvider().search().search(
+				query: SearchQuery(keyword: nil, preset: .recentlyAddedAlbums, limit: nil, offset: nil)
+			).albums
+		}
+
+		async let newRel = safeLoad("New Releases") {
+			try await core.getProvider().search().search(
+				query: SearchQuery(keyword: nil, preset: .newlyReleasedAlbums, limit: nil, offset: nil)
+			).albums
+		}
+
+		async let pl = safeLoad("Playlists") {
+			try await core.getProvider().playlist().getPlaylists()
+		}
+
+		let (lpResult, rResult, nrResult, pResult) = await (lastPlayed, recent, newRel, pl)
+
+		if let lpResult { self.lastPlayedAlbums = lpResult }
+		if let rResult { self.recentAlbums = rResult }
+		if let nrResult { self.newAlbums = nrResult }
+		if let pResult { self.playlists = pResult }
+	}
+
+	/// Helper function to capture errors for specific tasks
+	private func safeLoad<T>(_ label: String, block: () async throws -> T) async -> T? {
 		do {
-			async let lastPlayedReq = core.getProvider()
-				.search().search(
-					query: SearchQuery(
-						keyword: nil, preset: SearchPreset.lastPlayedAlbums, limit: nil, offset: nil
-					)
-				)
-			async let recentReq = core.getProvider()
-				.search().search(
-					query: SearchQuery(
-						keyword: nil, preset: SearchPreset.recentlyAddedAlbums, limit: nil, offset: nil
-					)
-				)
-			async let newReq = core.getProvider()
-				.search().search(
-					query: SearchQuery(
-						keyword: nil, preset: SearchPreset.newlyReleasedAlbums, limit: nil, offset: nil
-					)
-				)
-			async let playlistsReq = core.getProvider().playlist().getPlaylists()
-
-			let (lastPlayed, recent, newRel, pl) = try await (
-				lastPlayedReq, recentReq, newReq, playlistsReq
-			)
-
-			lastPlayedAlbums = lastPlayed.albums
-			recentAlbums = recent.albums
-			newAlbums = newRel.albums
-			playlists = pl
+			return try await block()
 		} catch {
-			Log.app.error("Failed to load home data: \(error)")
+			Log.app.error("Failed to load \(label): \(error.localizedDescription)")
+			return nil
 		}
 	}
 }
