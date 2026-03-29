@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
-	@State private var isPlayerPresented = false
 
 	var body: some View {
 		ZStack {
@@ -36,7 +35,11 @@ struct ContentView: View {
 				}
 			}
 		}
-		.sheet(isPresented: $isPlayerPresented) {
+		.sheet(
+			isPresented: Binding(
+				get: { viewModel.showPlayerSheet }, set: { viewModel.showPlayerSheet = $0 }
+			)
+		) {
 			PlayerSheet()
 		}
 		.fullScreenCover(isPresented: Bindable(viewModel).showLogin) {
@@ -62,7 +65,7 @@ struct ContentView: View {
 
 	private var playBarButton: some View {
 		Button(action: {
-			if viewModel.currentTrack != nil { isPlayerPresented = true }
+			if viewModel.currentTrack != nil { viewModel.showPlayerSheet = true }
 		}) {
 			CurrentlyPlayingBar()
 		}

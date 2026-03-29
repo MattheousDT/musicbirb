@@ -29,6 +29,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	var uiState: UiState?
 	var accounts: [AccountConfig] = []
 	var activeAccount: AccountConfig?
+	var showPlayerSheet: Bool = false
 	var showLogin: Bool = false
 	var isAuthenticating: Bool = false
 	var loginError: String?
@@ -111,6 +112,27 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 			}
 		} catch {
 			Log.rust.error("Failed to initialize Rust Core: \(error)")
+		}
+
+		setupLifecycleObservers()
+	}
+
+	private func setupLifecycleObservers() {
+		NotificationCenter.default.addObserver(
+			forName: UIApplication.didBecomeActiveNotification,
+			object: nil,
+			queue: .main
+		) { [weak self] _ in
+			self?.handleAppResumed()
+		}
+	}
+
+	/// Called when the app enters the foreground (e.g. via tapping the Lock Screen media widget)
+	private func handleAppResumed() {
+		// If we are currently playing or have a track loaded,
+		// showing the player sheet provides a seamless transition from the lock screen.
+		if currentTrack != nil && uiState?.status == .playing {
+			self.showPlayerSheet = true
 		}
 	}
 
@@ -242,6 +264,11 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	func onStateChanged(state: UiState) {
 		Task { @MainActor in
 			self.uiState = state
+			self.remoteCommandManager.updateNowPlaying(
+				track: self.currentTrack,
+				position: state.positionSecs,
+				isPlaying: state.status == .playing
+			)
 		}
 	}
 }
