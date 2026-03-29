@@ -314,6 +314,16 @@
         }
       }
     },
+    "Nothing is queued" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "대기 중인 항목이 없습니다."
+          }
+        }
+      }
+    },
     "Password" : {
       "localizations" : {
         "ko" : {
@@ -340,6 +350,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다음 재생"
+          }
+        }
+      }
+    },
+    "Play something to start" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "먼저 아무거나 틀어보세요"
           }
         }
       }

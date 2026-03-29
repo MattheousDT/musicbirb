@@ -65,7 +65,7 @@ struct PaginatedList<Item, Content: View>: View {
 					}
 				}
 			}
-			.tabViewStyle(.page(indexDisplayMode: .always))
+			.tabViewStyle(.page(indexDisplayMode: .automatic))
 			// Height = (number of visible rows * height) + 40pts reserved for the dots outside the box
 			.frame(height: CGFloat(actualRowsNeeded) * rowHeight + 40)
 			.onAppear {

@@ -2,16 +2,14 @@ import SwiftUI
 
 struct CurrentlyPlayingBar: View {
 	@Environment(MusicbirbViewModel.self) private var viewModel
-	let track: Track
-	let isPlaying: Bool
 
 	var body: some View {
 		HStack(spacing: 12) {
 			VStack(alignment: .leading, spacing: 2) {
-				Text(track.title)
+				Text(viewModel.currentTrack?.title ?? String(localized: "Nothing is queued"))
 					.font(.system(size: 15, weight: .bold))
 					.lineLimit(1)
-				Text(track.artist)
+				Text(viewModel.currentTrack?.artist ?? String(localized: "Play something to start"))
 					.font(.system(size: 13, weight: .semibold))
 					.foregroundColor(.secondary)
 					.lineLimit(1)
@@ -20,7 +18,7 @@ struct CurrentlyPlayingBar: View {
 			Spacer()
 
 			Button(action: { try? viewModel.core?.togglePause() }) {
-				Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+				Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
 					.font(.title2)
 					.contentTransition(.symbolEffect(.replace))
 					.foregroundColor(.primary)

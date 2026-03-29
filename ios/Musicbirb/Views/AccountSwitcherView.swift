@@ -27,9 +27,11 @@ struct AccountSwitcherView: View {
 									Text(account.username)
 										.font(.subheadline)
 										.foregroundColor(.primary)
-									Text(account.url)
+										.truncationMode(.tail)
+									Text(URL(string: account.url)!.host()!)
 										.font(.caption)
 										.foregroundColor(.secondary)
+										.truncationMode(.tail)
 								}
 
 								if isActive {
