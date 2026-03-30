@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct PlayerSheet: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
+	@Environment(SettingsViewModel.self) private var settings
 	@State private var isSeeking = false
 	@State private var sliderValue: Double = 0.0
 	@State private var targetSeekTime: Double? = nil
@@ -10,7 +12,7 @@ struct PlayerSheet: View {
 	var body: some View {
 		NavigationView {
 			GeometryReader { geometry in
-				if let currentTrack = viewModel.currentTrack {
+				if let currentTrack = playbackViewModel.currentTrack {
 					let trackDuration = Double(max(currentTrack.durationSecs, 1))
 
 					VStack(spacing: 0) {
@@ -23,7 +25,10 @@ struct PlayerSheet: View {
 						)
 						.aspectRatio(1, contentMode: .fit)
 						.frame(width: imageSize, height: imageSize)
-						.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+						.clipShape(
+							RoundedRectangle(
+								cornerRadius: 24 * settings.cornerRounding.multiplier, style: .continuous)
+						)
 						.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
 						.id(currentTrack.id)
 
@@ -58,7 +63,7 @@ struct PlayerSheet: View {
 												} else if let target = self.targetSeekTime {
 													rawValue = target
 												} else {
-													rawValue = viewModel.uiState?.positionSecs ?? 0.0
+													rawValue = playbackViewModel.uiState?.positionSecs ?? 0.0
 												}
 
 												// Strictly clamp slider between 0 and total duration to prevent overshoots
@@ -71,7 +76,7 @@ struct PlayerSheet: View {
 											self.isSeeking = editing
 											if !editing {
 												self.targetSeekTime = self.sliderValue
-												try? viewModel.core?.seek(seconds: self.sliderValue)
+												try? coreManager.core?.seek(seconds: self.sliderValue)
 
 												DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
 													if self.targetSeekTime != nil {
@@ -83,7 +88,9 @@ struct PlayerSheet: View {
 									)
 									.tint(.primary)
 
-									if let mark = viewModel.uiState?.scrobbleMarkPos, mark > 0, trackDuration > 0 {
+									if let mark = playbackViewModel.uiState?.scrobbleMarkPos, mark > 0,
+										trackDuration > 0
+									{
 										let progress = Double(mark) / trackDuration
 										let padding: CGFloat = 12
 										let availableWidth = sliderGeo.size.width - (padding * 2)
@@ -103,7 +110,7 @@ struct PlayerSheet: View {
 							HStack {
 								let rawDisplayTime =
 									isSeeking
-									? sliderValue : (targetSeekTime ?? viewModel.uiState?.positionSecs ?? 0.0)
+									? sliderValue : (targetSeekTime ?? playbackViewModel.uiState?.positionSecs ?? 0.0)
 								let safeDisplayTime = min(max(rawDisplayTime, 0.0), trackDuration)
 
 								Text(formatTime(safeDisplayTime))
@@ -114,7 +121,7 @@ struct PlayerSheet: View {
 							.foregroundColor(.secondary)
 						}
 						.padding(.horizontal, 40)
-						.onChange(of: viewModel.uiState?.positionSecs) { _, newPos in
+						.onChange(of: playbackViewModel.uiState?.positionSecs) { _, newPos in
 							if let newPos = newPos, let target = self.targetSeekTime {
 								if abs(newPos - target) < 2.0 {
 									self.targetSeekTime = nil
@@ -125,20 +132,22 @@ struct PlayerSheet: View {
 						Spacer().frame(height: geometry.size.height * 0.05)
 
 						HStack(spacing: 48) {
-							Button(action: { try? viewModel.core?.prev() }) {
+							Button(action: { try? coreManager.core?.prev() }) {
 								Image(systemName: "backward.fill")
 									.font(.system(size: 28))
 									.foregroundColor(.primary)
 							}
 
-							Button(action: { try? viewModel.core?.togglePause() }) {
-								Image(systemName: viewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-									.font(.system(size: 72))
-									.contentTransition(.symbolEffect(.replace))
-									.foregroundColor(.primary)
+							Button(action: { try? coreManager.core?.togglePause() }) {
+								Image(
+									systemName: playbackViewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill"
+								)
+								.font(.system(size: 72))
+								.contentTransition(.symbolEffect(.replace))
+								.foregroundColor(.primary)
 							}
 
-							Button(action: { try? viewModel.core?.next() }) {
+							Button(action: { try? coreManager.core?.next() }) {
 								Image(systemName: "forward.fill")
 									.font(.system(size: 28))
 									.foregroundColor(.primary)

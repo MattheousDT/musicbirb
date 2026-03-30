@@ -1,11 +1,13 @@
 import SwiftUI
 
 struct ContentView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(AuthViewModel.self) private var authViewModel
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
+	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
 		ZStack {
-			if viewModel.isAuthenticating {
+			if authViewModel.isAuthenticating {
 				ProgressView("Connecting...")
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 					.background(Color(.systemBackground))
@@ -37,21 +39,22 @@ struct ContentView: View {
 		}
 		.sheet(
 			isPresented: Binding(
-				get: { viewModel.showPlayerSheet }, set: { viewModel.showPlayerSheet = $0 }
+				get: { playbackViewModel.showPlayerSheet }, set: { playbackViewModel.showPlayerSheet = $0 }
 			)
 		) {
 			PlayerSheet()
 		}
-		.fullScreenCover(isPresented: Bindable(viewModel).showLogin) {
+		.fullScreenCover(isPresented: Bindable(authViewModel).showLogin) {
 			LoginView()
 		}
+		.preferredColorScheme(settings.theme.colorScheme)
 	}
 
 	@ViewBuilder
 	private func tabContent<Content: View>(@ViewBuilder content: () -> Content) -> some View {
 		content()
 			.safeAreaInset(edge: .bottom, spacing: 0) {
-				if viewModel.currentTrack != nil {
+				if playbackViewModel.currentTrack != nil {
 					VStack(spacing: 0) {
 						Divider()
 						playBarButton
@@ -60,12 +63,13 @@ struct ContentView: View {
 					.transition(.move(edge: .bottom).combined(with: .opacity))
 				}
 			}
-			.animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.currentTrack != nil)
+			.animation(
+				.spring(response: 0.4, dampingFraction: 0.8), value: playbackViewModel.currentTrack != nil)
 	}
 
 	private var playBarButton: some View {
 		Button(action: {
-			if viewModel.currentTrack != nil { viewModel.showPlayerSheet = true }
+			if playbackViewModel.currentTrack != nil { playbackViewModel.showPlayerSheet = true }
 		}) {
 			CurrentlyPlayingBar()
 		}

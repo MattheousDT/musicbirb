@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AlbumGridItem: View {
+	@Environment(SettingsViewModel.self) private var settings
 	let album: Album
 	var showArtist: Bool = true
 	var showYear: Bool = true
@@ -16,7 +17,10 @@ struct AlbumGridItem: View {
 						placeholderColor: Color(UIColor.systemGray5)
 					)
 				)
-				.clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+				.clipShape(
+					RoundedRectangle(
+						cornerRadius: 16 * settings.cornerRounding.multiplier, style: .continuous)
+				)
 				.shadow(color: .black.opacity(0.05), radius: 8, y: 4)
 
 			VStack(alignment: .leading, spacing: 2) {

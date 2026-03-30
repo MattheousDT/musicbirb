@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct SearchView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@State private var query = ""
 	@State private var searchIsActive = false
@@ -130,7 +131,7 @@ struct SearchView: View {
 				isSearching = true
 				do {
 					try await Task.sleep(nanoseconds: 300_000_000)  // 300ms debounce
-					guard let core = viewModel.core else { return }
+					guard let core = coreManager.core else { return }
 
 					let req = SearchQuery(keyword: query, preset: nil, limit: 20, offset: 0)
 					let results = try await core.getProvider().search().search(query: req)
@@ -150,13 +151,13 @@ struct SearchView: View {
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {
-		return viewModel.currentTrack?.id == track.id
+		return playbackViewModel.currentTrack?.id == track.id
 	}
 
 	private func playTrack(_ track: Track, from tracks: [Track]) {
 		Task {
 			let index = tracks.firstIndex(where: { $0.id == track.id }) ?? 0
-			_ = try? await viewModel.core?.playTracks(
+			_ = try? await coreManager.core?.playTracks(
 				ids: tracks.map { $0.id }, startIndex: UInt32(index))
 		}
 	}

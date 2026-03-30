@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoginView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(AuthViewModel.self) private var authViewModel
 	@State private var providerId = "subsonic"
 	@State private var url = ""
 	@State private var username = ""
@@ -31,7 +31,7 @@ struct LoginView: View {
 					SecureField("Password", text: $password)
 				}
 
-				if let error = viewModel.loginError {
+				if let error = authViewModel.loginError {
 					Section {
 						Text(error)
 							.foregroundColor(.red)
@@ -57,22 +57,22 @@ struct LoginView: View {
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				// Only show Cancel if there are already other accounts to fall back to
-				if !viewModel.accounts.isEmpty && viewModel.activeAccount != nil {
+				if !authViewModel.accounts.isEmpty && authViewModel.activeAccount != nil {
 					ToolbarItem(placement: .cancellationAction) {
 						Button("Cancel") { dismiss() }
 					}
 				}
 			}
 		}
-		.interactiveDismissDisabled(viewModel.activeAccount == nil)
+		.interactiveDismissDisabled(authViewModel.activeAccount == nil)
 	}
 
 	private func performLogin() {
 		isLoggingIn = true
 		Task {
-			await viewModel.login(providerId: providerId, url: url, user: username, pass: password)
+			await authViewModel.login(providerId: providerId, url: url, user: username, pass: password)
 			isLoggingIn = false
-			if viewModel.loginError == nil {
+			if authViewModel.loginError == nil {
 				dismiss()
 			}
 		}

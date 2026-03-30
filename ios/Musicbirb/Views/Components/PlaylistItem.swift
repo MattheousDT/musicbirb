@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PlaylistItem: View {
+	@Environment(SettingsViewModel.self) private var settings
 	let playlist: Playlist
 
 	var body: some View {
@@ -10,7 +11,8 @@ struct PlaylistItem: View {
 				placeholderColor: Color(UIColor.systemGray5)
 			)
 			.frame(width: 48, height: 48)
-			.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+			.clipShape(
+				RoundedRectangle(cornerRadius: 8 * settings.cornerRounding.multiplier, style: .continuous))
 
 			VStack(alignment: .leading, spacing: 2) {
 				Text(playlist.name)

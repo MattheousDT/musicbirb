@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct ArtistView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let artistId: ArtistId
 	@State private var artistDetails: ArtistDetails?
@@ -42,7 +43,7 @@ struct ArtistView: View {
 		.navigationBarTitleDisplayMode(.inline)
 		.task {
 			do {
-				let details = try await viewModel.core?.getProvider()
+				let details = try await coreManager.core?.getProvider()
 					.artist().getArtistDetails(artistId: artistId)
 				try? await Task.sleep(nanoseconds: 100_000_000)
 				withAnimation(.easeOut(duration: 0.3)) {
@@ -136,12 +137,12 @@ struct ArtistView: View {
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {
-		return viewModel.currentTrack?.id == track.id
+		return playbackViewModel.currentTrack?.id == track.id
 	}
 
 	private func playTopTrack(_ index: Int) {
 		Task {
-			_ = try? await viewModel.core?.playTracks(
+			_ = try? await coreManager.core?.playTracks(
 				ids: artistDetails!.topSongs.map { $0.id }, startIndex: UInt32(index))
 		}
 	}

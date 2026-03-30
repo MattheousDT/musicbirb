@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct AlbumView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let albumId: AlbumId
 	@State private var albumDetails: AlbumDetails?
@@ -72,7 +73,7 @@ struct AlbumView: View {
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.task {
 			do {
-				albumDetails = try await viewModel.core?.getProvider()
+				albumDetails = try await coreManager.core?.getProvider()
 					.album().getAlbumDetails(albumId: albumId)
 			} catch {
 				Log.app.error("Album error: \(error)")
@@ -81,24 +82,24 @@ struct AlbumView: View {
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {
-		return viewModel.currentTrack?.id == track.id
+		return playbackViewModel.currentTrack?.id == track.id
 	}
 
 	private func playAlbum() {
 		Task {
-			_ = try? await viewModel.core?.playAlbum(id: albumId, startIndex: 0)
+			_ = try? await coreManager.core?.playAlbum(id: albumId, startIndex: 0)
 		}
 	}
 
 	private func playAlbumNext() {
 		Task {
-			_ = try? await viewModel.core?.queueAlbum(id: albumId, next: true)
+			_ = try? await coreManager.core?.queueAlbum(id: albumId, next: true)
 		}
 	}
 
 	private func playTrack(index: Int) {
 		Task {
-			_ = try? await viewModel.core?.playAlbum(id: albumId, startIndex: UInt32(index))
+			_ = try? await coreManager.core?.playAlbum(id: albumId, startIndex: UInt32(index))
 		}
 	}
 }

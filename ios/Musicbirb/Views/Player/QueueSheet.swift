@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct QueueSheet: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.dismiss) private var dismiss
 
 	var body: some View {
@@ -9,14 +10,14 @@ struct QueueSheet: View {
 			ScrollViewReader { proxy in
 				ScrollView {
 					LazyVStack(spacing: 0) {
-						if let queue = viewModel.uiState?.queue {
+						if let queue = playbackViewModel.uiState?.queue {
 							ForEach(Array(queue.enumerated()), id: \.offset) { index, track in
 								TrackItemRow(
 									track: track,
 									index: index + 1,
-									isActive: index == Int(viewModel.uiState?.queuePosition ?? 0),
+									isActive: index == Int(playbackViewModel.uiState?.queuePosition ?? 0),
 									action: {
-										try? viewModel.core?.playIndex(index: UInt32(index))
+										try? coreManager.core?.playIndex(index: UInt32(index))
 									}
 								)
 								.id(index)
@@ -35,7 +36,7 @@ struct QueueSheet: View {
 					}
 				}
 				.onAppear {
-					if let pos = viewModel.uiState?.queuePosition {
+					if let pos = playbackViewModel.uiState?.queuePosition {
 						proxy.scrollTo(Int(pos), anchor: UnitPoint(x: 0, y: 0.3))
 					}
 				}

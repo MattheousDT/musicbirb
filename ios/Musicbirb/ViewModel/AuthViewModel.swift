@@ -24,115 +24,59 @@ extension AccountConfig: Codable {
 }
 
 @Observable
-class MusicbirbViewModel: StateObserver, @unchecked Sendable {
-	var core: Musicbirb?
-	var uiState: UiState?
+class AuthViewModel: @unchecked Sendable {
 	var accounts: [AccountConfig] = []
 	var activeAccount: AccountConfig?
-	var showPlayerSheet: Bool = false
 	var showLogin: Bool = false
 	var isAuthenticating: Bool = false
 	var loginError: String?
 
-	private let remoteCommandManager = RemoteCommandManager()
+	var coreManager: CoreManager
 
-	var currentTrack: Track? {
-		guard let uiState = uiState,
-			!uiState.queue.isEmpty,
-			uiState.queuePosition >= 0,
-			uiState.queuePosition < uiState.queue.count
-		else {
-			return nil
-		}
-		return uiState.queue[Int(uiState.queuePosition)]
-	}
-
-	var isPlaying: Bool {
-		return uiState?.status == .playing
-	}
-
-	init() {
-		let docsDir =
-			FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? ""
-		let cacheDir =
-			FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.path ?? ""
-
+	init(coreManager: CoreManager) {
+		self.coreManager = coreManager
 		loadAccounts()
+	}
 
+	func checkSavedAccounts() {
 		let authenticator = Authenticator()
 
-		do {
-			let initializedCore = try initClient(
-				provider: nil,
-				dataDir: docsDir,
-				cacheDir: cacheDir,
-				observer: self
-			)
+		if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {
+			if let passData = KeychainHelper.shared.read(
+				service: "musicbirb_subsonic", account: acc.id),
+				let passString = String(data: passData, encoding: .utf8)
+			{
+				self.isAuthenticating = true
+				Task {
+					do {
+						let cred =
+							authenticator.credentialFromJson(json: passString)
+							?? AuthCredential.password(passString)
+						let p = try await authenticator.connectWithCredential(
+							provider: acc.provider, serverUrl: acc.url, username: acc.username, credential: cred
+						)
 
-			self.core = initializedCore
-			self.remoteCommandManager.setup(core: initializedCore)
+						await coreManager.core?.setProvider(provider: p)
 
-			// Check for saved accounts to attempt auto-login
-			if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {
-				if let passData = KeychainHelper.shared.read(
-					service: "musicbirb_subsonic", account: acc.id),
-					let passString = String(data: passData, encoding: .utf8)
-				{
-					self.isAuthenticating = true
-					Task {
-						do {
-							let cred =
-								authenticator.credentialFromJson(json: passString)
-								?? AuthCredential.password(passString)
-							let p = try await authenticator.connectWithCredential(
-								provider: acc.provider, serverUrl: acc.url, username: acc.username, credential: cred
-							)
-
-							await initializedCore.setProvider(provider: p)
-
-							await MainActor.run {
-								self.activeAccount = acc
-								self.isAuthenticating = false
-								self.showLogin = false
-							}
-						} catch {
-							Log.app.error("Auto-login failed: \(error)")
-							await MainActor.run {
-								self.isAuthenticating = false
-								self.loginError = error.localizedDescription
-								self.showLogin = true
-							}
+						await MainActor.run {
+							self.activeAccount = acc
+							self.isAuthenticating = false
+							self.showLogin = false
+						}
+					} catch {
+						Log.app.error("Auto-login failed: \(error)")
+						await MainActor.run {
+							self.isAuthenticating = false
+							self.loginError = error.localizedDescription
+							self.showLogin = true
 						}
 					}
-				} else {
-					self.showLogin = true
 				}
-				// No accounts saved at all, go straight to login
+			} else {
 				self.showLogin = true
 			}
-		} catch {
-			Log.rust.error("Failed to initialize Rust Core: \(error)")
-		}
-
-		setupLifecycleObservers()
-	}
-
-	private func setupLifecycleObservers() {
-		NotificationCenter.default.addObserver(
-			forName: UIApplication.didBecomeActiveNotification,
-			object: nil,
-			queue: .main
-		) { [weak self] _ in
-			self?.handleAppResumed()
-		}
-	}
-
-	/// Called when the app enters the foreground (e.g. via tapping the Lock Screen media widget)
-	private func handleAppResumed() {
-		// If we are currently playing or have a track loaded,
-		// showing the player sheet provides a seamless transition from the lock screen.
-		if currentTrack != nil && uiState?.status == .playing {
-			self.showPlayerSheet = true
+		} else {
+			self.showLogin = true
 		}
 	}
 
@@ -163,7 +107,6 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	@MainActor
 	func login(providerId: String, url: String, user: String, pass: String) async {
 		self.loginError = nil
-		guard let core = self.core else { return }
 		let authenticator = Authenticator()
 
 		do {
@@ -179,12 +122,10 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 				p = result.provider
 				credentialToSave = result.credential
 			case .browserAuth(let authUrl, _, _):
-				// In a complete implementation, open ASWebAuthenticationSession and call `authenticator.pollBrowserAuth` here
 				self.loginError = "Browser Auth via \(authUrl) not yet fully implemented on iOS"
 				return
 			}
 
-			// Safe ID generation mapping to the rust backend
 			let safeUrlUser = "\(user)@\(url)"
 			let safeId = String(safeUrlUser.map { $0.isLetter || $0.isNumber ? $0 : "_" })
 
@@ -201,7 +142,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 			activeAccount = newAccount
 			saveAccounts()
 
-			await core.setProvider(provider: p)
+			await coreManager.core?.setProvider(provider: p)
 			self.showLogin = false
 		} catch {
 			self.loginError = error.localizedDescription
@@ -224,7 +165,7 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 					credential: cred)
 				activeAccount = account
 				saveAccounts()
-				await core?.setProvider(provider: provider)
+				await coreManager.core?.setProvider(provider: provider)
 				self.showLogin = false
 			} catch {
 				Log.app.error("Failed to switch account: \(error)")
@@ -244,8 +185,8 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 	func logout() async {
 		activeAccount = nil
 		saveAccounts()
-		await core?.setProvider(provider: nil)
-		try? core?.clearQueue()
+		await coreManager.core?.setProvider(provider: nil)
+		try? coreManager.core?.clearQueue()
 		self.showLogin = true
 	}
 
@@ -258,17 +199,6 @@ class MusicbirbViewModel: StateObserver, @unchecked Sendable {
 			await logout()
 		} else {
 			saveAccounts()
-		}
-	}
-
-	func onStateChanged(state: UiState) {
-		Task { @MainActor in
-			self.uiState = state
-			self.remoteCommandManager.updateNowPlaying(
-				track: self.currentTrack,
-				position: state.positionSecs,
-				isPlaying: state.status == .playing
-			)
 		}
 	}
 }

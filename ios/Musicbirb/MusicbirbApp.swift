@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct MusicbirbApp: App {
-	@State private var viewModel = MusicbirbViewModel()
+	@State private var appEnv = AppEnvironment()
 
 	init() {
 		setupAudioSession()
@@ -13,10 +13,13 @@ struct MusicbirbApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
-				.environment(viewModel)
+				.environment(appEnv.coreManager)
+				.environment(appEnv.playbackViewModel)
+				.environment(appEnv.authViewModel)
+				.environment(appEnv.settingsViewModel)
 				.onAppear {
 					// Inject the view model into the static config helper
-					Config.viewModel = viewModel
+					Config.coreManager = appEnv.coreManager
 				}
 		}
 	}

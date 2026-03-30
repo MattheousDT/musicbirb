@@ -1,15 +1,16 @@
 import SwiftUI
 
 struct CurrentlyPlayingBar: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 
 	var body: some View {
 		HStack(spacing: 12) {
 			VStack(alignment: .leading, spacing: 2) {
-				Text(viewModel.currentTrack?.title ?? String(localized: "Nothing is queued"))
+				Text(playbackViewModel.currentTrack?.title ?? String(localized: "Nothing is queued"))
 					.font(.system(size: 15, weight: .bold))
 					.lineLimit(1)
-				Text(viewModel.currentTrack?.artist ?? String(localized: "Play something to start"))
+				Text(playbackViewModel.currentTrack?.artist ?? String(localized: "Play something to start"))
 					.font(.system(size: 13, weight: .semibold))
 					.foregroundColor(.secondary)
 					.lineLimit(1)
@@ -17,8 +18,8 @@ struct CurrentlyPlayingBar: View {
 
 			Spacer()
 
-			Button(action: { try? viewModel.core?.togglePause() }) {
-				Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+			Button(action: { try? coreManager.core?.togglePause() }) {
+				Image(systemName: playbackViewModel.isPlaying ? "pause.fill" : "play.fill")
 					.font(.title2)
 					.contentTransition(.symbolEffect(.replace))
 					.foregroundColor(.primary)
@@ -26,7 +27,7 @@ struct CurrentlyPlayingBar: View {
 			}
 			.padding(.trailing, 8)
 
-			Button(action: { try? viewModel.core?.next() }) {
+			Button(action: { try? coreManager.core?.next() }) {
 				Image(systemName: "forward.fill")
 					.font(.title2)
 					.foregroundColor(.primary)

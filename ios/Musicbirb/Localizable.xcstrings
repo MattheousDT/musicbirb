@@ -1,7 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@" : {
+
+    },
+    "%@ MB" : {
+
+    },
+    "%@ stars" : {
+
+    },
     "%lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -12,6 +22,7 @@
       }
     },
     "%u mins" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -46,6 +57,7 @@
       }
     },
     "%u releases" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -80,6 +92,7 @@
       }
     },
     "%u tracks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -114,6 +127,7 @@
       }
     },
     "Accounts" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -124,6 +138,7 @@
       }
     },
     "Add Account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -142,6 +157,9 @@
           }
         }
       }
+    },
+    "Album" : {
+
     },
     "Albums" : {
       "localizations" : {
@@ -173,7 +191,17 @@
         }
       }
     },
+    "Artwork Cache" : {
+
+    },
+    "Artwork Cache (MB)" : {
+
+    },
+    "Auto" : {
+
+    },
     "Cancel" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -184,6 +212,7 @@
       }
     },
     "Connecting..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -203,7 +232,11 @@
         }
       }
     },
+    "Dark" : {
+
+    },
     "Delete" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -213,7 +246,14 @@
         }
       }
     },
+    "Delete Downloads" : {
+
+    },
+    "Disabled" : {
+
+    },
     "Downloaded" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -253,6 +293,9 @@
         }
       }
     },
+    "High" : {
+
+    },
     "Home" : {
       "comment" : "Title of the main view of the app",
       "localizations" : {
@@ -263,6 +306,9 @@
           }
         }
       }
+    },
+    "Large" : {
+
     },
     "Last Played" : {
       "localizations" : {
@@ -275,6 +321,7 @@
       }
     },
     "Library" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -283,6 +330,15 @@
           }
         }
       }
+    },
+    "Light" : {
+
+    },
+    "Low" : {
+
+    },
+    "Medium" : {
+
     },
     "New Releases" : {
       "localizations" : {
@@ -295,6 +351,7 @@
       }
     },
     "No Results" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -314,7 +371,14 @@
         }
       }
     },
+    "None" : {
+
+    },
+    "Normal" : {
+
+    },
     "Nothing is queued" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -324,7 +388,11 @@
         }
       }
     },
+    "Original" : {
+
+    },
     "Password" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -335,6 +403,7 @@
       }
     },
     "Play" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -345,6 +414,7 @@
       }
     },
     "Play Next" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -355,6 +425,7 @@
       }
     },
     "Play something to start" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -385,6 +456,7 @@
       }
     },
     "Provider" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -395,6 +467,7 @@
       }
     },
     "Queue" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -425,6 +498,7 @@
       }
     },
     "Search" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -435,6 +509,7 @@
       }
     },
     "Search Musicbirb" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -443,6 +518,9 @@
           }
         }
       }
+    },
+    "Select a category" : {
+
     },
     "Server Info" : {
       "localizations" : {
@@ -455,6 +533,7 @@
       }
     },
     "Server URL" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -494,6 +573,9 @@
         }
       }
     },
+    "Small" : {
+
+    },
     "Songs" : {
       "localizations" : {
         "ko" : {
@@ -505,6 +587,7 @@
       }
     },
     "Songs, Albums, Artists" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -513,6 +596,15 @@
           }
         }
       }
+    },
+    "Streaming Cache" : {
+
+    },
+    "Streaming Cache (MB)" : {
+
+    },
+    "System" : {
+
     },
     "Top Songs" : {
       "localizations" : {
@@ -524,7 +616,11 @@
         }
       }
     },
+    "Track" : {
+
+    },
     "Username" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {

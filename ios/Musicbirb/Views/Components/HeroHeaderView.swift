@@ -6,6 +6,7 @@ public enum HeroImageShape {
 }
 
 struct HeroHeaderView<Subtitle: View, Actions: View>: View {
+	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.safeAreaInsets) private var safeAreaInsets
 
@@ -145,8 +146,10 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 			img.clipShape(Circle())
 				.shadow(color: .black.opacity(0.18), radius: 20, y: 12)
 		} else {
-			img.clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-				.shadow(color: .black.opacity(0.18), radius: 20, y: 12)
+			img.clipShape(
+				RoundedRectangle(cornerRadius: 24 * settings.cornerRounding.multiplier, style: .continuous)
+			)
+			.shadow(color: .black.opacity(0.18), radius: 20, y: 12)
 		}
 	}
 }

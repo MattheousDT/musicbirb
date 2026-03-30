@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct PlaylistView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let playlistId: PlaylistId
 	@State private var playlistDetails: PlaylistDetails?
@@ -64,7 +65,7 @@ struct PlaylistView: View {
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.task {
 			do {
-				playlistDetails = try await viewModel.core?.getProvider()
+				playlistDetails = try await coreManager.core?.getProvider()
 					.playlist().getPlaylistDetails(playlistId: playlistId)
 			} catch {
 				Log.app.error("Playlist error: \(error)")
@@ -73,24 +74,24 @@ struct PlaylistView: View {
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {
-		return viewModel.currentTrack?.id == track.id
+		return playbackViewModel.currentTrack?.id == track.id
 	}
 
 	private func playPlaylist() {
 		Task {
-			_ = try? await viewModel.core?.playPlaylist(id: playlistId, startIndex: 0)
+			_ = try? await coreManager.core?.playPlaylist(id: playlistId, startIndex: 0)
 		}
 	}
 
 	private func playPlaylistNext() {
 		Task {
-			_ = try? await viewModel.core?.queuePlaylist(id: playlistId, next: true)
+			_ = try? await coreManager.core?.queuePlaylist(id: playlistId, next: true)
 		}
 	}
 
 	private func playTrack(index: Int) {
 		Task {
-			_ = try? await viewModel.core?.playPlaylist(id: playlistId, startIndex: UInt32(index))
+			_ = try? await coreManager.core?.playPlaylist(id: playlistId, startIndex: UInt32(index))
 		}
 	}
 }

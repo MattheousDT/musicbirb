@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct HomeView: View {
-	@Environment(MusicbirbViewModel.self) private var viewModel
+	@Environment(CoreManager.self) private var coreManager
+	@Environment(AuthViewModel.self) private var authViewModel
 	@State private var lastPlayedAlbums: [Album] = []
 	@State private var recentAlbums: [Album] = []
 	@State private var newAlbums: [Album] = []
 	@State private var playlists: [Playlist] = []
-	@State private var showAccountSwitcher = false
+	@State private var showSettings = false
 
 	var body: some View {
 		NavigationStack {
@@ -99,9 +100,9 @@ struct HomeView: View {
 			.toolbar {
 				ToolbarItem(placement: .navigationBarTrailing) {
 					Button {
-						showAccountSwitcher = true
+						showSettings = true
 					} label: {
-						Image(systemName: "person.crop.circle")
+						Image(systemName: "gearshape")
 					}
 				}
 			}
@@ -113,17 +114,17 @@ struct HomeView: View {
 					await loadData()
 				}
 			}
-			.onChange(of: viewModel.activeAccount?.id) { _, _ in
+			.onChange(of: authViewModel.activeAccount?.id) { _, _ in
 				Task { await loadData() }
 			}
-			.sheet(isPresented: $showAccountSwitcher) {
-				AccountSwitcherView()
+			.fullScreenCover(isPresented: $showSettings) {
+				SettingsView()
 			}
 		}
 	}
 
 	private func loadData() async {
-		guard let core = viewModel.core, viewModel.activeAccount != nil else {
+		guard let core = coreManager.core, authViewModel.activeAccount != nil else {
 			lastPlayedAlbums = []
 			recentAlbums = []
 			newAlbums = []
