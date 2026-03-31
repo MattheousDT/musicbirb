@@ -28,6 +28,7 @@ extension EnvironmentValues {
 struct TrackItemRow: View {
 	@Environment(\.trackRowSubtitle) private var subtitleMode
 	@Environment(\.trackRowHorizontalPadding) private var horizontalPadding
+	@Environment(\.openAddToPlaylist) private var openAddToPlaylist
 
 	let track: Track
 	let index: Int
@@ -72,6 +73,11 @@ struct TrackItemRow: View {
 			.padding(.vertical, 12)
 			.padding(.horizontal, horizontalPadding)
 			.frame(maxWidth: .infinity)
+		}
+		.contextMenu {
+			Button(action: { openAddToPlaylist(track) }) {
+				Label("Add to Playlist", systemImage: "text.badge.plus")
+			}
 		}
 	}
 

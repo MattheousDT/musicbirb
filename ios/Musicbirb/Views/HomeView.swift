@@ -131,6 +131,11 @@ struct HomeView: View {
 			.onChange(of: authViewModel.activeAccount?.id) { _, _ in
 				Task { await loadData() }
 			}
+			.onReceive(
+				NotificationCenter.default.publisher(for: NSNotification.Name("Musicbirb.PlaylistChanged"))
+			) { _ in
+				Task { await loadData() }
+			}
 			.fullScreenCover(isPresented: $showSettings) {
 				SettingsView()
 			}

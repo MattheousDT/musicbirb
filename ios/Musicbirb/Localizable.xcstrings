@@ -10,6 +10,12 @@
     "%@ stars" : {
 
     },
+    "%@ tracks" : {
+
+    },
+    "%@ tracks were skipped because they are already in the playlist. You can change this behavior in Settings." : {
+
+    },
     "%lld" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -171,6 +177,9 @@
         }
       }
     },
+    "Are you sure you want to delete this playlist? This action cannot be undone." : {
+
+    },
     "Artists" : {
       "localizations" : {
         "ko" : {
@@ -250,6 +259,9 @@
 
     },
     "Disabled" : {
+
+    },
+    "Done" : {
 
     },
     "Downloaded" : {
@@ -338,6 +350,9 @@
 
     },
     "Medium" : {
+
+    },
+    "New Playlist" : {
 
     },
     "New Releases" : {
@@ -446,6 +461,7 @@
       }
     },
     "Playlists coming soon!" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -465,6 +481,9 @@
           }
         }
       }
+    },
+    "Public playlists can be viewed by other users on your server." : {
+
     },
     "Queue" : {
       "extractionState" : "stale",
@@ -629,6 +648,9 @@
           }
         }
       }
+    },
+    "You haven't created any playlists yet." : {
+
     }
   },
   "version" : "1.1"

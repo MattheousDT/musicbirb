@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AlbumListItem: View {
 	@Environment(SettingsViewModel.self) private var settings
+	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
+
 	let album: Album
 
 	var body: some View {
@@ -35,5 +37,10 @@ struct AlbumListItem: View {
 		}
 		.padding(.all, 12)
 		.contentShape(Rectangle())
+		.contextMenu {
+			Button(action: { openAddAlbumToPlaylist(album) }) {
+				Label("Add to Playlist", systemImage: "text.badge.plus")
+			}
+		}
 	}
 }

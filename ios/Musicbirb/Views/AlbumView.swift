@@ -4,6 +4,8 @@ struct AlbumView: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
+	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
+
 	let albumId: AlbumId
 	@State private var albumDetails: AlbumDetails?
 	@State private var selectedArtistId: ArtistId?
@@ -73,6 +75,20 @@ struct AlbumView: View {
 		}
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
+		.toolbar {
+			ToolbarItem(placement: .topBarTrailing) {
+				if albumDetails != nil {
+					Menu {
+						Button(action: openPlaylistSheet) {
+							Label("Add to Playlist", systemImage: "text.badge.plus")
+						}
+					} label: {
+						Image(systemName: "ellipsis.circle")
+							.background(Circle().fill(.ultraThinMaterial))
+					}
+				}
+			}
+		}
 		.toolbarBackground(.hidden, for: .navigationBar)
 		.navigationDestination(item: $selectedArtistId) { id in
 			ArtistView(artistId: id)
@@ -85,6 +101,11 @@ struct AlbumView: View {
 				Log.app.error("Album error: \(error)")
 			}
 		}
+	}
+
+	private func openPlaylistSheet() {
+		guard let album = albumDetails else { return }
+		openAddAlbumToPlaylist(Album(album))
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {

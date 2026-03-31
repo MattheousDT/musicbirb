@@ -5,6 +5,11 @@ struct ContentView: View {
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(SettingsViewModel.self) private var settings
 
+	@State private var trackForPlaylist: Track?
+	@State private var albumForPlaylist: Album?
+	@State private var isProcessingPlaylist: Bool = false
+	@State private var duplicateAlertCount: UInt32?
+
 	var body: some View {
 		ZStack {
 			if authViewModel.isAuthenticating {
@@ -35,6 +40,48 @@ struct ContentView: View {
 					}
 					.toolbarBackground(.visible, for: .tabBar)
 				}
+			}
+		}
+		.environment(\.openAddToPlaylist) { track in
+			self.trackForPlaylist = track
+		}
+		.environment(\.openAddAlbumToPlaylist) { album in
+			self.albumForPlaylist = album
+		}
+		.sheet(item: $trackForPlaylist) { track in
+			AddToPlaylistSheet(trackIds: [track.id], albumId: nil) { skipped in
+				if skipped > 0 { duplicateAlertCount = skipped }
+				isProcessingPlaylist = false
+			} onProcessing: { processing in
+				isProcessingPlaylist = processing
+			}
+			.presentationDragIndicator(.visible)
+		}
+		.sheet(item: $albumForPlaylist) { album in
+			AddToPlaylistSheet(trackIds: nil, albumId: album.id) { skipped in
+				if skipped > 0 { duplicateAlertCount = skipped }
+				isProcessingPlaylist = false
+			} onProcessing: { processing in
+				isProcessingPlaylist = processing
+			}
+			.presentationDragIndicator(.visible)
+		}
+		.alert(
+			"Tracks Skipped",
+			isPresented: Binding(
+				get: { duplicateAlertCount != nil },
+				set: { if !$0 { duplicateAlertCount = nil } }
+			)
+		) {
+			Button("OK", role: .cancel) {}
+		} message: {
+			Text(
+				"\(duplicateAlertCount ?? 0) tracks were skipped because they are already in the playlist. You can change this behavior in Settings."
+			)
+		}
+		.overlay {
+			if isProcessingPlaylist {
+				ProgressHUD(title: "Adding to Playlist...")
 			}
 		}
 		.sheet(

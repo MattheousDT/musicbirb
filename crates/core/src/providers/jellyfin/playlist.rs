@@ -1,6 +1,6 @@
 use super::{JellyfinContext, dto::*};
 use crate::error::MusicbirbError;
-use crate::models::{CoverArtId, Playlist, PlaylistDetails, PlaylistId, Track};
+use crate::models::{CoverArtId, Playlist, PlaylistDetails, PlaylistId, Track, TrackId};
 use crate::providers::PlaylistProvider;
 use std::sync::Arc;
 
@@ -32,6 +32,41 @@ impl PlaylistProvider for JellyfinPlaylist {
 			))
 			.await?;
 		Ok(res.items.into_iter().map(Track::from).collect())
+	}
+
+	async fn create_playlist(
+		&self,
+		_name: &str,
+		_description: Option<String>,
+		_public: bool,
+	) -> Result<Playlist, MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
+	}
+
+	async fn update_playlist(
+		&self,
+		_id: &PlaylistId,
+		_name: Option<String>,
+		_description: Option<String>,
+		_public: Option<bool>,
+	) -> Result<(), MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
+	}
+
+	async fn delete_playlist(&self, _id: &PlaylistId) -> Result<(), MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
+	}
+
+	async fn add_to_playlist(&self, _id: &PlaylistId, _track_ids: Vec<TrackId>) -> Result<(), MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
+	}
+
+	async fn remove_from_playlist(&self, _id: &PlaylistId, _track_indices: Vec<u32>) -> Result<(), MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
+	}
+
+	async fn replace_playlist_tracks(&self, _id: &PlaylistId, _track_ids: Vec<TrackId>) -> Result<(), MusicbirbError> {
+		Err(MusicbirbError::Internal("Not implemented for Jellyfin".into()))
 	}
 
 	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError> {

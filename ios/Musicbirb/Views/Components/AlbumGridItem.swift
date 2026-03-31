@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AlbumGridItem: View {
 	@Environment(SettingsViewModel.self) private var settings
+	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
+
 	let album: Album
 	var showArtist: Bool = true
 	var showYear: Bool = true
@@ -43,5 +45,10 @@ struct AlbumGridItem: View {
 			.frame(maxWidth: .infinity, alignment: .leading)  // Explicitly clamps constraints so grid columns truncate instead of stretch
 		}
 		.frame(maxWidth: .infinity)
+		.contextMenu {
+			Button(action: { openAddAlbumToPlaylist(album) }) {
+				Label("Add to Playlist", systemImage: "text.badge.plus")
+			}
+		}
 	}
 }

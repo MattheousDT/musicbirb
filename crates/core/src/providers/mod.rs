@@ -129,8 +129,34 @@ pub trait PlaylistProvider: Send + Sync {
 	// /// Updates an existing playlist (e.g., adding/removing tracks, renaming).
 	// TODO: async fn update_playlist(&self, id: &PlaylistId, ... ) -> Result<(), MusicbirbError>;
 
-	// /// Deletes a playlist from the server.
-	// TODO: async fn delete_playlist(&self, id: &PlaylistId) -> Result<(), MusicbirbError>;
+	// /// Creates a new empty playlist on the server.
+	async fn create_playlist(
+		&self,
+		name: &str,
+		description: Option<String>,
+		public: bool,
+	) -> Result<Playlist, MusicbirbError>;
+
+	/// Updates an existing playlist (e.g., adding/removing tracks, renaming).
+	async fn update_playlist(
+		&self,
+		id: &PlaylistId,
+		name: Option<String>,
+		description: Option<String>,
+		public: Option<bool>,
+	) -> Result<(), MusicbirbError>;
+
+	/// Deletes a playlist from the server.
+	async fn delete_playlist(&self, id: &PlaylistId) -> Result<(), MusicbirbError>;
+
+	/// Adds an array of track IDs to a playlist
+	async fn add_to_playlist(&self, id: &PlaylistId, track_ids: Vec<TrackId>) -> Result<(), MusicbirbError>;
+
+	/// Removes tracks at specific index offsets from the playlist
+	async fn remove_from_playlist(&self, id: &PlaylistId, track_indices: Vec<u32>) -> Result<(), MusicbirbError>;
+
+	/// Entirely replaces a playlist's tracks with a new sequence of tracks
+	async fn replace_playlist_tracks(&self, id: &PlaylistId, track_ids: Vec<TrackId>) -> Result<(), MusicbirbError>;
 }
 
 /// Handles reporting playback data back to the server.
