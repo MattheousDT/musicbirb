@@ -6,21 +6,23 @@ struct AlbumView: View {
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	let albumId: AlbumId
 	@State private var albumDetails: AlbumDetails?
+	@State private var selectedArtistId: ArtistId?
 
 	var body: some View {
-		ScrollView {
+		Group {
 			if let album = albumDetails {
-				VStack(spacing: 0) {
+				List {
 					HeroHeaderView(
 						coverArt: album.coverArt,
 						title: album.title,
 						subtitle: {
 							if let artistId = album.artistId {
-								NavigationLink(destination: ArtistView(artistId: artistId)) {
+								Button(action: { selectedArtistId = artistId }) {
 									Text(album.artist)
 										.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
 										.foregroundColor(.accentColor)
 								}
+								.buttonStyle(.plain)
 							} else {
 								Text(album.artist)
 									.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
@@ -47,30 +49,34 @@ struct AlbumView: View {
 							}
 						}
 					)
+					.listRowInsets(EdgeInsets())
+					.listRowSeparator(.hidden)
+					.listRowBackground(Color.clear)
 
-					VStack {
-						LazyVStack(spacing: 0) {
-							ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
-								TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-									playTrack(index: index)
-								}
-							}
+					ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
+						TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+							playTrack(index: index)
 						}
-						.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 24)
+						.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
+						.listRowInsets(EdgeInsets())
+						.listRowSeparator(.hidden)
+						.listRowBackground(Color.clear)
 					}
-					.frame(maxWidth: .infinity)
 				}
-				.padding(.bottom, 120)
+				.listStyle(.plain)
+				.contentMargins(.horizontal, 0, for: .scrollContent)
 			} else {
-				VStack {
-					Spacer().frame(height: 200)
-					ProgressView().scaleEffect(1.5)
-				}
+				ProgressView()
+					.scaleEffect(1.5)
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
 		}
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
 		.toolbarBackground(.hidden, for: .navigationBar)
+		.navigationDestination(item: $selectedArtistId) { id in
+			ArtistView(artistId: id)
+		}
 		.task {
 			do {
 				albumDetails = try await coreManager.core?.getProvider()

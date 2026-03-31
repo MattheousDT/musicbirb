@@ -42,7 +42,7 @@ struct ContentView: View {
 				get: { playbackViewModel.showPlayerSheet }, set: { playbackViewModel.showPlayerSheet = $0 }
 			)
 		) {
-			PlayerSheet()
+			PlayerSheet().presentationDragIndicator(.visible)
 		}
 		.fullScreenCover(isPresented: Bindable(authViewModel).showLogin) {
 			LoginView()

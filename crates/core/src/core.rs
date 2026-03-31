@@ -177,6 +177,12 @@ impl Musicbirb {
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
 	}
 
+	pub fn move_index(&self, from: u32, to: u32) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::MoveIndex(from as usize, to as usize))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
 	pub fn next(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::Next)

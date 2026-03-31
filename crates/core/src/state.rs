@@ -53,6 +53,7 @@ pub enum CoreMessage {
 	ReplaceTracks(Vec<Track>, usize),
 	ClearQueue,
 	RemoveIndex(usize),
+	MoveIndex(usize, usize),
 	Next,
 	Prev,
 	PlayIndex(usize),

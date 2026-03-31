@@ -158,7 +158,7 @@ struct PlayerSheet: View {
 					}
 					.padding(.bottom, 40)
 					.sheet(isPresented: $isQueueOpen) {
-						QueueSheet()
+						QueueSheet().presentationDragIndicator(.visible)
 					}
 					.navigationBarTitleDisplayMode(.inline)
 					.toolbar {
@@ -168,7 +168,6 @@ struct PlayerSheet: View {
 							}
 						}
 					}
-					.presentationDragIndicator(.visible)
 				}
 			}
 		}

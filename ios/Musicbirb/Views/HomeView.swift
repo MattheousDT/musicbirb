@@ -3,10 +3,12 @@ import SwiftUI
 struct HomeView: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(AuthViewModel.self) private var authViewModel
+	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@State private var lastPlayedAlbums: [Album] = []
 	@State private var recentAlbums: [Album] = []
 	@State private var newAlbums: [Album] = []
 	@State private var playlists: [Playlist] = []
+	@State private var showQueueSheet = false
 	@State private var showSettings = false
 
 	var body: some View {
@@ -98,6 +100,18 @@ struct HomeView: View {
 			.background(Color(UIColor.systemGroupedBackground))
 			.navigationTitle(Text("Home"))
 			.toolbar {
+				if let queue = playbackViewModel.uiState?.queue, !queue.isEmpty {
+					ToolbarItem(placement: .navigationBarTrailing) {
+						Button {
+							showQueueSheet = true
+						} label: {
+							Image(systemName: "list.bullet")
+						}
+					}
+				}
+				if #available(iOS 26, *) {
+					ToolbarSpacer(.fixed, placement: .topBarTrailing)
+				}
 				ToolbarItem(placement: .navigationBarTrailing) {
 					Button {
 						showSettings = true
@@ -119,6 +133,9 @@ struct HomeView: View {
 			}
 			.fullScreenCover(isPresented: $showSettings) {
 				SettingsView()
+			}
+			.sheet(isPresented: $showQueueSheet) {
+				QueueSheet().presentationDragIndicator(.visible)
 			}
 		}
 	}

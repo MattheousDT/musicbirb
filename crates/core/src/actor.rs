@@ -279,9 +279,10 @@ impl CoreActor {
 					self.queue.remove(idx);
 					self.queue_position -= 1;
 				} else if idx == self.queue_position {
-					// We removed the currently playing track! Hard stop and load whatever is now at this position.
+					// We removed the currently playing track!
 					self.queue.remove(idx);
-					if self.queue.is_empty() {
+					if self.queue.is_empty() || self.queue_position >= self.queue.len() {
+						// No next track available, stop playback
 						self.queue_position = 0;
 						self.player_has_current = false;
 						self.player_has_next = false;
@@ -293,9 +294,7 @@ impl CoreActor {
 						let _ = player.clear_playlist().await;
 						self.update_art_state(api, tx);
 					} else {
-						if self.queue_position >= self.queue.len() {
-							self.queue_position = self.queue.len() - 1;
-						}
+						// Play the next track which has now shifted into `queue_position`
 						self.play_track_at(self.queue_position, player, api, tx, state_tx).await;
 						return;
 					}
@@ -310,6 +309,35 @@ impl CoreActor {
 						self.check_preload(api, tx);
 					}
 				}
+				self.dispatch_state(&player.get_state(), state_tx);
+			}
+			CoreMessage::MoveIndex(from, to) => {
+				if from >= self.queue.len() || to >= self.queue.len() {
+					return;
+				}
+				if from == to {
+					return;
+				}
+
+				let item = self.queue.remove(from);
+				self.queue.insert(to, item);
+
+				if self.queue_position == from {
+					self.queue_position = to;
+				} else if from < self.queue_position && to >= self.queue_position {
+					self.queue_position -= 1;
+				} else if from > self.queue_position && to <= self.queue_position {
+					self.queue_position += 1;
+				}
+
+				// Preloaded next track might be invalid now
+				if self.player_has_next {
+					let _ = player.remove_index(1).await;
+					self.player_has_next = false;
+					self.fetching_preload_for = None;
+				}
+				self.check_preload(api, tx);
+
 				self.dispatch_state(&player.get_state(), state_tx);
 			}
 			CoreMessage::Next => {

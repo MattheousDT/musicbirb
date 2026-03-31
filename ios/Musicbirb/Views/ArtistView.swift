@@ -7,13 +7,17 @@ struct ArtistView: View {
 	let artistId: ArtistId
 	@State private var artistDetails: ArtistDetails?
 	@State private var isLoading = true
+	@State private var selectedAlbumId: AlbumId?
+	@State private var selectedSimilarArtistId: ArtistId?
 
 	var body: some View {
-		ScrollView {
+		Group {
 			if isLoading {
-				ArtistSkeletonView()
+				ProgressView()
+					.scaleEffect(1.5)
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			} else if let artist = artistDetails {
-				VStack(spacing: 0) {
+				List {
 					HeroHeaderView(
 						coverArt: artist.coverArt,
 						title: artist.name,
@@ -23,6 +27,9 @@ struct ArtistView: View {
 						imageShape: .circle,
 						actions: { EmptyView() }
 					)
+					.listRowInsets(EdgeInsets())
+					.listRowSeparator(.hidden)
+					.listRowBackground(Color.clear)
 
 					if !artist.topSongs.isEmpty {
 						topSongsSection(artist)
@@ -36,11 +43,18 @@ struct ArtistView: View {
 						similarArtistsSection(artist)
 					}
 				}
-				.padding(.bottom, 120)
+				.listStyle(.plain)
+				.contentMargins(.horizontal, 0, for: .scrollContent)
 			}
 		}
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
+		.navigationDestination(item: $selectedAlbumId) { id in
+			AlbumView(albumId: id)
+		}
+		.navigationDestination(item: $selectedSimilarArtistId) { id in
+			ArtistView(artistId: id)
+		}
 		.task {
 			do {
 				let details = try await coreManager.core?.getProvider()
@@ -59,32 +73,28 @@ struct ArtistView: View {
 
 	@ViewBuilder
 	private func topSongsSection(_ artist: ArtistDetails) -> some View {
-		VStack(alignment: .leading, spacing: 8) {
+		VStack(alignment: .leading, spacing: 4) {
 			Text("Top Songs")
 				.font(.system(size: 22, weight: .black))
-				.padding(.horizontal, 16)
+				.padding(.horizontal, 20)
+				.padding(.top, 16)
+				.padding(.bottom, 8)
 
-			let columns =
-				horizontalSizeClass == .regular
-				// spacing: 0 removes the gap between columns so highlights touch
-				? [GridItem(.flexible(), spacing: 0), GridItem(.flexible(), spacing: 0)]
-				: [GridItem(.flexible())]
-
-			LazyVGrid(columns: columns, spacing: 0) {
-				ForEach(
-					Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
-					id: \.element.id
-				) { index, track in
-					TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-						playTopTrack(index)
-					}
-					.environment(\.trackRowSubtitle, .album)
-					// Smaller padding for grid items, but larger for left/right edges on iPad
-					.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 30 : 16)
+			ForEach(
+				Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
+				id: \.element.id
+			) { index, track in
+				TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+					playTopTrack(index)
 				}
+				.environment(\.trackRowSubtitle, .album)
+				.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
 			}
 		}
-		.padding(.bottom, 32)
+		.padding(.bottom, 24)
+		.listRowInsets(EdgeInsets())
+		.listRowSeparator(.hidden)
+		.listRowBackground(Color.clear)
 	}
 
 	@ViewBuilder
@@ -92,7 +102,7 @@ struct ArtistView: View {
 		VStack(alignment: .leading, spacing: 12) {
 			Text("Releases")
 				.font(.system(size: 22, weight: .black))
-				.padding(.horizontal, 16)
+				.padding(.horizontal, 20)
 
 			let gridCols = Array(
 				repeating: GridItem(.flexible(), spacing: 16),
@@ -100,15 +110,18 @@ struct ArtistView: View {
 
 			LazyVGrid(columns: gridCols, spacing: 20) {
 				ForEach(artist.albums, id: \.id) { album in
-					NavigationLink(destination: AlbumView(albumId: album.id)) {
+					Button(action: { selectedAlbumId = album.id }) {
 						AlbumGridItem(album: album, showArtist: false)
 					}
 					.buttonStyle(.plain)
 				}
 			}
-			.padding(.horizontal, 16)
+			.padding(.horizontal, 20)
 		}
 		.padding(.bottom, 32)
+		.listRowInsets(EdgeInsets())
+		.listRowSeparator(.hidden)
+		.listRowBackground(Color.clear)
 	}
 
 	@ViewBuilder
@@ -116,12 +129,12 @@ struct ArtistView: View {
 		VStack(alignment: .leading, spacing: 12) {
 			Text("Similar Artists")
 				.font(.system(size: 22, weight: .black))
-				.padding(.horizontal, 16)
+				.padding(.horizontal, 20)
 
 			ScrollView(.horizontal, showsIndicators: false) {
 				LazyHStack(spacing: 16) {
 					ForEach(artist.similarArtists, id: \.id) { similar in
-						NavigationLink(destination: ArtistView(artistId: similar.id)) {
+						Button(action: { selectedSimilarArtistId = similar.id }) {
 							VStack(spacing: 8) {
 								ArtistGridItem(artist: similar)
 							}
@@ -131,9 +144,13 @@ struct ArtistView: View {
 				}
 				.scrollTargetLayout()
 			}
-			.contentMargins(.horizontal, 16, for: .scrollContent)
+			.contentMargins(.horizontal, 20, for: .scrollContent)
 			.scrollTargetBehavior(.viewAligned)
 		}
+		.padding(.bottom, 32)
+		.listRowInsets(EdgeInsets())
+		.listRowSeparator(.hidden)
+		.listRowBackground(Color.clear)
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {

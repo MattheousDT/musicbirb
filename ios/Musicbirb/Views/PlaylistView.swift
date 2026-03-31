@@ -8,9 +8,9 @@ struct PlaylistView: View {
 	@State private var playlistDetails: PlaylistDetails?
 
 	var body: some View {
-		ScrollView {
+		Group {
 			if let playlist = playlistDetails {
-				VStack(spacing: 0) {
+				List {
 					HeroHeaderView(
 						coverArt: playlist.coverArt,
 						title: playlist.name,
@@ -39,25 +39,26 @@ struct PlaylistView: View {
 							}
 						}
 					)
+					.listRowInsets(EdgeInsets())
+					.listRowSeparator(.hidden)
+					.listRowBackground(Color.clear)
 
-					VStack {
-						LazyVStack(spacing: 0) {
-							ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, track in
-								TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-									playTrack(index: index)
-								}
-							}
+					ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, track in
+						TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+							playTrack(index: index)
 						}
-						.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 24)
+						.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
+						.listRowInsets(EdgeInsets())
+						.listRowSeparator(.hidden)
+						.listRowBackground(Color.clear)
 					}
-					.frame(maxWidth: .infinity)
 				}
-				.padding(.bottom, 120)
+				.listStyle(.plain)
+				.contentMargins(.horizontal, 0, for: .scrollContent)
 			} else {
-				VStack {
-					Spacer().frame(height: 200)
-					ProgressView().scaleEffect(1.5)
-				}
+				ProgressView()
+					.scaleEffect(1.5)
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			}
 		}
 		.ignoresSafeArea(edges: .top)
