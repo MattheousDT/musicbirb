@@ -105,7 +105,7 @@ struct HomeView: View {
 						Button {
 							showQueueSheet = true
 						} label: {
-							Image(systemName: "list.bullet")
+							Label("Queue", systemImage: "music.note.list")
 						}
 					}
 				}
@@ -116,7 +116,7 @@ struct HomeView: View {
 					Button {
 						showSettings = true
 					} label: {
-						Image(systemName: "gearshape")
+						Label("Settings", systemImage: "gearshape")
 					}
 				}
 			}

@@ -4,11 +4,13 @@ struct DownloadsSettingsView: View {
 	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Form {
 			Section("Automatic Sync") {
-				Toggle("Sync Starred Tracks", isOn: Bindable(settings).syncStarredTracks)
-				Toggle("Sync Starred Albums", isOn: Bindable(settings).syncStarredAlbums)
-				Toggle("Sync Starred Artists", isOn: Bindable(settings).syncStarredArtists)
+				Toggle("Sync Starred Tracks", isOn: $settings.syncStarredTracks)
+				Toggle("Sync Starred Albums", isOn: $settings.syncStarredAlbums)
+				Toggle("Sync Starred Artists", isOn: $settings.syncStarredArtists)
 			}
 
 			Section {

@@ -4,9 +4,11 @@ struct PlaybackSettingsView: View {
 	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Form {
 			Section("Audio Options") {
-				Picker("ReplayGain", selection: Bindable(settings).replayGain) {
+				Picker("ReplayGain", selection: $settings.replayGain) {
 					Text("Disabled").tag(ReplayGainMode.disabled)
 					Text("Track").tag(ReplayGainMode.track)
 					Text("Album").tag(ReplayGainMode.album)
@@ -15,7 +17,7 @@ struct PlaybackSettingsView: View {
 			}
 
 			Section("Queue") {
-				Toggle("Continuous Play", isOn: Bindable(settings).continuousPlay)
+				Toggle("Continuous Play", isOn: $settings.continuousPlay)
 			}
 		}
 		.navigationTitle("Playback")

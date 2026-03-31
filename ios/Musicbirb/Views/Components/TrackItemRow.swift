@@ -44,7 +44,7 @@ struct TrackItemRow: View {
 							.font(.system(size: 14, weight: .semibold))
 							.foregroundColor(.accentColor)
 					} else {
-						Text("\(index)")
+						Text(verbatim: "\(index)")
 							.font(.system(size: 15, weight: .regular))
 							.foregroundColor(Color(UIColor.tertiaryLabel))
 					}

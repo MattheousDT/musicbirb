@@ -22,8 +22,8 @@ struct PlaylistItem: View {
 
 				Text(
 					[
-						String(localized: "\(playlist.songCount) tracks"),
-						String(localized: "\(playlist.durationSecs / 60) mins"),
+						String(localized: "\(Int(playlist.songCount)) tracks"),
+						String(localized: "\(Int(playlist.durationSecs / 60)) mins"),
 					].compactMap { $0 }.joined(separator: " • ")
 				)
 				.font(.system(size: 13, weight: .medium))

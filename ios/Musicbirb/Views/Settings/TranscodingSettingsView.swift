@@ -4,21 +4,23 @@ struct TranscodingSettingsView: View {
 	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Form {
 			Section("Quality") {
-				Picker("Wi-Fi", selection: Bindable(settings).wifiTranscoding) {
+				Picker("Wi-Fi", selection: $settings.wifiTranscoding) {
 					transcodingOptions()
 				}
-				Picker("Mobile Data", selection: Bindable(settings).mobileTranscoding) {
+				Picker("Mobile Data", selection: $settings.mobileTranscoding) {
 					transcodingOptions()
 				}
-				Picker("Downloads", selection: Bindable(settings).downloadsTranscoding) {
+				Picker("Downloads", selection: $settings.downloadsTranscoding) {
 					transcodingOptions()
 				}
 			}
 
 			Section("Advanced") {
-				Toggle("Estimate Content Length", isOn: Bindable(settings).estimateContentLength)
+				Toggle("Estimate Content Length", isOn: $settings.estimateContentLength)
 			}
 		}
 		.navigationTitle("Transcoding")

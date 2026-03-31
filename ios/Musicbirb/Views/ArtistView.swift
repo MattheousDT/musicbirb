@@ -22,7 +22,7 @@ struct ArtistView: View {
 						coverArt: artist.coverArt,
 						title: artist.name,
 						subtitle: { EmptyView() },
-						meta: String(localized: "\(artist.albumCount) releases"),
+						meta: String(localized: "\(Int(artist.albumCount)) releases"),
 						description: artist.biography,
 						imageShape: .circle,
 						actions: { EmptyView() }

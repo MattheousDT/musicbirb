@@ -16,24 +16,28 @@ struct SettingsView: View {
 		}
 	}
 
-	private let searchKeywords: [(name: String, destination: SettingsDestination)] = [
-		("Accounts", .account), ("Sign In", .account), ("Sign Out", .account),
-		("General", .general), ("Save Searches", .general), ("Allow Adding Duplicates", .general),
-		("Scrobbling", .general), ("Sharing", .general), ("Scan Library", .general),
-		("UI", .ui), ("Theme", .ui), ("Corner Rounding", .ui), ("Audio Quality", .ui),
-		("Star Rating", .ui), ("Item Rating", .ui), ("Shuffle", .ui), ("Directories", .ui),
-		("Album Detail", .ui),
-		("Data Usage", .dataUsage), ("Lyrics", .dataUsage), ("Cache", .dataUsage),
-		("Resolution", .dataUsage), ("Wi-Fi only alert", .dataUsage), ("Mobile data limit", .dataUsage),
-		("Downloads", .downloads), ("Sync", .downloads), ("Delete Downloads", .downloads),
-		("Transcoding", .transcoding), ("Wi-Fi Transcoding", .transcoding),
-		("Mobile Transcoding", .transcoding), ("Downloads Transcoding", .transcoding),
-		("Playback", .playback), ("ReplayGain", .playback), ("Continuous Play", .playback),
-	]
+	private let searchKeywords: [(name: LocalizedStringResource, destination: SettingsDestination)] =
+		[
+			("Accounts", .account), ("Sign In", .account), ("Sign Out", .account),
+			("General", .general), ("Save Searches", .general), ("Allow Adding Duplicates", .general),
+			("Scrobbling", .general), ("Sharing", .general), ("Scan Library", .general),
+			("UI", .ui), ("Theme", .ui), ("Corner Rounding", .ui), ("Audio Quality", .ui),
+			("Star Rating", .ui), ("Item Rating", .ui), ("Shuffle", .ui), ("Directories", .ui),
+			("Album Detail", .ui),
+			("Data Usage", .dataUsage), ("Lyrics", .dataUsage), ("Cache", .dataUsage),
+			("Resolution", .dataUsage), ("Wi-Fi only alert", .dataUsage),
+			("Mobile data limit", .dataUsage),
+			("Downloads", .downloads), ("Sync", .downloads), ("Delete Downloads", .downloads),
+			("Transcoding", .transcoding), ("Wi-Fi Transcoding", .transcoding),
+			("Mobile Transcoding", .transcoding), ("Downloads Transcoding", .transcoding),
+			("Playback", .playback), ("ReplayGain", .playback), ("Continuous Play", .playback),
+		]
 
-	var filteredResults: [(name: String, destination: SettingsDestination)] {
+	var filteredResults: [(name: LocalizedStringResource, destination: SettingsDestination)] {
 		if searchText.isEmpty { return [] }
-		return searchKeywords.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+		return searchKeywords.filter {
+			String(localized: $0.name).localizedCaseInsensitiveContains(searchText)
+		}
 	}
 
 	var body: some View {
@@ -41,7 +45,7 @@ struct SettingsView: View {
 			List(selection: $selection) {
 				if !searchText.isEmpty {
 					Section("Search Results") {
-						ForEach(filteredResults, id: \.name) { result in
+						ForEach(filteredResults, id: \.name.key) { result in
 							NavigationLink(value: result.destination) {
 								Text(result.name)
 							}

@@ -27,7 +27,7 @@ struct PlaylistListView: View {
 		.toolbar {
 			ToolbarItem(placement: .topBarTrailing) {
 				Button(action: { showCreateSheet = true }) {
-					Image(systemName: "plus")
+					Label("New Playlist", systemImage: "plus")
 				}
 			}
 		}

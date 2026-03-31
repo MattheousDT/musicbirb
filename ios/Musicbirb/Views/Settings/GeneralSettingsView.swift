@@ -4,27 +4,28 @@ struct GeneralSettingsView: View {
 	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Form {
 			Section("Search & Lists") {
-				Toggle("Save Searches", isOn: Bindable(settings).saveSearches)
+				Toggle("Save Searches", isOn: $settings.saveSearches)
 				Toggle(
 					"Allow Adding Duplicates to Playlists",
-					isOn: Bindable(settings).allowDuplicatesInPlaylists)
+					isOn: $settings.allowDuplicatesInPlaylists)
 			}
 
 			Section("Playback Filters") {
-				Picker("Ignore Tracks Below Rating", selection: Bindable(settings).ignoreTracksBelowRating)
-				{
+				Picker("Ignore Tracks Below Rating", selection: $settings.ignoreTracksBelowRating) {
 					Text("Disabled").tag(0)
 					ForEach(2...5, id: \.self) { rating in
-						Text("\(rating) stars").tag(rating)
+						Text("\(rating) stars", comment: "Star rating").tag(rating)
 					}
 				}
 			}
 
 			Section("Integration") {
-				Toggle("Scrobbling", isOn: Bindable(settings).scrobblingEnabled)
-				Toggle("Sharing", isOn: Bindable(settings).sharingEnabled)
+				Toggle("Scrobbling", isOn: $settings.scrobblingEnabled)
+				Toggle("Sharing", isOn: $settings.sharingEnabled)
 			}
 
 			Section {

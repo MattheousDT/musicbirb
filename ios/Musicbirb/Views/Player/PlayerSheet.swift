@@ -164,7 +164,7 @@ struct PlayerSheet: View {
 					.toolbar {
 						ToolbarItem(placement: .navigationBarTrailing) {
 							Button(action: { isQueueOpen = true }) {
-								Image(systemName: "list.bullet")
+								Image(systemName: "music.note.list")
 							}
 						}
 					}

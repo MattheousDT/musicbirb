@@ -38,8 +38,8 @@ struct PlaylistView: View {
 							}
 						},
 						meta: [
-							String(localized: "\(playlist.songCount) tracks"),
-							String(localized: "\(playlist.durationSecs / 60) mins"),
+							String(localized: "\(Int(playlist.songCount)) tracks"),
+							String(localized: "\(Int(playlist.durationSecs / 60)) mins"),
 						].compactMap { $0 }.joined(separator: " • "),
 						description: playlist.comment,
 						imageShape: .roundedRectangle,
@@ -70,6 +70,9 @@ struct PlaylistView: View {
 					}
 					.onMove { source, destination in
 						playlistDetails?.songs.move(fromOffsets: source, toOffset: destination)
+						if !editMode.isEditing {
+							savePlaylistChanges()
+						}
 					}
 					.onDelete { offsets in
 						playlistDetails?.songs.remove(atOffsets: offsets)
@@ -115,8 +118,7 @@ struct PlaylistView: View {
 								Label("Delete Playlist", systemImage: "trash")
 							}
 						} label: {
-							Image(systemName: "ellipsis.circle")
-								.background(Circle().fill(.ultraThinMaterial))
+							Label("More options", systemImage: "ellipsis.circle")
 						}
 					}
 				}

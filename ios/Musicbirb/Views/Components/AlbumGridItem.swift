@@ -35,7 +35,7 @@ struct AlbumGridItem: View {
 					[
 						showArtist ? album.artist : nil,
 						(showYear && album.year != nil) ? "\(album.year!)" : nil,
-						album.songCount != nil ? String(localized: "\(album.songCount!) tracks") : nil,
+						album.songCount != nil ? String(localized: "\(Int(album.songCount!)) tracks") : nil,
 					].compactMap { $0 }.joined(separator: " • "),
 				)
 				.font(.system(size: 13, weight: .semibold))

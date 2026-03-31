@@ -61,7 +61,7 @@ struct AccountSettingsView: View {
 				} label: {
 					HStack {
 						Image(systemName: "person.badge.plus")
-						Text("Add account...")
+						Text("Add an account")
 					}
 					.foregroundColor(.primary)
 				}

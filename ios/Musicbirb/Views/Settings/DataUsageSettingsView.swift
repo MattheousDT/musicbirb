@@ -4,11 +4,13 @@ struct DataUsageSettingsView: View {
 	@Environment(SettingsViewModel.self) private var settings
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Form {
 			Section("Media") {
-				Toggle("Automatically Download Lyrics", isOn: Bindable(settings).autoDownloadLyrics)
+				Toggle("Automatically Download Lyrics", isOn: $settings.autoDownloadLyrics)
 
-				Picker("Image Resolution", selection: Bindable(settings).imageResolution) {
+				Picker("Image Resolution", selection: $settings.imageResolution) {
 					Text("Low").tag(ImageResolution.low)
 					Text("Normal").tag(ImageResolution.normal)
 					Text("High").tag(ImageResolution.high)
@@ -19,7 +21,7 @@ struct DataUsageSettingsView: View {
 			Section("Cache Size") {
 				VStack(alignment: .leading) {
 					Text("Streaming Cache (MB)")
-					Slider(value: Bindable(settings).streamingCacheSizeMB, in: 256...4096, step: 256) {
+					Slider(value: $settings.streamingCacheSizeMB, in: 256...4096, step: 256) {
 						Text("Streaming Cache")
 					} minimumValueLabel: {
 						Text(verbatim: "256").font(.caption)
@@ -33,7 +35,7 @@ struct DataUsageSettingsView: View {
 
 				VStack(alignment: .leading) {
 					Text("Artwork Cache (MB)")
-					Slider(value: Bindable(settings).artworkCacheSizeMB, in: 128...2048, step: 128) {
+					Slider(value: $settings.artworkCacheSizeMB, in: 128...2048, step: 128) {
 						Text("Artwork Cache")
 					} minimumValueLabel: {
 						Text(verbatim: "128").font(.caption)
@@ -47,8 +49,8 @@ struct DataUsageSettingsView: View {
 			}
 
 			Section("Cellular") {
-				Toggle("Stream via Wi-Fi only alert", isOn: Bindable(settings).streamWifiOnlyAlert)
-				Toggle("Limit mobile data usage", isOn: Bindable(settings).limitMobileDataUsage)
+				Toggle("Stream via Wi-Fi only alert", isOn: $settings.streamWifiOnlyAlert)
+				Toggle("Limit mobile data usage", isOn: $settings.limitMobileDataUsage)
 			}
 		}
 		.navigationTitle("Data Usage")

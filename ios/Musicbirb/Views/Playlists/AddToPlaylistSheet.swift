@@ -49,7 +49,7 @@ struct AddToPlaylistSheet: View {
 										.font(.system(size: 16, weight: .semibold))
 										.foregroundColor(.primary)
 
-									Text("\(playlist.songCount) tracks")
+									Text("\(Int(playlist.songCount)) tracks")
 										.font(.system(size: 13))
 										.foregroundColor(.secondary)
 								}

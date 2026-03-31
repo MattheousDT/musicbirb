@@ -3,7 +3,7 @@ import SwiftUI
 struct LoginView: View {
 	@Environment(AuthViewModel.self) private var authViewModel
 	@State private var providerId = "subsonic"
-	@State private var url = ""
+	@State private var url = "https://"
 	@State private var username = ""
 	@State private var password = ""
 
@@ -53,7 +53,7 @@ struct LoginView: View {
 					.disabled(url.isEmpty || username.isEmpty || isLoggingIn)
 				}
 			}
-			.navigationTitle("Add Account")
+			.navigationTitle("Add an account")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				// Only show Cancel if there are already other accounts to fall back to

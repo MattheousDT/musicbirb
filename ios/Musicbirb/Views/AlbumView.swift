@@ -33,8 +33,8 @@ struct AlbumView: View {
 						},
 						meta: [
 							horizontalSizeClass != .regular ? album.year.map(String.init) : nil,
-							String(localized: "\(album.songCount) tracks"),
-							String(localized: "\(album.durationSecs / 60) mins"),
+							String(localized: "\(Int(album.songCount)) tracks"),
+							String(localized: "\(Int(album.durationSecs / 60)) mins"),
 						].compactMap { $0 }.joined(separator: " • "),
 						description: nil,
 						imageShape: .roundedRectangle,
@@ -83,8 +83,7 @@ struct AlbumView: View {
 							Label("Add to Playlist", systemImage: "text.badge.plus")
 						}
 					} label: {
-						Image(systemName: "ellipsis.circle")
-							.background(Circle().fill(.ultraThinMaterial))
+						Label("More options", systemImage: "ellipsis.circle")
 					}
 				}
 			}
