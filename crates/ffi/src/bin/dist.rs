@@ -11,8 +11,6 @@ fn main() -> anyhow::Result<()> {
 	let target_dir = project_root.join("target");
 	let lib_name = "musicbirb";
 
-	// DO NOT rm -rf bindings_dir here anymore.
-	// We only create it if it's missing.
 	if !bindings_dir.exists() {
 		fs::create_dir_all(&bindings_dir)?;
 	}
@@ -48,22 +46,44 @@ fn main() -> anyhow::Result<()> {
 	)?;
 
 	println!("🏗️ Building Rust for iOS targets...");
-	let ios_targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim"];
-	for target in ios_targets {
+	let targets = [
+		("aarch64-apple-ios", "iphoneos"),
+		("aarch64-apple-ios-sim", "iphonesimulator"),
+	];
+
+	for (target, sdk_name) in targets {
+		println!("  Targeting {} (SDK: {})...", target, sdk_name);
+
+		// Get the absolute path to the SDK using xcrun
+		let sdk_path = String::from_utf8(
+			Command::new("xcrun")
+				.args(["--sdk", sdk_name, "--show-sdk-path"])
+				.output()?
+				.stdout,
+		)?
+		.trim()
+		.to_string();
+
 		run_command(
-			Command::new("cargo").args(["build", "-p", "ffi", "--target", target, "--release"]),
+			Command::new("cargo")
+				.args(["build", "-p", "ffi", "--target", target, "--release"])
+				.env("IPHONEOS_DEPLOYMENT_TARGET", "17.0")
+				.env("SDKROOT", &sdk_path)
+				.env("CFLAGS", format!("-miphoneos-version-min=17.0 -isysroot {}", sdk_path))
+				.env(
+					"CXXFLAGS",
+					format!("-miphoneos-version-min=17.0 -isysroot {}", sdk_path),
+				),
 			project_root,
 		)?;
 	}
 
-	// Incremental XCFramework logic:
-	// xcodebuild is slow. We only run it if the static libs are newer than the existing framework.
 	let xcframework_path = bindings_dir.join(format!("{}.xcframework", lib_name));
 	let mut needs_xcframework = !xcframework_path.exists();
 
 	if !needs_xcframework {
 		let fw_mtime = fs::metadata(&xcframework_path)?.modified()?;
-		for target in ios_targets {
+		for (target, _) in targets {
 			let lib_path = target_dir
 				.join(target)
 				.join("release")
@@ -77,7 +97,6 @@ fn main() -> anyhow::Result<()> {
 
 	if needs_xcframework {
 		println!("📦 Creating XCFramework...");
-		// If it exists, we must remove it first or xcodebuild will fail
 		if xcframework_path.exists() {
 			let _ = fs::remove_dir_all(&xcframework_path);
 		}
@@ -123,7 +142,7 @@ fn main() -> anyhow::Result<()> {
 		)?;
 		let _ = fs::remove_dir_all(headers_dir);
 	} else {
-		println!("⏭️ XCFramework is up to date, skipping bundle step.");
+		println!("⏭️ XCFramework is up to date.");
 	}
 
 	Ok(())
