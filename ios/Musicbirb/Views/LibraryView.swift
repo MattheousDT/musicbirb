@@ -17,7 +17,7 @@ struct LibraryView: View {
 				NavigationLink {
 					Text(verbatim: "TODO")
 				} label: {
-					Label("Artists", systemImage: "square.stack")
+					Label("Albums", systemImage: "square.stack")
 				}
 				NavigationLink {
 					Text(verbatim: "TODO")

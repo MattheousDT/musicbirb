@@ -52,26 +52,27 @@ pub fn init_client(
 	let observer_arc = Arc::new(observer);
 
 	crate::RUNTIME.spawn(async move {
-		let mut last_queue = Vec::new();
-
-		{
-			let state = state_rx.borrow().clone();
-			last_queue = state.queue.clone();
-			observer_arc.on_queue_changed(state.queue);
-			observer_arc.on_playback_state_changed(crate::state::PlaybackState {
+		let (mut last_queue, initial_playback_state) = {
+			let state = state_rx.borrow();
+			let queue = state.queue.clone();
+			let pb = crate::state::PlaybackState {
 				queue_position: state.queue_position as u32,
 				position_secs: state.sync.position_secs,
 				status: state.sync.status,
 				scrobble_mark_pos: state.scrobble_mark_pos,
-			});
-		}
+			};
+			(queue, pb)
+		};
+
+		observer_arc.on_queue_changed(last_queue.clone());
+		observer_arc.on_playback_state_changed(initial_playback_state);
 
 		while state_rx.changed().await.is_ok() {
-			let state = state_rx.borrow().clone();
+			let state = state_rx.borrow();
 
 			if state.queue != last_queue {
 				last_queue = state.queue.clone();
-				observer_arc.on_queue_changed(state.queue);
+				observer_arc.on_queue_changed(last_queue.clone());
 			}
 
 			observer_arc.on_playback_state_changed(crate::state::PlaybackState {

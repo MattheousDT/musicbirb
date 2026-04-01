@@ -65,7 +65,7 @@ impl ScrobbleManager {
 
 	pub fn save(&self) {
 		if let Ok(data) = serde_json::to_string(&self.queue) {
-			let _ = fs::write(&self.file_path, data);
+			let _ = tokio::fs::write(&self.file_path, data);
 		}
 	}
 }

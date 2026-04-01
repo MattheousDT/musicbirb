@@ -130,7 +130,8 @@ struct SearchView: View {
 				}
 				isSearching = true
 				do {
-					try await Task.sleep(nanoseconds: 300_000_000)  // 300ms debounce
+					try await Task.sleep(for: .milliseconds(300))
+					if Task.isCancelled { return }
 					guard let core = coreManager.core else { return }
 
 					let req = SearchQuery(keyword: query, preset: nil, limit: 20, offset: 0)
