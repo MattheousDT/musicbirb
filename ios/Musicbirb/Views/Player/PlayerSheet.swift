@@ -89,7 +89,7 @@ struct PlayerSheet: View {
 									.tint(.primary)
 
 									if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
-										trackDuration > 0, settings.scrobblingEnabled
+                                       trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
 									{
 										let progress = Double(mark) / trackDuration
 										let padding: CGFloat = 12

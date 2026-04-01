@@ -92,7 +92,6 @@ struct PlaylistView: View {
 		}
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
-		.toolbarBackground(.hidden, for: .navigationBar)
 		.toolbar {
 			if playlistDetails != nil {
 				ToolbarItem(placement: .topBarTrailing) {

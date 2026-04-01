@@ -88,7 +88,6 @@ struct AlbumView: View {
 				}
 			}
 		}
-		.toolbarBackground(.hidden, for: .navigationBar)
 		.navigationDestination(item: $selectedArtistId) { id in
 			ArtistView(artistId: id)
 		}
