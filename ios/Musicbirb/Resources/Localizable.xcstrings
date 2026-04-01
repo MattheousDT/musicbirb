@@ -1248,6 +1248,16 @@
         }
       }
     },
+    "Show Scrobble Marker" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크로블 마커를 표시"
+          }
+        }
+      }
+    },
     "Show Shuffle" : {
       "localizations" : {
         "ko" : {

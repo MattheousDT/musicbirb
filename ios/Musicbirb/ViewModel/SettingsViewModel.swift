@@ -59,6 +59,9 @@ class SettingsViewModel: @unchecked Sendable {
 	var showShuffle: Bool { didSet { defaults.set(showShuffle, forKey: "showShuffle") } }
 	var showDirectories: Bool { didSet { defaults.set(showDirectories, forKey: "showDirectories") } }
 	var showAlbumDetail: Bool { didSet { defaults.set(showAlbumDetail, forKey: "showAlbumDetail") } }
+	var showScrobbleMarker: Bool {
+		didSet { defaults.set(showScrobbleMarker, forKey: "showScrobbleMarker") }
+	}
 
 	// General
 	var saveSearches: Bool { didSet { defaults.set(saveSearches, forKey: "saveSearches") } }
@@ -134,6 +137,7 @@ class SettingsViewModel: @unchecked Sendable {
 		self.showShuffle = defaults.object(forKey: "showShuffle") as? Bool ?? true
 		self.showDirectories = defaults.object(forKey: "showDirectories") as? Bool ?? true
 		self.showAlbumDetail = defaults.object(forKey: "showAlbumDetail") as? Bool ?? true
+		self.showScrobbleMarker = defaults.object(forKey: "showScrobbleMarker") as? Bool ?? true
 
 		self.saveSearches = defaults.object(forKey: "saveSearches") as? Bool ?? true
 		self.allowDuplicatesInPlaylists =

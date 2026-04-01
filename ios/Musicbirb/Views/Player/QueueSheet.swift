@@ -60,15 +60,12 @@ struct QueueSheet: View {
 					}
 				}
 				.onAppear {
-					if let q = playbackViewModel.uiState?.queue {
-						localQueue = q
-					}
-					if let pos = playbackViewModel.uiState?.queuePosition, Int(pos) < localQueue.count {
+					localQueue = playbackViewModel.queue
+					if let pos = playbackViewModel.playbackState?.queuePosition, Int(pos) < localQueue.count {
 						proxy.scrollTo(localQueue[Int(pos)].id, anchor: UnitPoint(x: 0, y: 0.3))
 					}
 				}
-				.onChange(of: playbackViewModel.uiState?.queue) { _, newQueue in
-					guard let newQueue = newQueue else { return }
+				.onChange(of: playbackViewModel.queue) { _, newQueue in
 					let now = Date()
 
 					// Ignore updates straight from the rust core if we've mutated our local queue recently
@@ -88,11 +85,9 @@ struct QueueSheet: View {
 	}
 
 	private func isTrackActive(index: Int) -> Bool {
-		guard let activeIndex = playbackViewModel.uiState?.queuePosition,
-			let realQueue = playbackViewModel.uiState?.queue,
-			Int(activeIndex) < realQueue.count,
-			index < localQueue.count
-		else { return false }
+		guard let activeIndex = playbackViewModel.playbackState?.queuePosition else { return false }
+		let realQueue = playbackViewModel.queue
+		guard Int(activeIndex) < realQueue.count, index < localQueue.count else { return false }
 
 		return localQueue[index].id == realQueue[Int(activeIndex)].id
 	}

@@ -31,6 +31,7 @@ struct UISettingsView: View {
 				Toggle("Show Shuffle", isOn: $settings.showShuffle)
 				Toggle("Show Directories", isOn: $settings.showDirectories)
 				Toggle("Show Album Detail", isOn: $settings.showAlbumDetail)
+				Toggle("Show Scrobble Marker", isOn: $settings.showScrobbleMarker)
 			}
 		}
 		.navigationTitle("UI")

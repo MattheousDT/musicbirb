@@ -56,7 +56,8 @@ pub trait AudioEngineDelegate: Send + Sync {
 
 #[uniffi::export(callback_interface)]
 pub trait StateObserver: Send + Sync {
-	fn on_state_changed(&self, state: crate::state::UiState);
+	fn on_playback_state_changed(&self, state: crate::state::PlaybackState);
+	fn on_queue_changed(&self, queue: Vec<crate::models::Track>);
 }
 
 pub struct MobileBackend {

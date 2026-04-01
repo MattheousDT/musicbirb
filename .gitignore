@@ -1,41 +1,30 @@
-# dependencies
-node_modules/
+# Rust
+target/
 
-# env
-.env*
+# UniFFI / Bindings
+# We ignore the generated artifacts, but we check in the Project
+# that references their paths.
+ios/Bindings/
 
-# Swift
-*.xcodeproj
+# Swift / iOS
+ios/build/
+.build
 *.ipa
 *.dSYM.zip
 *.dSYM
-xcuserdata/
-*.hmap
-ios/build
-ios/Bindings
 buildServer.json
 
-# Rust
-target
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Xcode User Data (User-specific settings inside the project)
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
 
 # macOS
 .DS_Store
 *.pem
 
-# typescript
-*.tsbuildinfo
+# Env
+.env*
 
-# generated native folders
-/*/cpp
-/*/ios
-/*/android
-
-# FFI Generation
-app-ffi/*
-!app-ffi/package.json
-!app-ffi/*.yaml
+# Dependencies
+node_modules/

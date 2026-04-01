@@ -4,25 +4,26 @@ import UIKit
 
 @Observable
 class PlaybackViewModel: StateObserver, @unchecked Sendable {
-	var uiState: UiState?
+	var playbackState: PlaybackState?
+	var queue: [Track] = []
 	var showPlayerSheet: Bool = false
 	var coreManager: CoreManager?
 
 	private let remoteCommandManager = RemoteCommandManager()
 
 	var currentTrack: Track? {
-		guard let uiState = uiState,
-			!uiState.queue.isEmpty,
-			uiState.queuePosition >= 0,
-			uiState.queuePosition < uiState.queue.count
+		guard let state = playbackState,
+			!queue.isEmpty,
+			state.queuePosition >= 0,
+			state.queuePosition < queue.count
 		else {
 			return nil
 		}
-		return uiState.queue[Int(uiState.queuePosition)]
+		return queue[Int(state.queuePosition)]
 	}
 
 	var isPlaying: Bool {
-		return uiState?.status == .playing
+		return playbackState?.status == .playing
 	}
 
 	init() {}
@@ -46,19 +47,32 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	}
 
 	private func handleAppResumed() {
-		if currentTrack != nil && uiState?.status == .playing {
+		if currentTrack != nil && playbackState?.status == .playing {
 			self.showPlayerSheet = true
 		}
 	}
 
-	func onStateChanged(state: UiState) {
+	func onPlaybackStateChanged(state: PlaybackState) {
 		Task { @MainActor in
-			self.uiState = state
+			self.playbackState = state
 			self.remoteCommandManager.updateNowPlaying(
 				track: self.currentTrack,
 				position: state.positionSecs,
 				isPlaying: state.status == .playing
 			)
+		}
+	}
+
+	func onQueueChanged(queue: [Track]) {
+		Task { @MainActor in
+			self.queue = queue
+			if let state = self.playbackState {
+				self.remoteCommandManager.updateNowPlaying(
+					track: self.currentTrack,
+					position: state.positionSecs,
+					isPlaying: state.status == .playing
+				)
+			}
 		}
 	}
 }

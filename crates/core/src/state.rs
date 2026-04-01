@@ -38,8 +38,7 @@ impl Default for CoreState {
 
 #[cfg(feature = "ffi")]
 #[derive(uniffi::Record, Debug, Clone)]
-pub struct UiState {
-	pub queue: Vec<Track>,
+pub struct PlaybackState {
 	pub queue_position: u32,
 	pub position_secs: f64,
 	pub status: PlayerStatus,

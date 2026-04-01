@@ -50,12 +50,36 @@ pub fn init_client(
 	});
 
 	let observer_arc = Arc::new(observer);
-	let core_clone = Arc::clone(&core);
 
 	crate::RUNTIME.spawn(async move {
-		observer_arc.on_state_changed(core_clone.get_ui_state());
+		let mut last_queue = Vec::new();
+
+		{
+			let state = state_rx.borrow().clone();
+			last_queue = state.queue.clone();
+			observer_arc.on_queue_changed(state.queue);
+			observer_arc.on_playback_state_changed(crate::state::PlaybackState {
+				queue_position: state.queue_position as u32,
+				position_secs: state.sync.position_secs,
+				status: state.sync.status,
+				scrobble_mark_pos: state.scrobble_mark_pos,
+			});
+		}
+
 		while state_rx.changed().await.is_ok() {
-			observer_arc.on_state_changed(core_clone.get_ui_state());
+			let state = state_rx.borrow().clone();
+
+			if state.queue != last_queue {
+				last_queue = state.queue.clone();
+				observer_arc.on_queue_changed(state.queue);
+			}
+
+			observer_arc.on_playback_state_changed(crate::state::PlaybackState {
+				queue_position: state.queue_position as u32,
+				position_secs: state.sync.position_secs,
+				status: state.sync.status,
+				scrobble_mark_pos: state.scrobble_mark_pos,
+			});
 		}
 	});
 
@@ -72,18 +96,6 @@ pub struct Musicbirb {
 #[cfg_attr(feature = "ffi", uniffi::export)]
 #[macros::async_ffi]
 impl Musicbirb {
-	#[cfg(feature = "ffi")]
-	pub fn get_ui_state(&self) -> crate::state::UiState {
-		let state = self.state_rx.borrow().clone();
-		crate::state::UiState {
-			queue: state.queue,
-			queue_position: state.queue_position as u32,
-			position_secs: state.sync.position_secs,
-			status: state.sync.status,
-			scrobble_mark_pos: state.scrobble_mark_pos,
-		}
-	}
-
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
 
 	async fn get_provider(&self) -> Result<Arc<dyn Provider>, MusicbirbError> {

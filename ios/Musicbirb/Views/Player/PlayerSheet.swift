@@ -63,7 +63,7 @@ struct PlayerSheet: View {
 												} else if let target = self.targetSeekTime {
 													rawValue = target
 												} else {
-													rawValue = playbackViewModel.uiState?.positionSecs ?? 0.0
+													rawValue = playbackViewModel.playbackState?.positionSecs ?? 0.0
 												}
 
 												// Strictly clamp slider between 0 and total duration to prevent overshoots
@@ -88,8 +88,8 @@ struct PlayerSheet: View {
 									)
 									.tint(.primary)
 
-									if let mark = playbackViewModel.uiState?.scrobbleMarkPos, mark > 0,
-										trackDuration > 0
+									if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
+										trackDuration > 0, settings.scrobblingEnabled
 									{
 										let progress = Double(mark) / trackDuration
 										let padding: CGFloat = 12
@@ -101,6 +101,7 @@ struct PlayerSheet: View {
 												.frame(width: 2, height: 12)
 												.offset(x: offset)
 												.allowsHitTesting(false)
+												.animation(.default, value: offset)
 										}
 									}
 								}
@@ -110,7 +111,8 @@ struct PlayerSheet: View {
 							HStack {
 								let rawDisplayTime =
 									isSeeking
-									? sliderValue : (targetSeekTime ?? playbackViewModel.uiState?.positionSecs ?? 0.0)
+									? sliderValue
+									: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
 								let safeDisplayTime = min(max(rawDisplayTime, 0.0), trackDuration)
 
 								Text(formatTime(safeDisplayTime))
@@ -121,7 +123,7 @@ struct PlayerSheet: View {
 							.foregroundColor(.secondary)
 						}
 						.padding(.horizontal, 40)
-						.onChange(of: playbackViewModel.uiState?.positionSecs) { _, newPos in
+						.onChange(of: playbackViewModel.playbackState?.positionSecs) { _, newPos in
 							if let newPos = newPos, let target = self.targetSeekTime {
 								if abs(newPos - target) < 2.0 {
 									self.targetSeekTime = nil

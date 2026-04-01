@@ -100,7 +100,7 @@ struct HomeView: View {
 			.background(Color(UIColor.systemGroupedBackground))
 			.navigationTitle(Text("Home"))
 			.toolbar {
-				if let queue = playbackViewModel.uiState?.queue, !queue.isEmpty {
+				if !playbackViewModel.queue.isEmpty {
 					ToolbarItem(placement: .navigationBarTrailing) {
 						Button {
 							showQueueSheet = true

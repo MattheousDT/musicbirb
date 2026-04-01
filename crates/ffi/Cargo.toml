@@ -10,7 +10,12 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 musicbirb = { path = "../core", features = ["ffi", "rodio"] }
 uniffi = { version = "0.30.0", features = ["cli"] }
+anyhow = "1.0"
 
 [[bin]]
 name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
+
+[[bin]]
+name = "dist"
+path = "src/bin/dist.rs"
