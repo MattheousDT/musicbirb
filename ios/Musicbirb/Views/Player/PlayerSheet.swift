@@ -4,6 +4,8 @@ struct PlayerSheet: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(SettingsViewModel.self) private var settings
+	@Environment(\.displayScale) private var displayScale
+
 	@State private var isSeeking = false
 	@State private var sliderValue: Double = 0.0
 	@State private var targetSeekTime: Double? = nil
@@ -20,7 +22,10 @@ struct PlayerSheet: View {
 
 						let imageSize = min(min(geometry.size.width * 0.85, 400), geometry.size.height * 0.45)
 						SmoothImage(
-							url: Config.getCoverUrl(id: currentTrack.coverArt, size: 480), contentMode: .fill,
+							url: Config.getCoverUrl(
+								id: currentTrack.coverArt, size: Int(imageSize * displayScale)
+							),
+							contentMode: .fill,
 							placeholderColor: Color.white.opacity(0.1)
 						)
 						.aspectRatio(1, contentMode: .fit)
@@ -29,8 +34,8 @@ struct PlayerSheet: View {
 							RoundedRectangle(
 								cornerRadius: 24 * settings.cornerRounding.multiplier, style: .continuous)
 						)
+						.animation(.default, value: currentTrack.coverArt)
 						.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
-						.id(currentTrack.id)
 
 						Spacer().frame(height: geometry.size.height * 0.06)
 
@@ -40,11 +45,13 @@ struct PlayerSheet: View {
 								.foregroundColor(.primary)
 								.lineLimit(1)
 								.minimumScaleFactor(0.7)
+								.animation(.default, value: currentTrack.title)
 
 							Text(currentTrack.artist)
 								.font(.system(size: 18, weight: .bold))
 								.foregroundColor(.accentColor)
 								.lineLimit(1)
+								.animation(.default, value: currentTrack.artistId)
 
 						}
 						.padding(.horizontal, 24)
@@ -89,7 +96,7 @@ struct PlayerSheet: View {
 									.tint(.primary)
 
 									if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
-                                       trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
+										trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
 									{
 										let progress = Double(mark) / trackDuration
 										let padding: CGFloat = 12

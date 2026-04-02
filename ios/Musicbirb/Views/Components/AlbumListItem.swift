@@ -3,13 +3,15 @@ import SwiftUI
 struct AlbumListItem: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
+	@Environment(\.displayScale) private var displayScale
 
 	let album: Album
 
 	var body: some View {
 		HStack(spacing: 12) {
 			SmoothImage(
-				url: Config.getCoverUrl(id: album.coverArt, size: 150), contentMode: .fill,
+				url: Config.getCoverUrl(id: album.coverArt, size: Int(48 * displayScale)),
+				contentMode: .fill,
 				placeholderColor: Color(UIColor.systemGray5)
 			)
 			.frame(width: 48, height: 48)

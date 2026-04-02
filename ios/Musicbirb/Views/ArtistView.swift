@@ -17,33 +17,31 @@ struct ArtistView: View {
 					.scaleEffect(1.5)
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			} else if let artist = artistDetails {
-				List {
-					HeroHeaderView(
-						coverArt: artist.coverArt,
-						title: artist.name,
-						subtitle: { EmptyView() },
-						meta: String(localized: "\(Int(artist.albumCount)) releases"),
-						description: artist.biography,
-						imageShape: .circle,
-						actions: { EmptyView() }
-					)
-					.listRowInsets(EdgeInsets())
-					.listRowSeparator(.hidden)
-					.listRowBackground(Color.clear)
+				ScrollView {
+					VStack(spacing: 0) {
+						HeroHeaderView(
+							coverArt: artist.coverArt,
+							title: artist.name,
+							subtitle: { EmptyView() },
+							meta: String(localized: "\(Int(artist.albumCount)) releases"),
+							description: artist.biography,
+							imageShape: .circle,
+							actions: { EmptyView() }
+						)
 
-					if !artist.topSongs.isEmpty {
-						topSongsSection(artist)
-					}
+						if !artist.topSongs.isEmpty {
+							topSongsSection(artist)
+						}
 
-					if !artist.albums.isEmpty {
-						releasesSection(artist)
-					}
+						if !artist.albums.isEmpty {
+							releasesSection(artist)
+						}
 
-					if !artist.similarArtists.isEmpty {
-						similarArtistsSection(artist)
+						if !artist.similarArtists.isEmpty {
+							similarArtistsSection(artist)
+						}
 					}
 				}
-				.listStyle(.plain)
 				.contentMargins(.horizontal, 0, for: .scrollContent)
 			}
 		}
@@ -73,28 +71,31 @@ struct ArtistView: View {
 
 	@ViewBuilder
 	private func topSongsSection(_ artist: ArtistDetails) -> some View {
-		VStack(alignment: .leading, spacing: 4) {
+		VStack(alignment: .leading, spacing: 8) {
 			Text("Top Songs")
 				.font(.system(size: 22, weight: .black))
 				.padding(.horizontal, 20)
 				.padding(.top, 16)
-				.padding(.bottom, 8)
 
-			ForEach(
-				Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
-				id: \.element.id
-			) { index, track in
-				TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
-					playTopTrack(index)
+			let columns =
+				horizontalSizeClass == .regular
+				? [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+				: [GridItem(.flexible())]
+
+			LazyVGrid(columns: columns, spacing: 0) {
+				ForEach(
+					Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
+					id: \.element.id
+				) { index, track in
+					TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+						playTopTrack(index)
+					}
+					.environment(\.trackRowSubtitle, .album)
+					.environment(\.trackRowHorizontalPadding, 20)
 				}
-				.environment(\.trackRowSubtitle, .album)
-				.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
 			}
 		}
 		.padding(.bottom, 24)
-		.listRowInsets(EdgeInsets())
-		.listRowSeparator(.hidden)
-		.listRowBackground(Color.clear)
 	}
 
 	@ViewBuilder
@@ -119,9 +120,6 @@ struct ArtistView: View {
 			.padding(.horizontal, 20)
 		}
 		.padding(.bottom, 32)
-		.listRowInsets(EdgeInsets())
-		.listRowSeparator(.hidden)
-		.listRowBackground(Color.clear)
 	}
 
 	@ViewBuilder
@@ -148,9 +146,6 @@ struct ArtistView: View {
 			.scrollTargetBehavior(.viewAligned)
 		}
 		.padding(.bottom, 32)
-		.listRowInsets(EdgeInsets())
-		.listRowSeparator(.hidden)
-		.listRowBackground(Color.clear)
 	}
 
 	private func isPlaying(_ track: Track) -> Bool {

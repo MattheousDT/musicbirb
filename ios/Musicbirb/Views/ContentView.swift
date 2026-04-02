@@ -20,7 +20,7 @@ struct ContentView: View {
 				if #available(iOS 26.0, *) {
 					TabView {
 						Tab("Home", systemImage: "house.fill") { HomeView() }
-						Tab("Library", systemImage: "music.note.square.stack.fill") { LibraryView() }
+						Tab("Library", systemImage: "music.note.square.stack") { LibraryView() }
 						Tab("Downloads", systemImage: "square.and.arrow.down") { Text("Downloads") }
 						Tab("Search", systemImage: "magnifyingglass", role: .search) { SearchView() }
 					}
@@ -32,7 +32,7 @@ struct ContentView: View {
 						tabContent { HomeView() }
 							.tabItem { Label("Home", systemImage: "house.fill") }
 						tabContent { LibraryView() }
-							.tabItem { Label("Library", systemImage: "music.note.square.stack.fill") }
+							.tabItem { Label("Library", systemImage: "square.grid.2x2.fill") }
 						tabContent { Text("Downloads") }
 							.tabItem { Label("Downloads", systemImage: "square.and.arrow.down") }
 						tabContent { SearchView() }

@@ -2,12 +2,14 @@ import SwiftUI
 
 struct PlaylistItem: View {
 	@Environment(SettingsViewModel.self) private var settings
+	@Environment(\.displayScale) private var displayScale
+
 	let playlist: Playlist
 
 	var body: some View {
 		HStack(spacing: 12) {
 			SmoothImage(
-				url: Config.getCoverUrl(id: playlist.coverArt, size: 150), contentMode: .fill,
+				url: Config.getCoverUrl(id: playlist.coverArt, size: Int(48 * displayScale)),
 				placeholderColor: Color(UIColor.systemGray5)
 			)
 			.frame(width: 48, height: 48)

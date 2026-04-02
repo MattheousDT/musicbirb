@@ -3,6 +3,7 @@ import SwiftUI
 struct AlbumGridItem: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
+	@Environment(\.displayScale) private var displayScale
 
 	let album: Album
 	var showArtist: Bool = true
@@ -13,11 +14,14 @@ struct AlbumGridItem: View {
 			Color.clear
 				.aspectRatio(1, contentMode: .fill)
 				.overlay(
-					SmoothImage(
-						url: Config.getCoverUrl(id: album.coverArt, size: 300),
-						contentMode: .fill,
-						placeholderColor: Color(UIColor.systemGray5)
-					)
+					GeometryReader { geometry in
+						SmoothImage(
+							url: Config.getCoverUrl(
+								id: album.coverArt, size: Int(geometry.size.width * displayScale)),
+							contentMode: .fill,
+							placeholderColor: Color(UIColor.systemGray5)
+						)
+					}
 				)
 				.clipShape(
 					RoundedRectangle(

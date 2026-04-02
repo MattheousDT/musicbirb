@@ -9,6 +9,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.safeAreaInsets) private var safeAreaInsets
+	@Environment(\.displayScale) private var displayScale
 
 	let coverArt: String?
 	let title: String
@@ -18,12 +19,15 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 	let imageShape: HeroImageShape
 	@ViewBuilder let actions: Actions
 
-	/// Proportional image size: 240 feels "premium" on iPhone and "standard" on iPad.
 	private var imageSize: CGFloat {
 		horizontalSizeClass == .regular ? 240 : 230
 	}
 
-	/// Robust padding calculation to clear Status Bar + Navigation Bar + Aesthetic Space.
+	private var imageSizePx: Int {
+		Int(imageSize * displayScale)
+	}
+
+	// Status Bar + Navigation Bar + Extra Space.
 	private var topPadding: CGFloat {
 		let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top : 47  // Fallback for iPhone 15+
 		let navBarHeight: CGFloat = 44
@@ -35,7 +39,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 		VStack(spacing: 0) {
 			if horizontalSizeClass == .regular {
 				HStack(alignment: .center, spacing: 40) {
-					imageView(size: imageSize)
+					imageView()
 
 					VStack(alignment: .leading, spacing: 12) {
 						Text(title)
@@ -72,7 +76,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				.padding(.bottom, 60)
 			} else {
 				VStack(spacing: 20) {
-					imageView(size: imageSize)
+					imageView()
 
 					VStack(spacing: 10) {
 						Text(title)
@@ -116,11 +120,13 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				ZStack {
 					Color(UIColor.systemGray5)
 
-					SmoothImage(url: Config.getCoverUrl(id: coverArt, size: 512), contentMode: .fill)
-						.frame(width: geo.size.width, height: geo.size.height)
-						.clipped()
-						.blur(radius: horizontalSizeClass == .regular ? 50 : 35, opaque: true)
-						.overlay(Color.black.opacity(0.15))
+					SmoothImage(
+						url: Config.getCoverUrl(id: coverArt, size: imageSizePx), contentMode: .fill
+					)
+					.frame(width: geo.size.width, height: geo.size.height)
+					.clipped()
+					.blur(radius: horizontalSizeClass == .regular ? 50 : 35, opaque: true)
+					.overlay(Color.black.opacity(0.15))
 
 					LinearGradient(
 						gradient: Gradient(colors: [.clear, Color(UIColor.systemBackground)]),
@@ -134,13 +140,13 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 	}
 
 	@ViewBuilder
-	private func imageView(size: CGFloat) -> some View {
+	private func imageView() -> some View {
 		let img = SmoothImage(
-			url: Config.getCoverUrl(id: coverArt, size: 512),
+			url: Config.getCoverUrl(id: coverArt, size: imageSizePx),
 			contentMode: .fill,
 			placeholderColor: Color(UIColor.systemGray6)
 		)
-		.frame(width: size, height: size)
+		.frame(width: imageSize, height: imageSize)
 
 		if imageShape == .circle {
 			img.clipShape(Circle())
