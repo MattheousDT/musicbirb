@@ -62,7 +62,6 @@ struct ArtistView: View {
 		}
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle("")
-		.toolbarBackground(.hidden, for: .navigationBar)
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(artistDetails?.name ?? "")

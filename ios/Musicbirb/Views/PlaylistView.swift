@@ -133,7 +133,6 @@ struct PlaylistView: View {
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle("")
-		.toolbarBackground(.hidden, for: .navigationBar)
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(playlistDetails?.name ?? "")

@@ -34,7 +34,6 @@ struct ContentView: View {
 						tabContent { SearchView() }
 							.tabItem { Label("Search", systemImage: "magnifyingglass") }
 					}
-					.toolbarBackground(.visible, for: .tabBar)
 				}
 			}
 		}

@@ -8,7 +8,7 @@ struct CurrentlyPlayingBar: View {
 
 	var body: some View {
 		if #available(iOS 26, *) {
-			content.background(.ultraThinMaterial)
+			content.background(.clear)
 		} else {
 			content.background(.bar).overlay(
 				Rectangle().frame(height: 0.3).foregroundColor(Color(UIColor.separator)), alignment: .top)

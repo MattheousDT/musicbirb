@@ -113,7 +113,6 @@ struct AlbumView: View {
 		}
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle("")
-		.toolbarBackground(.hidden, for: .navigationBar)
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(albumDetails?.title ?? "")
