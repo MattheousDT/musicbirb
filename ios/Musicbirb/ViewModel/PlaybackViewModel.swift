@@ -53,7 +53,7 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	func playAlbum(id: AlbumId, startIndex: UInt32 = 0) {
 		Task {
 			do {
-				try await coreManager?.core?.playAlbum(id: id, startIndex: startIndex)
+				let _ = try await coreManager?.core?.playAlbum(id: id, startIndex: startIndex)
 			} catch {
 				Log.app.error("Playback error: \(error)")
 				appRouter?.activeAlert = .generalError(error)
@@ -64,7 +64,7 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	func queueAlbum(id: AlbumId, next: Bool = true) {
 		Task {
 			do {
-				try await coreManager?.core?.queueAlbum(id: id, next: next)
+				let _ = try await coreManager?.core?.queueAlbum(id: id, next: next)
 			} catch {
 				Log.app.error("Playback error: \(error)")
 				appRouter?.activeAlert = .generalError(error)
@@ -75,7 +75,7 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	func playPlaylist(id: PlaylistId, startIndex: UInt32 = 0) {
 		Task {
 			do {
-				try await coreManager?.core?.playPlaylist(id: id, startIndex: startIndex)
+				let _ = try await coreManager?.core?.playPlaylist(id: id, startIndex: startIndex)
 			} catch {
 				Log.app.error("Playback error: \(error)")
 				appRouter?.activeAlert = .generalError(error)
@@ -86,7 +86,7 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	func queuePlaylist(id: PlaylistId, next: Bool = true) {
 		Task {
 			do {
-				try await coreManager?.core?.queuePlaylist(id: id, next: next)
+				let _ = try await coreManager?.core?.queuePlaylist(id: id, next: next)
 			} catch {
 				Log.app.error("Playback error: \(error)")
 				appRouter?.activeAlert = .generalError(error)

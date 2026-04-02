@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
     "%lld MB" : {
       "localizations" : {
         "ko" : {
@@ -598,6 +601,9 @@
         }
       }
     },
+    "Full Artwork Header" : {
+
+    },
     "General" : {
       "localizations" : {
         "ko" : {
@@ -647,6 +653,9 @@
           }
         }
       }
+    },
+    "Immersive Header" : {
+
     },
     "Integration" : {
       "localizations" : {

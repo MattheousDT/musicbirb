@@ -4,11 +4,16 @@ struct ArtistView: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
+	@Environment(\.colorScheme) private var colorScheme
+
 	let artistId: ArtistId
 	@State private var artistDetails: ArtistDetails?
 	@State private var isLoading = true
 	@State private var selectedAlbumId: AlbumId?
 	@State private var selectedSimilarArtistId: ArtistId?
+
+	@State private var artworkLoader = ArtworkColorLoader()
+	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
 		Group {
@@ -17,46 +22,74 @@ struct ArtistView: View {
 					.scaleEffect(1.5)
 					.frame(maxWidth: .infinity, maxHeight: .infinity)
 			} else if let artist = artistDetails {
-				ScrollView {
-					VStack(spacing: 0) {
-						HeroHeaderView(
-							coverArt: artist.coverArt,
-							title: artist.name,
-							subtitle: { EmptyView() },
-							meta: String(localized: "\(Int(artist.albumCount)) releases"),
-							description: artist.biography,
-							imageShape: .circle,
-							actions: { EmptyView() }
-						)
+				ZStack(alignment: .top) {
+					(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
+						.ignoresSafeArea()
 
-						if !artist.topSongs.isEmpty {
-							topSongsSection(artist)
-						}
+					ScrollView {
+						LazyVStack(spacing: 0) {
+							HeroHeaderView(
+								coverArt: artist.coverArt,
+								title: artist.name,
+								subtitle: { EmptyView() },
+								meta: String(localized: "\(Int(artist.albumCount)) releases"),
+								description: artist.biography,
+								imageShape: .circle,
+								actions: { EmptyView() },
+								artworkLoader: artworkLoader,
+							)
 
-						if !artist.albums.isEmpty {
-							releasesSection(artist)
-						}
+							if !artist.topSongs.isEmpty {
+								topSongsSection(artist)
+							}
 
-						if !artist.similarArtists.isEmpty {
-							similarArtistsSection(artist)
+							if !artist.albums.isEmpty {
+								releasesSection(artist)
+							}
+
+							if !artist.similarArtists.isEmpty {
+								similarArtistsSection(artist)
+							}
 						}
 					}
+					.ignoresSafeArea(edges: .top)
+					.coordinateSpace(name: "scroll")
+					.onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+						titleScrollOffset = value
+					}
 				}
-				.contentMargins(.horizontal, 0, for: .scrollContent)
 			}
 		}
-		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
+		.navigationTitle("")
+		.toolbarBackground(.hidden, for: .navigationBar)
+		.toolbar {
+			ToolbarItem(placement: .principal) {
+				Text(artistDetails?.name ?? "")
+					.font(.headline)
+					.opacity(titleScrollOffset < 0 ? 1 : 0)
+					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+			}
+		}
 		.navigationDestination(item: $selectedAlbumId) { id in
 			AlbumView(albumId: id)
 		}
 		.navigationDestination(item: $selectedSimilarArtistId) { id in
 			ArtistView(artistId: id)
 		}
+		.onChange(of: colorScheme) { _, newScheme in
+			artworkLoader.updateTheme(for: newScheme)
+		}
 		.task {
 			do {
 				let details = try await coreManager.core?.getProvider()
 					.artist().getArtistDetails(artistId: artistId)
+
+				if let cover = details?.coverArt {
+					await artworkLoader.load(
+						url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+				}
+
 				try? await Task.sleep(nanoseconds: 100_000_000)
 				withAnimation(.easeOut(duration: 0.3)) {
 					self.artistDetails = details

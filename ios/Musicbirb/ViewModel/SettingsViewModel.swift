@@ -62,6 +62,9 @@ class SettingsViewModel: @unchecked Sendable {
 	var showScrobbleMarker: Bool {
 		didSet { defaults.set(showScrobbleMarker, forKey: "showScrobbleMarker") }
 	}
+	var immersiveHeader: Bool {
+		didSet { defaults.set(immersiveHeader, forKey: "immersiveHeader") }
+	}
 
 	// General
 	var saveSearches: Bool { didSet { defaults.set(saveSearches, forKey: "saveSearches") } }
@@ -138,6 +141,7 @@ class SettingsViewModel: @unchecked Sendable {
 		self.showDirectories = defaults.object(forKey: "showDirectories") as? Bool ?? true
 		self.showAlbumDetail = defaults.object(forKey: "showAlbumDetail") as? Bool ?? true
 		self.showScrobbleMarker = defaults.object(forKey: "showScrobbleMarker") as? Bool ?? true
+		self.immersiveHeader = defaults.object(forKey: "immersiveHeader") as? Bool ?? true
 
 		self.saveSearches = defaults.object(forKey: "saveSearches") as? Bool ?? true
 		self.allowDuplicatesInPlaylists =

@@ -71,6 +71,8 @@
 		C90CEA952F7ED3EB00762DC5 /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA942F7ED3EB00762DC5 /* Notifications.swift */; };
 		C90CEA962F7ED3EB00762DC5 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */; };
 		C90CEA972F7ED3EB00762DC5 /* GlobalPresentationModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */; };
+		C90CEA9A2F7EDCA300762DC5 /* ArtworkColorLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */; };
+		C90CEA9B2F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */; };
 		D6943D632B115FDC551938C7 /* SafeAreaInsetsKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB77748EEF34BE4A81203FB /* SafeAreaInsetsKey.swift */; };
 		DE06783F479AE18618CC1E18 /* DownloadsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBEC38DD6376A93079AB448 /* DownloadsSettingsView.swift */; };
 		EDB2DE23D89EB57989FB1674 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49D12703ACFE1EB69BE172B7 /* PlaylistView.swift */; };
@@ -146,6 +148,8 @@
 		C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalPresentationModifier.swift; sourceTree = "<group>"; };
 		C90CEA942F7ED3EB00762DC5 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
+		C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkColorLoader.swift; sourceTree = "<group>"; };
+		C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollOffsetPreferenceKey.swift; sourceTree = "<group>"; };
 		CA40B953291768C2F7B12294 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		CB128C34B3A4D6C0720A8413 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		CB1A1BDA128173A7E126C84B /* PlayerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSheet.swift; sourceTree = "<group>"; };
@@ -196,6 +200,8 @@
 		2357BD4A712B6892C14FF5A3 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */,
+				C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */,
 				C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */,
 				C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */,
 				C90CEA942F7ED3EB00762DC5 /* Notifications.swift */,
@@ -443,6 +449,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C90CEA9A2F7EDCA300762DC5 /* ArtworkColorLoader.swift in Sources */,
+				C90CEA9B2F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift in Sources */,
 				8D6338F1E4107FCD1088A40F /* AccountSettingsView.swift in Sources */,
 				B808283FB1D37A518D530A17 /* AddToPlaylistSheet.swift in Sources */,
 				4D20ED385BFF61D348424858 /* AlbumGridItem.swift in Sources */,
