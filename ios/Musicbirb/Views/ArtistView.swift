@@ -153,9 +153,7 @@ struct ArtistView: View {
 	}
 
 	private func playTopTrack(_ index: Int) {
-		Task {
-			_ = try? await coreManager.core?.playTracks(
-				ids: artistDetails!.topSongs.map { $0.id }, startIndex: UInt32(index))
-		}
+		playbackViewModel.playTracks(
+			ids: artistDetails!.topSongs.map { $0.id }, startIndex: UInt32(index))
 	}
 }

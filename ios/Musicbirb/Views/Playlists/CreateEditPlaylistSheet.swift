@@ -76,7 +76,7 @@ struct CreateEditPlaylistSheet: View {
 
 				isSaving = false
 				NotificationCenter.default.post(
-					name: NSNotification.Name("Musicbirb.PlaylistChanged"), object: nil)
+					name: .playlistChanged, object: nil)
 				onComplete?()
 				dismiss()
 			} catch {

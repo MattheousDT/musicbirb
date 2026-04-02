@@ -4,11 +4,7 @@ struct ContentView: View {
 	@Environment(AuthViewModel.self) private var authViewModel
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(SettingsViewModel.self) private var settings
-
-	@State private var trackForPlaylist: Track?
-	@State private var albumForPlaylist: Album?
-	@State private var isProcessingPlaylist: Bool = false
-	@State private var duplicateAlertCount: UInt32?
+	@Environment(AppRouter.self) private var router
 
 	var body: some View {
 		ZStack {
@@ -42,59 +38,26 @@ struct ContentView: View {
 				}
 			}
 		}
+		.globalPresentation()
 		.environment(\.openAddToPlaylist) { track in
-			self.trackForPlaylist = track
+			router.activeSheet = .addToPlaylist(trackIds: [track.id], albumId: nil)
 		}
 		.environment(\.openAddAlbumToPlaylist) { album in
-			self.albumForPlaylist = album
-		}
-		.sheet(item: $trackForPlaylist) { track in
-			AddToPlaylistSheet(trackIds: [track.id], albumId: nil) { skipped in
-				if skipped > 0 { duplicateAlertCount = skipped }
-				isProcessingPlaylist = false
-			} onProcessing: { processing in
-				isProcessingPlaylist = processing
-			}
-			.presentationDragIndicator(.visible)
-		}
-		.sheet(item: $albumForPlaylist) { album in
-			AddToPlaylistSheet(trackIds: nil, albumId: album.id) { skipped in
-				if skipped > 0 { duplicateAlertCount = skipped }
-				isProcessingPlaylist = false
-			} onProcessing: { processing in
-				isProcessingPlaylist = processing
-			}
-			.presentationDragIndicator(.visible)
-		}
-		.alert(
-			"Tracks Skipped",
-			isPresented: Binding(
-				get: { duplicateAlertCount != nil },
-				set: { if !$0 { duplicateAlertCount = nil } }
-			)
-		) {
-			Button("OK", role: .cancel) {}
-		} message: {
-			Text(
-				"\(duplicateAlertCount ?? 0) tracks were skipped because they are already in the playlist. You can change this behavior in Settings."
-			)
-		}
-		.overlay {
-			if isProcessingPlaylist {
-				ProgressHUD(title: "Adding to Playlist...")
-			}
-		}
-		.sheet(
-			isPresented: Binding(
-				get: { playbackViewModel.showPlayerSheet }, set: { playbackViewModel.showPlayerSheet = $0 }
-			)
-		) {
-			PlayerSheet().presentationDragIndicator(.visible)
-		}
-		.fullScreenCover(isPresented: Bindable(authViewModel).showLogin) {
-			LoginView()
+			router.activeSheet = .addToPlaylist(trackIds: nil, albumId: album.id)
 		}
 		.preferredColorScheme(settings.theme.colorScheme)
+		.onChange(of: playbackViewModel.showPlayerSheet) { _, show in
+			if show {
+				router.activeSheet = .player
+			} else if router.activeSheet?.id == "player" {
+				router.dismissSheet()
+			}
+		}
+		.onChange(of: router.activeSheet?.id) { _, sheetId in
+			if sheetId != "player" && playbackViewModel.showPlayerSheet {
+				playbackViewModel.showPlayerSheet = false
+			}
+		}
 	}
 
 	@ViewBuilder
@@ -116,7 +79,7 @@ struct ContentView: View {
 
 	private var playBarButton: some View {
 		Button(action: {
-			if playbackViewModel.currentTrack != nil { playbackViewModel.showPlayerSheet = true }
+			if playbackViewModel.currentTrack != nil { router.activeSheet = .player }
 		}) {
 			CurrentlyPlayingBar()
 		}

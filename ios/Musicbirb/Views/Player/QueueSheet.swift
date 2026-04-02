@@ -3,6 +3,7 @@ import SwiftUI
 struct QueueSheet: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
+	@Environment(AppRouter.self) private var router
 	@Environment(\.dismiss) private var dismiss
 	@State private var editMode: EditMode = .inactive
 
@@ -113,9 +114,8 @@ struct QueueSheet: View {
 	private func clearQueue() {
 		try? coreManager.core?.clearQueue()
 
-		var transaction = Transaction()
-		transaction.disablesAnimations = true
-		withTransaction(transaction) {
+		withTransaction(Transaction()) {
+			router.dismissSheet()
 			playbackViewModel.showPlayerSheet = false
 		}
 

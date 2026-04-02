@@ -178,7 +178,7 @@ struct AddToPlaylistSheet: View {
 					playlistPresence[playlist.id] = false
 				}
 				NotificationCenter.default.post(
-					name: NSNotification.Name("Musicbirb.PlaylistChanged"), object: nil)
+					name: .playlistChanged, object: nil)
 			} catch {
 				Log.app.error("Failed to toggle playlist: \(error)")
 			}

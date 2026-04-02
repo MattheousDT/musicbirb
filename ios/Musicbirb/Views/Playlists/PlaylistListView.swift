@@ -41,7 +41,7 @@ struct PlaylistListView: View {
 			await loadPlaylists()
 		}
 		.onReceive(
-			NotificationCenter.default.publisher(for: NSNotification.Name("Musicbirb.PlaylistChanged"))
+			NotificationCenter.default.publisher(for: .playlistChanged)
 		) { _ in
 			Task { await loadPlaylists() }
 		}

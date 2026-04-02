@@ -156,10 +156,8 @@ struct SearchView: View {
 	}
 
 	private func playTrack(_ track: Track, from tracks: [Track]) {
-		Task {
-			let index = tracks.firstIndex(where: { $0.id == track.id }) ?? 0
-			_ = try? await coreManager.core?.playTracks(
-				ids: tracks.map { $0.id }, startIndex: UInt32(index))
-		}
+		let index = tracks.firstIndex(where: { $0.id == track.id }) ?? 0
+		playbackViewModel.playTracks(
+			ids: tracks.map { $0.id }, startIndex: UInt32(index))
 	}
 }

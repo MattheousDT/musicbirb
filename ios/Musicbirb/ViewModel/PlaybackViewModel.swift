@@ -8,6 +8,7 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 	var queue: [Track] = []
 	var showPlayerSheet: Bool = false
 	var coreManager: CoreManager?
+	var appRouter: AppRouter?
 
 	private let remoteCommandManager = RemoteCommandManager()
 
@@ -28,8 +29,9 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 
 	init() {}
 
-	func setup(coreManager: CoreManager) {
+	func setup(coreManager: CoreManager, appRouter: AppRouter) {
 		self.coreManager = coreManager
+		self.appRouter = appRouter
 		if let core = coreManager.core {
 			self.remoteCommandManager.setup(core: core)
 		}
@@ -43,6 +45,63 @@ class PlaybackViewModel: StateObserver, @unchecked Sendable {
 			queue: .main
 		) { [weak self] _ in
 			self?.handleAppResumed()
+		}
+	}
+
+	// MARK: - Playback Commands
+
+	func playAlbum(id: AlbumId, startIndex: UInt32 = 0) {
+		Task {
+			do {
+				try await coreManager?.core?.playAlbum(id: id, startIndex: startIndex)
+			} catch {
+				Log.app.error("Playback error: \(error)")
+				appRouter?.activeAlert = .generalError(error)
+			}
+		}
+	}
+
+	func queueAlbum(id: AlbumId, next: Bool = true) {
+		Task {
+			do {
+				try await coreManager?.core?.queueAlbum(id: id, next: next)
+			} catch {
+				Log.app.error("Playback error: \(error)")
+				appRouter?.activeAlert = .generalError(error)
+			}
+		}
+	}
+
+	func playPlaylist(id: PlaylistId, startIndex: UInt32 = 0) {
+		Task {
+			do {
+				try await coreManager?.core?.playPlaylist(id: id, startIndex: startIndex)
+			} catch {
+				Log.app.error("Playback error: \(error)")
+				appRouter?.activeAlert = .generalError(error)
+			}
+		}
+	}
+
+	func queuePlaylist(id: PlaylistId, next: Bool = true) {
+		Task {
+			do {
+				try await coreManager?.core?.queuePlaylist(id: id, next: next)
+			} catch {
+				Log.app.error("Playback error: \(error)")
+				appRouter?.activeAlert = .generalError(error)
+			}
+		}
+	}
+
+	func playTracks(ids: [TrackId], startIndex: UInt32 = 0) {
+		Task {
+			do {
+				try await coreManager?.core?.playTracks(ids: ids, startIndex: startIndex)
+			} catch {
+				Log.app.error("Playback error: \(error)")
+				appRouter?.activeAlert = .generalError(error)
+			}
 		}
 	}
 

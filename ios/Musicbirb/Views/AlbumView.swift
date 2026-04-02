@@ -111,20 +111,14 @@ struct AlbumView: View {
 	}
 
 	private func playAlbum() {
-		Task {
-			_ = try? await coreManager.core?.playAlbum(id: albumId, startIndex: 0)
-		}
+		playbackViewModel.playAlbum(id: albumId, startIndex: 0)
 	}
 
 	private func playAlbumNext() {
-		Task {
-			_ = try? await coreManager.core?.queueAlbum(id: albumId, next: true)
-		}
+		playbackViewModel.queueAlbum(id: albumId, next: true)
 	}
 
 	private func playTrack(index: Int) {
-		Task {
-			_ = try? await coreManager.core?.playAlbum(id: albumId, startIndex: UInt32(index))
-		}
+		playbackViewModel.playAlbum(id: albumId, startIndex: UInt32(index))
 	}
 }

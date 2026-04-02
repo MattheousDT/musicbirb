@@ -173,7 +173,7 @@ struct PlaylistView: View {
 				try await core.replacePlaylistTracks(id: playlistId, trackIds: newIds)
 				originalSongIds = newIds
 				NotificationCenter.default.post(
-					name: NSNotification.Name("Musicbirb.PlaylistChanged"), object: nil)
+					name: .playlistChanged, object: nil)
 				isSaving = false
 			} catch {
 				Log.app.error("Failed to sync playlist: \(error)")
@@ -191,7 +191,7 @@ struct PlaylistView: View {
 			do {
 				try await core.deletePlaylist(id: playlistId)
 				NotificationCenter.default.post(
-					name: NSNotification.Name("Musicbirb.PlaylistChanged"), object: nil)
+					name: .playlistChanged, object: nil)
 				isSaving = false
 				dismiss()
 			} catch {
@@ -206,20 +206,14 @@ struct PlaylistView: View {
 	}
 
 	private func playPlaylist() {
-		Task {
-			_ = try? await coreManager.core?.playPlaylist(id: playlistId, startIndex: 0)
-		}
+		playbackViewModel.playPlaylist(id: playlistId, startIndex: 0)
 	}
 
 	private func playPlaylistNext() {
-		Task {
-			_ = try? await coreManager.core?.queuePlaylist(id: playlistId, next: true)
-		}
+		playbackViewModel.queuePlaylist(id: playlistId, next: true)
 	}
 
 	private func playTrack(index: Int) {
-		Task {
-			_ = try? await coreManager.core?.playPlaylist(id: playlistId, startIndex: UInt32(index))
-		}
+		playbackViewModel.playPlaylist(id: playlistId, startIndex: UInt32(index))
 	}
 }

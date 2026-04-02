@@ -17,6 +17,7 @@ struct MusicbirbApp: App {
 				.environment(appEnv.playbackViewModel)
 				.environment(appEnv.authViewModel)
 				.environment(appEnv.settingsViewModel)
+				.environment(appEnv.appRouter)
 				.onAppear {
 					// Inject the view model into the static config helper
 					Config.coreManager = appEnv.coreManager
