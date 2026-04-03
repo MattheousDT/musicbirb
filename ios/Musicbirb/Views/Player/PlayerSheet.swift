@@ -100,7 +100,7 @@ struct PlayerSheet: View {
 														style: .continuous)
 												)
 												.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
-												.transition(.scale(scale: 0.95).combined(with: .opacity))
+												.transition(.opacity)
 										} else {
 											RoundedRectangle(cornerRadius: 24 * settings.cornerRounding.multiplier)
 												.fill(Color.primary.opacity(0.05))

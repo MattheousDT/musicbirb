@@ -79,8 +79,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 								)
 							)
 							.shadow(color: .black.opacity(0.3), radius: 16, y: 10)
-							.transition(
-								.scale(scale: 0.9).combined(with: .opacity).animation(.easeOut(duration: 0.5)))
+							.transition(.opacity.animation(.easeOut(duration: 0.6)))
 					} else {
 						// Placeholder matching the layout footprint
 						Rectangle()
