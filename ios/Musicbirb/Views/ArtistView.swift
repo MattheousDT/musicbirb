@@ -1,3 +1,4 @@
+import SwiftQuery
 import SwiftUI
 
 struct ArtistView: View {
@@ -8,21 +9,18 @@ struct ArtistView: View {
 	@Environment(\.displayScale) private var displayScale
 
 	let artistId: ArtistId
-	@State private var artistDetails: ArtistDetails?
-	@State private var isLoading = true
+
+	@UseQuery<ArtistDetails> var artistDetails
+	@UseQuery<ArtworkResult> var artworkData
+
 	@State private var selectedAlbumId: AlbumId?
 	@State private var selectedSimilarArtistId: ArtistId?
-
 	@State private var artworkLoader = ArtworkColorLoader()
 	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
 		Group {
-			if isLoading {
-				ProgressView()
-					.scaleEffect(1.5)
-					.frame(maxWidth: .infinity, maxHeight: .infinity)
-			} else if let artist = artistDetails {
+			Boundary($artistDetails) { artist in
 				ZStack(alignment: .top) {
 					(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
 						.ignoresSafeArea()
@@ -61,6 +59,21 @@ struct ArtistView: View {
 						titleScrollOffset = value
 					}
 				}
+				.query(
+					$artworkData, queryKey: ["artists", artistId, "artwork"],
+					options: QueryOptions(staleTime: .infinity)
+				) {
+					guard let cover = artist.coverArt else { throw CancellationError() }
+					let size =
+						horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+					guard let url = Config.getCoverUrl(id: cover, size: size) else { throw URLError(.badURL) }
+					return try await ArtworkService.fetchAndExtract(url: url)
+				}
+				.task(id: artworkData) {
+					if let result = artworkData {
+						artworkLoader.apply(result: result, scheme: colorScheme)
+					}
+				}
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
@@ -82,29 +95,8 @@ struct ArtistView: View {
 		.onChange(of: colorScheme) { _, newScheme in
 			artworkLoader.updateTheme(for: newScheme)
 		}
-		.task {
-			do {
-				let details = try await coreManager.core?.getProvider()
-					.artist().getArtistDetails(artistId: artistId)
-
-				if let cover = details?.coverArt {
-					await artworkLoader.load(
-						url: Config.getCoverUrl(
-							id: cover,
-							size:
-								horizontalSizeClass == .regular
-								? 800 : Int(UIScreen.main.bounds.width * displayScale)), scheme: colorScheme)
-				}
-
-				try? await Task.sleep(nanoseconds: 100_000_000)
-				withAnimation(.easeOut(duration: 0.3)) {
-					self.artistDetails = details
-					self.isLoading = false
-				}
-			} catch {
-				Log.app.error("Artist error: \(error)")
-				self.isLoading = false
-			}
+		.query($artistDetails, queryKey: ["artists", artistId], options: QueryOptions(staleTime: 300)) {
+			try await coreManager.core!.getProvider().artist().getArtistDetails(artistId: artistId)
 		}
 	}
 
@@ -127,10 +119,12 @@ struct ArtistView: View {
 					id: \.element.id
 				) { index, track in
 					TrackItemRow(
-						track: track, index: index + 1, isActive: isPlaying(track),
+						track: track, index: index + 1,
+						isActive: playbackViewModel.currentTrack?.id == track.id,
 						accentColor: artworkLoader.primaryColor
 					) {
-						playTopTrack(index)
+						playbackViewModel.playTracks(
+							ids: artist.topSongs.map { $0.id }, startIndex: UInt32(index))
 					}
 					.environment(\.trackRowSubtitle, .album)
 					.environment(\.trackRowHorizontalPadding, 20)
@@ -188,14 +182,5 @@ struct ArtistView: View {
 			.scrollTargetBehavior(.viewAligned)
 		}
 		.padding(.bottom, 32)
-	}
-
-	private func isPlaying(_ track: Track) -> Bool {
-		return playbackViewModel.currentTrack?.id == track.id
-	}
-
-	private func playTopTrack(_ index: Int) {
-		playbackViewModel.playTracks(
-			ids: artistDetails!.topSongs.map { $0.id }, startIndex: UInt32(index))
 	}
 }

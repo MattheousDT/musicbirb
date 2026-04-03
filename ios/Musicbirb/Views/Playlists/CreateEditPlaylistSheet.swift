@@ -1,16 +1,16 @@
+import SwiftQuery
 import SwiftUI
 
 struct CreateEditPlaylistSheet: View {
 	var existingPlaylist: PlaylistDetails?
-	var onComplete: (() -> Void)? = nil
 
 	@Environment(\.dismiss) private var dismiss
 	@Environment(CoreManager.self) private var coreManager
+	@UseMutation var saveMutation
 
 	@State private var name: String = ""
 	@State private var description: String = ""
 	@State private var isPublic: Bool = false
-	@State private var isSaving = false
 
 	var isEditing: Bool { existingPlaylist != nil }
 
@@ -33,13 +33,14 @@ struct CreateEditPlaylistSheet: View {
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
 					Button("Cancel") { dismiss() }
-						.disabled(isSaving)
+						.disabled(saveMutation.isLoading)
 				}
 				ToolbarItem(placement: .confirmationAction) {
 					Button("Save") {
-						savePlaylist()
+						performSave()
 					}
-					.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+					.disabled(
+						name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saveMutation.isLoading)
 				}
 			}
 			.onAppear {
@@ -50,38 +51,41 @@ struct CreateEditPlaylistSheet: View {
 				}
 			}
 			.overlay {
-				if isSaving {
+				if saveMutation.isLoading {
 					ProgressHUD(title: "Saving...")
 				}
 			}
 		}
 	}
 
-	private func savePlaylist() {
-		isSaving = true
-		Task {
-			do {
-				let core = coreManager.core
-				let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-				let descOpt =
-					description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
+	private func performSave() {
+		let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+		let descOpt =
+			description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
+		let pid = existingPlaylist?.id
 
-				if let pl = existingPlaylist {
-					try await core?.updatePlaylist(
-						id: pl.id, name: cleanName, description: descOpt, isPublic: isPublic)
+		Task {
+			await saveMutation.asyncPerform {
+				if let id = pid {
+					try await coreManager.core?.updatePlaylist(
+						id: id, name: cleanName, description: descOpt, isPublic: isPublic)
 				} else {
-					_ = try await core?.createPlaylist(
+					_ = try await coreManager.core?.createPlaylist(
 						name: cleanName, description: descOpt, isPublic: isPublic)
 				}
+			} onCompleted: { client in
+				Task {
+					await client.invalidate(["playlists"])
 
-				isSaving = false
-				NotificationCenter.default.post(
-					name: .playlistChanged, object: nil)
-				onComplete?()
-				dismiss()
-			} catch {
-				Log.app.error("Failed to save playlist: \(error)")
-				isSaving = false
+					if let id = pid {
+						await client.invalidate(["playlists", id])
+						await client.invalidate(["playlists", id, "artwork"])
+					}
+
+					await MainActor.run {
+						dismiss()
+					}
+				}
 			}
 		}
 	}

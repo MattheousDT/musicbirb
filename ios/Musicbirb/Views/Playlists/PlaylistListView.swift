@@ -1,27 +1,29 @@
+import SwiftQuery
 import SwiftUI
 
 struct PlaylistListView: View {
 	@Environment(CoreManager.self) private var coreManager
-	@Environment(AuthViewModel.self) private var authViewModel
-	@State private var playlists: [Playlist] = []
-	@State private var isLoading = true
+	@UseQuery<[Playlist]> var playlists
 	@State private var showCreateSheet = false
 
 	var body: some View {
-		Group {
-			if isLoading {
-				ProgressView()
-			} else if playlists.isEmpty {
-				ContentUnavailableView("No Playlists", systemImage: "music.note.list")
-			} else {
-				List(playlists) { playlist in
-					NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
-						PlaylistItem(playlist: playlist)
+		Boundary($playlists) { items in
+			Group {
+				if items.isEmpty {
+					ContentUnavailableView("No Playlists", systemImage: "music.note.list")
+				} else {
+					List(items) { playlist in
+						NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
+							PlaylistItem(playlist: playlist)
+						}
+						.listRowInsets(EdgeInsets())
 					}
-					.listRowInsets(EdgeInsets())
+					.listStyle(.plain)
 				}
-				.listStyle(.plain)
 			}
+		}
+		.query($playlists, queryKey: ["playlists"], options: QueryOptions(staleTime: 300)) {
+			try await coreManager.core!.getProvider().playlist().getPlaylists()
 		}
 		.navigationTitle("Playlists")
 		.toolbar {
@@ -32,28 +34,8 @@ struct PlaylistListView: View {
 			}
 		}
 		.sheet(isPresented: $showCreateSheet) {
-			CreateEditPlaylistSheet {
-				Task { await loadPlaylists() }
-			}
-			.presentationDetents([.medium])
+			CreateEditPlaylistSheet()
+				.presentationDetents([.medium])
 		}
-		.task {
-			await loadPlaylists()
-		}
-		.onReceive(
-			NotificationCenter.default.publisher(for: .playlistChanged)
-		) { _ in
-			Task { await loadPlaylists() }
-		}
-	}
-
-	private func loadPlaylists() async {
-		isLoading = true
-		do {
-			playlists = try await coreManager.core?.getProvider().playlist().getPlaylists() ?? []
-		} catch {
-			Log.app.error("Failed to load library playlists: \(error)")
-		}
-		isLoading = false
 	}
 }

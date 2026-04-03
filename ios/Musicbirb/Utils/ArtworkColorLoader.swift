@@ -1,53 +1,33 @@
 import CoreImage
 import SwiftUI
 
-@Observable
-public class ArtworkColorLoader {
-	public var image: UIImage?
-	private var rawBackground: Color?
-	private var rawAccent: Color?
+public struct ArtworkResult: @unchecked Sendable, Equatable {
+	public let image: UIImage
+	public let rawBackground: Color
+	public let rawAccent: Color
 
-	public var backgroundColor: Color?
-	public var primaryColor: Color?
+	public static func == (lhs: ArtworkResult, rhs: ArtworkResult) -> Bool {
+		// Fast pointer comparison for cache hits
+		lhs.image === rhs.image
+	}
+}
 
-	public init() {}
+public enum ArtworkService {
+	public static func fetchAndExtract(url: URL) async throws -> ArtworkResult {
+		let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad)
+		let (data, _) = try await URLSession.shared.data(for: request)
 
-	@MainActor
-	public func updateTheme(for scheme: ColorScheme) {
-		guard let bg = rawBackground, let acc = rawAccent else { return }
-		withAnimation(.easeInOut(duration: 0.6)) {
-			self.backgroundColor = bg.adaptiveBackground(for: scheme)
-			self.primaryColor = acc.adaptiveAccent(against: self.backgroundColor ?? .black)
+		guard let uiImage = UIImage(data: data) else {
+			throw URLError(.cannotDecodeRawData)
 		}
+
+		return await Task.detached {
+			let extracted = extractColors(from: uiImage)
+			return ArtworkResult(image: uiImage, rawBackground: extracted.bg, rawAccent: extracted.accent)
+		}.value
 	}
 
-	@MainActor
-	public func load(url: URL?, scheme: ColorScheme) async {
-		guard let url = url else { return }
-
-		do {
-			let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad)
-			let (data, _) = try await URLSession.shared.data(for: request)
-			guard let uiImage = UIImage(data: data) else { return }
-
-			Task.detached {
-				let extracted = self.extractColors(from: uiImage)
-				await MainActor.run {
-					// Use withAnimation so the image and initial colors fade in gracefully
-					withAnimation(.easeInOut(duration: 0.6)) {
-						self.image = uiImage
-						self.rawBackground = extracted.bg
-						self.rawAccent = extracted.accent
-						self.updateTheme(for: scheme)
-					}
-				}
-			}
-		} catch {
-			Log.app.error("Artwork load error: \(error)")
-		}
-	}
-
-	private func extractColors(from image: UIImage) -> (bg: Color, accent: Color) {
+	private static func extractColors(from image: UIImage) -> (bg: Color, accent: Color) {
 		guard let cgImage = image.cgImage else { return (.black, .accentColor) }
 
 		let width = CGFloat(cgImage.width)
@@ -65,9 +45,9 @@ public class ArtworkColorLoader {
 		return (bg, accent)
 	}
 
-	private func getDominantColor(from cgImage: CGImage, rect: CGRect, weightBySaturation: Bool)
-		-> Color?
-	{
+	private static func getDominantColor(
+		from cgImage: CGImage, rect: CGRect, weightBySaturation: Bool
+	) -> Color? {
 		guard let cropped = cgImage.cropping(to: rect) else { return nil }
 
 		let w = 64
@@ -144,6 +124,37 @@ public class ArtworkColorLoader {
 			green: (gSums[bestKey]! / totalWeight) / 255.0,
 			blue: (bSums[bestKey]! / totalWeight) / 255.0
 		)
+	}
+}
+
+@Observable
+public class ArtworkColorLoader {
+	public var image: UIImage?
+	private var rawBackground: Color?
+	private var rawAccent: Color?
+
+	public var backgroundColor: Color?
+	public var primaryColor: Color?
+
+	public init() {}
+
+	@MainActor
+	public func apply(result: ArtworkResult, scheme: ColorScheme) {
+		withAnimation(.easeInOut(duration: 0.6)) {
+			self.image = result.image
+			self.rawBackground = result.rawBackground
+			self.rawAccent = result.rawAccent
+			self.updateTheme(for: scheme)
+		}
+	}
+
+	@MainActor
+	public func updateTheme(for scheme: ColorScheme) {
+		guard let bg = rawBackground, let acc = rawAccent else { return }
+		withAnimation(.easeInOut(duration: 0.6)) {
+			self.backgroundColor = bg.adaptiveBackground(for: scheme)
+			self.primaryColor = acc.adaptiveAccent(against: self.backgroundColor ?? .black)
+		}
 	}
 }
 

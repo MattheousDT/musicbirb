@@ -68,11 +68,12 @@
 		C74B43499FA762A786546990 /* AlbumListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FED6657CF286BD535EE677E /* AlbumListItem.swift */; };
 		C81476EF006C9CA1AE75E6CC /* musicbirb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F20B742F64CD436FD2BE42 /* musicbirb.swift */; };
 		C90CEA912F7D7E2A00762DC5 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = C90CEA902F7D7E2A00762DC5 /* Localizable.xcstrings */; };
-		C90CEA952F7ED3EB00762DC5 /* Notifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA942F7ED3EB00762DC5 /* Notifications.swift */; };
 		C90CEA962F7ED3EB00762DC5 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */; };
 		C90CEA972F7ED3EB00762DC5 /* GlobalPresentationModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */; };
 		C90CEA9A2F7EDCA300762DC5 /* ArtworkColorLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */; };
 		C90CEA9B2F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */; };
+		C90CEAA42F802FA800762DC5 /* SwiftQuery in Frameworks */ = {isa = PBXBuildFile; productRef = C90CEAA32F802FA800762DC5 /* SwiftQuery */; };
+		C90CEAA82F80347900762DC5 /* SwiftQuery+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C90CEAA72F80347900762DC5 /* SwiftQuery+Extensions.swift */; };
 		D6943D632B115FDC551938C7 /* SafeAreaInsetsKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB77748EEF34BE4A81203FB /* SafeAreaInsetsKey.swift */; };
 		DE06783F479AE18618CC1E18 /* DownloadsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBEC38DD6376A93079AB448 /* DownloadsSettingsView.swift */; };
 		EDB2DE23D89EB57989FB1674 /* PlaylistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49D12703ACFE1EB69BE172B7 /* PlaylistView.swift */; };
@@ -147,9 +148,9 @@
 		C90CEA902F7D7E2A00762DC5 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalPresentationModifier.swift; sourceTree = "<group>"; };
-		C90CEA942F7ED3EB00762DC5 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
 		C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkColorLoader.swift; sourceTree = "<group>"; };
 		C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollOffsetPreferenceKey.swift; sourceTree = "<group>"; };
+		C90CEAA72F80347900762DC5 /* SwiftQuery+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwiftQuery+Extensions.swift"; sourceTree = "<group>"; };
 		CA40B953291768C2F7B12294 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		CB128C34B3A4D6C0720A8413 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		CB1A1BDA128173A7E126C84B /* PlayerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSheet.swift; sourceTree = "<group>"; };
@@ -173,6 +174,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				271BDAA3445103C8B032C23E /* musicbirb.xcframework in Frameworks */,
+				C90CEAA42F802FA800762DC5 /* SwiftQuery in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -200,11 +202,11 @@
 		2357BD4A712B6892C14FF5A3 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				C90CEAA72F80347900762DC5 /* SwiftQuery+Extensions.swift */,
 				C90CEA982F7EDCA300762DC5 /* ArtworkColorLoader.swift */,
 				C90CEA992F7EDCA300762DC5 /* ScrollOffsetPreferenceKey.swift */,
 				C90CEA922F7ED3EB00762DC5 /* AppRouter.swift */,
 				C90CEA932F7ED3EB00762DC5 /* GlobalPresentationModifier.swift */,
-				C90CEA942F7ED3EB00762DC5 /* Notifications.swift */,
 				9B221D557BC59AC8DAC81977 /* KeychainHelper.swift */,
 				ABA19A2BE2E0B4E8705B7B07 /* Log.swift */,
 				C69B276F5986023E8F506663 /* ModelExtensions.swift */,
@@ -362,10 +364,12 @@
 			buildRules = (
 			);
 			dependencies = (
+				C90CEAA62F80305C00762DC5 /* PBXTargetDependency */,
 				C90CEA8D2F7D7CC800762DC5 /* PBXTargetDependency */,
 			);
 			name = Musicbirb;
 			packageProductDependencies = (
+				C90CEAA32F802FA800762DC5 /* SwiftQuery */,
 			);
 			productName = Musicbirb;
 			productReference = 074D18E6C96C79E86092DBA8 /* Musicbirb.app */;
@@ -395,6 +399,9 @@
 			);
 			mainGroup = FE1EB79BCA94D1FB7B256F5D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6E1ED4D9EE87BE15A7675B97 /* Products */;
 			projectDirPath = "";
@@ -466,6 +473,7 @@
 				1943C993C4F3E6AA968901EF /* CreateEditPlaylistSheet.swift in Sources */,
 				9B6DBB8CA2837B1477FD311A /* CurrentlyPlayingBar.swift in Sources */,
 				A7F6EE1FC33FE9510C18CB2E /* DataUsageSettingsView.swift in Sources */,
+				C90CEAA82F80347900762DC5 /* SwiftQuery+Extensions.swift in Sources */,
 				DE06783F479AE18618CC1E18 /* DownloadsSettingsView.swift in Sources */,
 				27E99FA2EFABC630FABB8419 /* GeneralSettingsView.swift in Sources */,
 				29D5A45169DB5D6339432B97 /* HeroActionButton.swift in Sources */,
@@ -485,7 +493,6 @@
 				F0854021DA020B30E7637681 /* PlayerSheet.swift in Sources */,
 				31F8FDD0C30D8691C5D2533A /* PlaylistActionEnvironment.swift in Sources */,
 				0194837E451FB38DEC66B858 /* PlaylistItem.swift in Sources */,
-				C90CEA952F7ED3EB00762DC5 /* Notifications.swift in Sources */,
 				C90CEA962F7ED3EB00762DC5 /* AppRouter.swift in Sources */,
 				C90CEA972F7ED3EB00762DC5 /* GlobalPresentationModifier.swift in Sources */,
 				72E61F4E03BCC048055E9A98 /* PlaylistListView.swift in Sources */,
@@ -511,6 +518,10 @@
 			isa = PBXTargetDependency;
 			target = C90CEA872F7D7C4200762DC5 /* RustBuild */;
 			targetProxy = C90CEA8C2F7D7CC800762DC5 /* PBXContainerItemProxy */;
+		};
+		C90CEAA62F80305C00762DC5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = C90CEAA52F80305C00762DC5 /* SwiftQuery */;
 		};
 /* End PBXTargetDependency section */
 
@@ -733,6 +744,30 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/MattheousDT/swift-query";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C90CEAA32F802FA800762DC5 /* SwiftQuery */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */;
+			productName = SwiftQuery;
+		};
+		C90CEAA52F80305C00762DC5 /* SwiftQuery */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */;
+			productName = SwiftQuery;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EDC4AD04E3E411D0CC495BAE /* Project object */;
 }

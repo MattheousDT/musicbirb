@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftQuery
 
 struct PlayerSheet: View {
 	@Environment(CoreManager.self) private var coreManager
@@ -8,6 +9,8 @@ struct PlayerSheet: View {
 	@Environment(\.displayScale) private var displayScale
 	@Environment(\.colorScheme) private var colorScheme
 
+	@UseQuery<ArtworkResult> var artworkData
+
 	@State private var isSeeking = false
 	@State private var sliderValue: Double = 0.0
 	@State private var targetSeekTime: Double? = nil
@@ -15,11 +18,7 @@ struct PlayerSheet: View {
 
 	@State private var artworkLoader = ArtworkColorLoader()
 
-	private var isImmersive: Bool {
-		// Hardcoded for now because I don't like immersive mode in the player that much
-		false
-		// settings.immersiveHeader
-	}
+	private var isImmersive: Bool { false }
 
 	var body: some View {
 		NavigationStack {
@@ -40,7 +39,7 @@ struct PlayerSheet: View {
 						.overlay(Color.black.opacity(colorScheme == .light ? 0.0 : 0.2))
 						.mask(
 							LinearGradient(
-								stops: [
+								stops:[
 									.init(color: .black, location: 0.0),
 									.init(color: .clear, location: 1.0),
 								],
@@ -57,8 +56,6 @@ struct PlayerSheet: View {
 					let screenWidth = geometry.size.width
 
 					ZStack(alignment: .top) {
-
-						// --- IMMERSIVE ARTWORK ---
 						if isImmersive {
 							if let image = artworkLoader.image {
 								Image(uiImage: image)
@@ -68,7 +65,7 @@ struct PlayerSheet: View {
 									.clipped()
 									.mask(
 										LinearGradient(
-											stops: [
+											stops:[
 												.init(color: .black, location: 0.8),
 												.init(color: .clear, location: 1.0),
 											],
@@ -81,11 +78,8 @@ struct PlayerSheet: View {
 							}
 						}
 
-						// --- UI LAYER ---
 						VStack(spacing: 0) {
-
 							if !isImmersive {
-								// --- NORMAL MODE ARTWORK (Flexible & Auto-Centering) ---
 								VStack(spacing: 0) {
 									Spacer(minLength: 24)
 
@@ -112,12 +106,8 @@ struct PlayerSheet: View {
 									Spacer(minLength: 24)
 								}
 								.frame(maxWidth: .infinity, maxHeight: .infinity)
-
 							} else {
-								// --- IMMERSIVE MODE SPACER ---
-								Spacer()
-									.frame(minHeight: screenWidth * 0.65)
-									.layoutPriority(-1)
+								Spacer().frame(minHeight: screenWidth * 0.65).layoutPriority(-1)
 							}
 
 							// --- BOTTOM CONTROLS SECTION ---
@@ -148,11 +138,7 @@ struct PlayerSheet: View {
 											Slider(
 												value: Binding(
 													get: {
-														let rawValue =
-															isSeeking
-															? sliderValue
-															: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs
-																?? 0.0)
+														let rawValue = isSeeking ? sliderValue : (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
 														return min(max(rawValue, 0.0), trackDuration)
 													},
 													set: { sliderValue = $0 }
@@ -163,17 +149,13 @@ struct PlayerSheet: View {
 													if !editing {
 														targetSeekTime = sliderValue
 														try? coreManager.core?.seek(seconds: sliderValue)
-														DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-															targetSeekTime = nil
-														}
+														DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { targetSeekTime = nil }
 													}
 												}
 											)
 											.tint(artworkLoader.primaryColor ?? .primary)
 
-											if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
-												trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
-											{
+											if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0, trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker {
 												let progress = Double(mark) / trackDuration
 												let padding: CGFloat = 12
 												let availableWidth = sliderGeo.size.width - (padding * 2)
@@ -192,12 +174,7 @@ struct PlayerSheet: View {
 									.frame(height: 30)
 
 									HStack {
-										Text(
-											formatTime(
-												isSeeking
-													? sliderValue
-													: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
-											))
+										Text(formatTime(isSeeking ? sliderValue : (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)))
 										Spacer()
 										Text(formatTime(trackDuration))
 									}
@@ -216,12 +193,9 @@ struct PlayerSheet: View {
 									.foregroundColor(.primary)
 
 									Button(action: { try? coreManager.core?.togglePause() }) {
-										Image(
-											systemName: playbackViewModel.isPlaying
-												? "pause.circle.fill" : "play.circle.fill"
-										)
-										.font(.system(size: 72))
-										.contentTransition(.symbolEffect(.replace))
+										Image(systemName: playbackViewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+											.font(.system(size: 72))
+											.contentTransition(.symbolEffect(.replace))
 									}
 									.foregroundColor(.primary)
 
@@ -247,15 +221,18 @@ struct PlayerSheet: View {
 			}
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbarBackground(.hidden, for: .navigationBar)
-		}
-		.task(id: playbackViewModel.currentTrack?.coverArt) {
-			if let cover = playbackViewModel.currentTrack?.coverArt {
-				await artworkLoader.load(
-					url: Config.getCoverUrl(
-						id: cover,
-						size:
-							horizontalSizeClass == .regular
-							? 800 : Int(UIScreen.main.bounds.width * displayScale)), scheme: colorScheme)
+
+			// 🖼️ ARTWORK QUERY
+			.query($artworkData, queryKey:["artwork", "album", playbackViewModel.currentTrack?.albumId ?? playbackViewModel.currentTrack?.coverArt ?? "unknown"], options: QueryOptions(staleTime: .infinity)) {
+				guard let cover = playbackViewModel.currentTrack?.coverArt else { throw CancellationError() }
+				let size = horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+				guard let url = Config.getCoverUrl(id: cover, size: size) else { throw URLError(.badURL) }
+				return try await ArtworkService.fetchAndExtract(url: url)
+			}
+			.task(id: artworkData) {
+				if let result = artworkData {
+					artworkLoader.apply(result: result, scheme: colorScheme)
+				}
 			}
 		}
 		.onChange(of: colorScheme) { _, newScheme in
