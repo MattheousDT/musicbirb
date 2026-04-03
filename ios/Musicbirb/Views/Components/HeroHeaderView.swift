@@ -37,10 +37,6 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 		return minDimension * 0.65
 	}
 
-	private var imageSizePx: Int {
-		Int(floatingImageSize * displayScale)
-	}
-
 	var body: some View {
 		VStack(spacing: 0) {
 			if horizontalSizeClass == .regular {
@@ -50,12 +46,6 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 			}
 		}
 		.frame(maxWidth: .infinity)
-		.task(id: coverArt) {
-			await artworkLoader.load(
-				url: Config.getCoverUrl(id: coverArt, size: imageSizePx),
-				scheme: colorScheme
-			)
-		}
 	}
 
 	@ViewBuilder
@@ -186,7 +176,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				}
 				.mask(
 					LinearGradient(
-						stops: [
+						stops:[
 							.init(color: .black, location: 0.3),
 							.init(color: .clear, location: 1),
 						],

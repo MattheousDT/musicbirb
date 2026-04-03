@@ -83,7 +83,7 @@ struct AlbumView: View {
 										}
 									}
 								},
-								artworkLoader: artworkLoader,
+								artworkLoader: artworkLoader
 							)
 
 							LazyVStack(spacing: 0) {
@@ -115,7 +115,7 @@ struct AlbumView: View {
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
-		.navigationTitle("")
+		.navigationTitle(albumDetails?.title ?? "")
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(albumDetails?.title ?? "")

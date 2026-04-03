@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-      "shouldTranslate" : false
-    },
     "%lld MB" : {
       "localizations" : {
         "ko" : {

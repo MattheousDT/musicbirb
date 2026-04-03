@@ -27,7 +27,7 @@ struct ArtistView: View {
 						.ignoresSafeArea()
 
 					ScrollView {
-						LazyVStack(spacing: 0) {
+						VStack(spacing: 0) {
 							HeroHeaderView(
 								coverArt: artist.coverArt,
 								title: artist.name,
@@ -36,19 +36,21 @@ struct ArtistView: View {
 								description: artist.biography,
 								imageShape: .circle,
 								actions: { EmptyView() },
-								artworkLoader: artworkLoader,
+								artworkLoader: artworkLoader
 							)
 
-							if !artist.topSongs.isEmpty {
-								topSongsSection(artist)
-							}
+							LazyVStack(spacing: 0) {
+								if !artist.topSongs.isEmpty {
+									topSongsSection(artist)
+								}
 
-							if !artist.albums.isEmpty {
-								releasesSection(artist)
-							}
+								if !artist.albums.isEmpty {
+									releasesSection(artist)
+								}
 
-							if !artist.similarArtists.isEmpty {
-								similarArtistsSection(artist)
+								if !artist.similarArtists.isEmpty {
+									similarArtistsSection(artist)
+								}
 							}
 						}
 					}
@@ -61,7 +63,7 @@ struct ArtistView: View {
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
-		.navigationTitle("")
+		.navigationTitle(artistDetails?.name ?? "")
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(artistDetails?.name ?? "")

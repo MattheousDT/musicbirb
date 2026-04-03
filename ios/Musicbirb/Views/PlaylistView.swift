@@ -85,11 +85,12 @@ struct PlaylistView: View {
 									}
 								}
 							},
-							artworkLoader: artworkLoader,
+							artworkLoader: artworkLoader
 						)
 						.listRowInsets(EdgeInsets())
 						.listRowSeparator(.hidden)
 						.listRowBackground(Color.clear)
+						.buttonStyle(.plain)
 
 						ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, track in
 							TrackItemRow(
@@ -135,7 +136,7 @@ struct PlaylistView: View {
 		}
 		.ignoresSafeArea(edges: .top)
 		.navigationBarTitleDisplayMode(.inline)
-		.navigationTitle("")
+		.navigationTitle(playlistDetails?.name ?? "")
 		.toolbar {
 			ToolbarItem(placement: .principal) {
 				Text(playlistDetails?.name ?? "")
@@ -235,6 +236,11 @@ struct PlaylistView: View {
 				.playlist().getPlaylistDetails(playlistId: playlistId)
 			playlistDetails = details
 			originalSongIds = details?.songs.map { $0.id } ?? []
+
+			if let cover = details?.coverArt {
+				await artworkLoader.load(
+					url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+			}
 		} catch {
 			Log.app.error("Playlist error: \(error)")
 		}

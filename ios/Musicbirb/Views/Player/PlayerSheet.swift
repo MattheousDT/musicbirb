@@ -5,180 +5,235 @@ struct PlayerSheet: View {
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.displayScale) private var displayScale
+	@Environment(\.colorScheme) private var colorScheme
 
 	@State private var isSeeking = false
 	@State private var sliderValue: Double = 0.0
 	@State private var targetSeekTime: Double? = nil
 	@State private var isQueueOpen = false
 
+	@State private var artworkLoader = ArtworkColorLoader()
+
+	private var isImmersive: Bool {
+		// Hardcoded for now because I don't like immersive mode in the player that much
+		false
+		// settings.immersiveHeader
+	}
+
 	var body: some View {
-		NavigationView {
-			GeometryReader { geometry in
-				if let currentTrack = playbackViewModel.currentTrack {
-					let trackDuration = Double(max(currentTrack.durationSecs, 1))
+		NavigationStack {
+			ZStack(alignment: .top) {
+				// 1. BASE BACKGROUND
+				(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
+					.ignoresSafeArea()
 
-					VStack(spacing: 0) {
-						Spacer()
-
-						let imageSize = min(min(geometry.size.width * 0.85, 400), geometry.size.height * 0.45)
-						SmoothImage(
-							url: Config.getCoverUrl(
-								id: currentTrack.coverArt, size: Int(imageSize * displayScale)
-							),
-							contentMode: .fill,
-							placeholderColor: Color.white.opacity(0.1)
+				// 2. FULL SHEET BLURRY OVERLAY
+				if let image = artworkLoader.image {
+					Image(uiImage: image)
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+						.frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+						.clipped()
+						.blur(radius: 60, opaque: true)
+						.opacity(colorScheme == .light ? 0.4 : 0.8)
+						.overlay(Color.black.opacity(colorScheme == .light ? 0.0 : 0.2))
+						.mask(
+							LinearGradient(
+								stops: [
+									.init(color: .black, location: 0.0),
+									.init(color: .clear, location: 1.0),
+								],
+								startPoint: .top,
+								endPoint: .bottom
+							)
 						)
-						.aspectRatio(1, contentMode: .fit)
-						.frame(width: imageSize, height: imageSize)
-						.clipShape(
-							RoundedRectangle(
-								cornerRadius: 24 * settings.cornerRounding.multiplier, style: .continuous)
-						)
-						.animation(.default, value: currentTrack.coverArt)
-						.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
+						.ignoresSafeArea()
+						.transition(.opacity.animation(.easeInOut(duration: 0.6)))
+				}
 
-						Spacer().frame(height: geometry.size.height * 0.06)
+				// 3. CONTENT LAYER
+				GeometryReader { geometry in
+					let screenWidth = geometry.size.width
 
-						VStack(spacing: 4) {
-							Text(currentTrack.title)
-								.font(.system(size: 28, weight: .black))
-								.foregroundColor(.primary)
-								.lineLimit(1)
-								.minimumScaleFactor(0.7)
-								.animation(.default, value: currentTrack.title)
+					ZStack(alignment: .top) {
 
-							Text(currentTrack.artist)
-								.font(.system(size: 18, weight: .bold))
-								.foregroundColor(.accentColor)
-								.lineLimit(1)
-								.animation(.default, value: currentTrack.artistId)
-
+						// --- IMMERSIVE ARTWORK ---
+						if isImmersive {
+							if let image = artworkLoader.image {
+								Image(uiImage: image)
+									.resizable()
+									.aspectRatio(contentMode: .fill)
+									.frame(width: screenWidth, height: screenWidth)
+									.clipped()
+									.mask(
+										LinearGradient(
+											stops: [
+												.init(color: .black, location: 0.8),
+												.init(color: .clear, location: 1.0),
+											],
+											startPoint: .top,
+											endPoint: .bottom
+										)
+									)
+									.ignoresSafeArea(edges: .top)
+									.transition(.opacity.animation(.easeInOut))
+							}
 						}
-						.padding(.horizontal, 24)
 
-						Spacer().frame(height: geometry.size.height * 0.05)
+						// --- UI LAYER ---
+						VStack(spacing: 0) {
 
-						VStack(spacing: 10) {
-							GeometryReader { sliderGeo in
-								ZStack(alignment: .leading) {
+							if !isImmersive {
+								// --- NORMAL MODE ARTWORK (Flexible & Auto-Centering) ---
+								VStack(spacing: 0) {
+									Spacer(minLength: 24)
+
+									ZStack {
+										if let image = artworkLoader.image {
+											Image(uiImage: image)
+												.resizable()
+												.aspectRatio(1, contentMode: .fit)
+												.clipShape(
+													RoundedRectangle(
+														cornerRadius: 24 * settings.cornerRounding.multiplier,
+														style: .continuous)
+												)
+												.shadow(color: .black.opacity(0.25), radius: 20, y: 10)
+												.transition(.scale(scale: 0.95).combined(with: .opacity))
+										} else {
+											RoundedRectangle(cornerRadius: 24 * settings.cornerRounding.multiplier)
+												.fill(Color.primary.opacity(0.05))
+												.aspectRatio(1, contentMode: .fit)
+										}
+									}
+									.padding(.horizontal, 32)
+
+									Spacer(minLength: 24)
+								}
+								.frame(maxWidth: .infinity, maxHeight: .infinity)
+
+							} else {
+								// --- IMMERSIVE MODE SPACER ---
+								Spacer()
+									.frame(minHeight: screenWidth * 0.65)
+									.layoutPriority(-1)
+							}
+
+							// --- BOTTOM CONTROLS SECTION ---
+							VStack(spacing: 0) {
+								VStack(spacing: 4) {
+									Text(playbackViewModel.currentTrack?.title ?? "Not Playing")
+										.font(.system(size: 28, weight: .black))
+										.foregroundColor(.primary)
+										.lineLimit(1)
+										.minimumScaleFactor(0.7)
+
+									Text(playbackViewModel.currentTrack?.artist ?? "Unknown Artist")
+										.font(.system(size: 18, weight: .bold))
+										.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
+										.lineLimit(1)
+								}
+								.padding(.horizontal, 24)
+
+								Spacer().frame(height: 32)
+
+								// SLIDER
+								VStack(spacing: 8) {
+									let trackDuration = Double(
+										max(playbackViewModel.currentTrack?.durationSecs ?? 1, 1))
+
 									Slider(
 										value: Binding(
 											get: {
-												let rawValue: Double
-												if self.isSeeking {
-													rawValue = self.sliderValue
-												} else if let target = self.targetSeekTime {
-													rawValue = target
-												} else {
-													rawValue = playbackViewModel.playbackState?.positionSecs ?? 0.0
-												}
-
-												// Strictly clamp slider between 0 and total duration to prevent overshoots
+												let rawValue =
+													isSeeking
+													? sliderValue
+													: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
 												return min(max(rawValue, 0.0), trackDuration)
 											},
-											set: { self.sliderValue = $0 }
+											set: { sliderValue = $0 }
 										),
 										in: 0...trackDuration,
 										onEditingChanged: { editing in
-											self.isSeeking = editing
+											isSeeking = editing
 											if !editing {
-												self.targetSeekTime = self.sliderValue
-												try? coreManager.core?.seek(seconds: self.sliderValue)
-
-												DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-													if self.targetSeekTime != nil {
-														self.targetSeekTime = nil
-													}
+												targetSeekTime = sliderValue
+												try? coreManager.core?.seek(seconds: sliderValue)
+												DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+													targetSeekTime = nil
 												}
 											}
 										}
 									)
-									.tint(.primary)
+									.tint(artworkLoader.primaryColor ?? .primary)
 
-									if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
-										trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
-									{
-										let progress = Double(mark) / trackDuration
-										let padding: CGFloat = 12
-										let availableWidth = sliderGeo.size.width - (padding * 2)
-										if availableWidth > 0 {
-											let offset = padding + (availableWidth * progress)
-											Rectangle()
-												.fill(Color.blue.opacity(0.8))
-												.frame(width: 2, height: 12)
-												.offset(x: offset)
-												.allowsHitTesting(false)
-												.animation(.default, value: offset)
-										}
+									HStack {
+										Text(
+											formatTime(
+												isSeeking
+													? sliderValue
+													: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
+											))
+										Spacer()
+										Text(formatTime(trackDuration))
 									}
+									.font(.system(size: 12, weight: .bold, design: .monospaced))
+									.foregroundColor(.secondary)
 								}
-							}
-							.frame(height: 30)
+								.padding(.horizontal, 40)
 
-							HStack {
-								let rawDisplayTime =
-									isSeeking
-									? sliderValue
-									: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
-								let safeDisplayTime = min(max(rawDisplayTime, 0.0), trackDuration)
+								Spacer().frame(height: 32)
 
-								Text(formatTime(safeDisplayTime))
-								Spacer()
-								Text(formatTime(trackDuration))
-							}
-							.font(.system(size: 12, weight: .bold, design: .monospaced))
-							.foregroundColor(.secondary)
-						}
-						.padding(.horizontal, 40)
-						.onChange(of: playbackViewModel.playbackState?.positionSecs) { _, newPos in
-							if let newPos = newPos, let target = self.targetSeekTime {
-								if abs(newPos - target) < 2.0 {
-									self.targetSeekTime = nil
+								// TRANSPORT CONTROLS
+								HStack(spacing: 48) {
+									Button(action: { try? coreManager.core?.prev() }) {
+										Image(systemName: "backward.fill").font(.system(size: 28))
+									}
+									.foregroundColor(.primary)
+
+									Button(action: { try? coreManager.core?.togglePause() }) {
+										Image(
+											systemName: playbackViewModel.isPlaying
+												? "pause.circle.fill" : "play.circle.fill"
+										)
+										.font(.system(size: 72))
+										.contentTransition(.symbolEffect(.replace))
+									}
+									.foregroundColor(.primary)
+
+									Button(action: { try? coreManager.core?.next() }) {
+										Image(systemName: "forward.fill").font(.system(size: 28))
+									}
+									.foregroundColor(.primary)
 								}
+								Spacer().frame(height: 24)
 							}
+							.padding(.vertical, 32)
 						}
-
-						Spacer().frame(height: geometry.size.height * 0.05)
-
-						HStack(spacing: 48) {
-							Button(action: { try? coreManager.core?.prev() }) {
-								Image(systemName: "backward.fill")
-									.font(.system(size: 28))
-									.foregroundColor(.primary)
-							}
-
-							Button(action: { try? coreManager.core?.togglePause() }) {
-								Image(
-									systemName: playbackViewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill"
-								)
-								.font(.system(size: 72))
-								.contentTransition(.symbolEffect(.replace))
-								.foregroundColor(.primary)
-							}
-
-							Button(action: { try? coreManager.core?.next() }) {
-								Image(systemName: "forward.fill")
-									.font(.system(size: 28))
-									.foregroundColor(.primary)
-							}
-						}
-
-						Spacer()
-					}
-					.padding(.bottom, 40)
-					.sheet(isPresented: $isQueueOpen) {
-						QueueSheet().presentationDragIndicator(.visible)
-					}
-					.navigationBarTitleDisplayMode(.inline)
-					.toolbar {
-						ToolbarItem(placement: .navigationBarTrailing) {
-							Button(action: { isQueueOpen = true }) {
-								Image(systemName: "music.note.list")
-							}
-						}
+						.frame(maxWidth: .infinity, maxHeight: .infinity)
 					}
 				}
 			}
+			.toolbar {
+				ToolbarItem(placement: .navigationBarTrailing) {
+					Button(action: { isQueueOpen = true }) {
+						Image(systemName: "music.note.list")
+					}
+				}
+			}
+			.navigationBarTitleDisplayMode(.inline)
+			.toolbarBackground(.hidden, for: .navigationBar)
+		}
+		.task(id: playbackViewModel.currentTrack?.coverArt) {
+			if let cover = playbackViewModel.currentTrack?.coverArt {
+				await artworkLoader.load(url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+			}
+		}
+		.onChange(of: colorScheme) { _, newScheme in
+			artworkLoader.updateTheme(for: newScheme)
+		}
+		.sheet(isPresented: $isQueueOpen) {
+			QueueSheet().presentationDragIndicator(.visible)
 		}
 	}
 
