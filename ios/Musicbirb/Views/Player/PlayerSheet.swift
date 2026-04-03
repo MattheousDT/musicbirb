@@ -4,6 +4,7 @@ struct PlayerSheet: View {
 	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(SettingsViewModel.self) private var settings
+	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.displayScale) private var displayScale
 	@Environment(\.colorScheme) private var colorScheme
 
@@ -126,7 +127,7 @@ struct PlayerSheet: View {
 										.font(.system(size: 28, weight: .black))
 										.foregroundColor(.primary)
 										.lineLimit(1)
-										.minimumScaleFactor(0.7)
+										.minimumScaleFactor(22 / 28)
 
 									Text(playbackViewModel.currentTrack?.artist ?? "Unknown Artist")
 										.font(.system(size: 18, weight: .bold))
@@ -142,30 +143,53 @@ struct PlayerSheet: View {
 									let trackDuration = Double(
 										max(playbackViewModel.currentTrack?.durationSecs ?? 1, 1))
 
-									Slider(
-										value: Binding(
-											get: {
-												let rawValue =
-													isSeeking
-													? sliderValue
-													: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs ?? 0.0)
-												return min(max(rawValue, 0.0), trackDuration)
-											},
-											set: { sliderValue = $0 }
-										),
-										in: 0...trackDuration,
-										onEditingChanged: { editing in
-											isSeeking = editing
-											if !editing {
-												targetSeekTime = sliderValue
-												try? coreManager.core?.seek(seconds: sliderValue)
-												DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-													targetSeekTime = nil
+									GeometryReader { sliderGeo in
+										ZStack(alignment: .leading) {
+											Slider(
+												value: Binding(
+													get: {
+														let rawValue =
+															isSeeking
+															? sliderValue
+															: (targetSeekTime ?? playbackViewModel.playbackState?.positionSecs
+																?? 0.0)
+														return min(max(rawValue, 0.0), trackDuration)
+													},
+													set: { sliderValue = $0 }
+												),
+												in: 0...trackDuration,
+												onEditingChanged: { editing in
+													isSeeking = editing
+													if !editing {
+														targetSeekTime = sliderValue
+														try? coreManager.core?.seek(seconds: sliderValue)
+														DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+															targetSeekTime = nil
+														}
+													}
+												}
+											)
+											.tint(artworkLoader.primaryColor ?? .primary)
+
+											if let mark = playbackViewModel.playbackState?.scrobbleMarkPos, mark > 0,
+												trackDuration > 0, settings.scrobblingEnabled, settings.showScrobbleMarker
+											{
+												let progress = Double(mark) / trackDuration
+												let padding: CGFloat = 12
+												let availableWidth = sliderGeo.size.width - (padding * 2)
+												if availableWidth > 0 {
+													let offset = padding + (availableWidth * progress)
+													Rectangle()
+														.fill((artworkLoader.primaryColor ?? Color.blue).opacity(0.8))
+														.frame(width: 2, height: 12)
+														.offset(x: offset)
+														.allowsHitTesting(false)
+														.animation(.default, value: offset)
 												}
 											}
 										}
-									)
-									.tint(artworkLoader.primaryColor ?? .primary)
+									}
+									.frame(height: 30)
 
 									HStack {
 										Text(
@@ -226,7 +250,12 @@ struct PlayerSheet: View {
 		}
 		.task(id: playbackViewModel.currentTrack?.coverArt) {
 			if let cover = playbackViewModel.currentTrack?.coverArt {
-				await artworkLoader.load(url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+				await artworkLoader.load(
+					url: Config.getCoverUrl(
+						id: cover,
+						size:
+							horizontalSizeClass == .regular
+							? 800 : Int(UIScreen.main.bounds.width * displayScale)), scheme: colorScheme)
 			}
 		}
 		.onChange(of: colorScheme) { _, newScheme in

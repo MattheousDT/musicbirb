@@ -8,6 +8,7 @@ struct PlaylistView: View {
 	@Environment(\.dismiss) private var dismiss
 	@Environment(AuthViewModel.self) private var authViewModel
 	@Environment(\.colorScheme) private var colorScheme
+	@Environment(\.displayScale) private var displayScale
 
 	let playlistId: PlaylistId
 	@State private var playlistDetails: PlaylistDetails?
@@ -239,7 +240,11 @@ struct PlaylistView: View {
 
 			if let cover = details?.coverArt {
 				await artworkLoader.load(
-					url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+					url: Config.getCoverUrl(
+						id: cover,
+						size:
+							horizontalSizeClass == .regular
+							? 800 : Int(UIScreen.main.bounds.width * displayScale)), scheme: colorScheme)
 			}
 		} catch {
 			Log.app.error("Playlist error: \(error)")

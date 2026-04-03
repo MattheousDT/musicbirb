@@ -5,6 +5,7 @@ struct ArtistView: View {
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.colorScheme) private var colorScheme
+	@Environment(\.displayScale) private var displayScale
 
 	let artistId: ArtistId
 	@State private var artistDetails: ArtistDetails?
@@ -88,7 +89,11 @@ struct ArtistView: View {
 
 				if let cover = details?.coverArt {
 					await artworkLoader.load(
-						url: Config.getCoverUrl(id: cover, size: 800), scheme: colorScheme)
+						url: Config.getCoverUrl(
+							id: cover,
+							size:
+								horizontalSizeClass == .regular
+								? 800 : Int(UIScreen.main.bounds.width * displayScale)), scheme: colorScheme)
 				}
 
 				try? await Task.sleep(nanoseconds: 100_000_000)

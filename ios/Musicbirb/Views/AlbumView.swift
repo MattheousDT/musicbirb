@@ -7,6 +7,7 @@ struct AlbumView: View {
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
 	@Environment(\.colorScheme) private var colorScheme
+	@Environment(\.displayScale) private var displayScale
 
 	let albumId: AlbumId
 	@State private var albumDetails: AlbumDetails?
@@ -169,7 +170,12 @@ struct AlbumView: View {
 					.album().getAlbumDetails(albumId: albumId)
 				if let album = albumDetails {
 					await artworkLoader.load(
-						url: Config.getCoverUrl(id: album.coverArt, size: 800), scheme: colorScheme)
+						url: Config.getCoverUrl(
+							id: album.coverArt,
+							size:
+								horizontalSizeClass == .regular
+								? 800 : Int(UIScreen.main.bounds.width * displayScale)
+						), scheme: colorScheme)
 				}
 			} catch {
 				Log.app.error("Album error: \(error)")

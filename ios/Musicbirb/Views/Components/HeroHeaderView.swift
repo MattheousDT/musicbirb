@@ -107,6 +107,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 					.multilineTextAlignment(.center)
 					.lineLimit(3)
 					.padding(.horizontal, 24)
+					.minimumScaleFactor(24 / 32)
 					.background(
 						GeometryReader { geo in
 							Color.clear.preference(
@@ -176,7 +177,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				}
 				.mask(
 					LinearGradient(
-						stops:[
+						stops: [
 							.init(color: .black, location: 0.3),
 							.init(color: .clear, location: 1),
 						],
