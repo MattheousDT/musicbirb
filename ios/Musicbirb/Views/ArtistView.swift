@@ -119,7 +119,10 @@ struct ArtistView: View {
 					Array(artist.topSongs.prefix(horizontalSizeClass == .regular ? 10 : 5).enumerated()),
 					id: \.element.id
 				) { index, track in
-					TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+					TrackItemRow(
+						track: track, index: index + 1, isActive: isPlaying(track),
+						accentColor: artworkLoader.primaryColor
+					) {
 						playTopTrack(index)
 					}
 					.environment(\.trackRowSubtitle, .album)

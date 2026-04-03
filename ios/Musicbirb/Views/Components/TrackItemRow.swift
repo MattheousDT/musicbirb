@@ -33,6 +33,7 @@ struct TrackItemRow: View {
 	let track: Track
 	let index: Int
 	let isActive: Bool
+	var accentColor: Color? = .accentColor
 	let action: () -> Void
 
 	var body: some View {
@@ -42,7 +43,7 @@ struct TrackItemRow: View {
 					if isActive {
 						Image(systemName: "speaker.wave.2.fill")
 							.font(.system(size: 14, weight: .semibold))
-							.foregroundColor(.accentColor)
+							.foregroundColor(accentColor)
 					} else {
 						Text(verbatim: "\(index)")
 							.font(.system(size: 15, weight: .regular))
@@ -54,7 +55,7 @@ struct TrackItemRow: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text(track.title)
 						.font(.system(size: 16, weight: .bold))
-						.foregroundColor(isActive ? .accentColor : .primary)
+						.foregroundColor(isActive ? accentColor : .primary)
 						.lineLimit(1)
 
 					Text(subtitleMode == .artist ? track.artist : track.album)

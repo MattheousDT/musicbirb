@@ -88,7 +88,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 									style: .continuous
 								)
 							)
-							.shadow(color: .black.opacity(0.35), radius: 25, y: 12)
+							.shadow(color: .black.opacity(0.3), radius: 16, y: 10)
 							.transition(
 								.scale(scale: 0.9).combined(with: .opacity).animation(.easeOut(duration: 0.5)))
 					} else {
@@ -178,6 +178,8 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 							.scaledToFill()
 							.frame(width: width, height: baseHeight + stretch)
 							.blur(radius: isImmersive ? 0 : 40, opaque: true)
+							// Blurry background on light mode usually lends itself to less legible text, so decrease opacity
+							.opacity(colorScheme == .light && !isImmersive ? 0.3 : 1)
 							.overlay(isImmersive ? Color.clear : Color.black.opacity(0.2))
 							.transition(.opacity.animation(.easeInOut(duration: 0.6)))
 					}

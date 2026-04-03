@@ -92,7 +92,10 @@ struct PlaylistView: View {
 						.listRowBackground(Color.clear)
 
 						ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, track in
-							TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+							TrackItemRow(
+								track: track, index: index + 1, isActive: isPlaying(track),
+								accentColor: artworkLoader.primaryColor
+							) {
 								if !editMode.isEditing { playTrack(index: index) }
 							}
 							.environment(\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)

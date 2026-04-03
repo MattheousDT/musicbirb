@@ -88,7 +88,10 @@ struct AlbumView: View {
 
 							LazyVStack(spacing: 0) {
 								ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
-									TrackItemRow(track: track, index: index + 1, isActive: isPlaying(track)) {
+									TrackItemRow(
+										track: track, index: index + 1, isActive: isPlaying(track),
+										accentColor: artworkLoader.primaryColor
+									) {
 										playTrack(index: index)
 									}
 									.padding(.vertical, 4)
