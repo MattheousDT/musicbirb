@@ -598,9 +598,6 @@
         }
       }
     },
-    "Full Artwork Header" : {
-
-    },
     "General" : {
       "localizations" : {
         "ko" : {
@@ -651,8 +648,16 @@
         }
       }
     },
-    "Immersive Header" : {
-
+    "Immersive Mode" : {
+      "comment" : "When the album art / artist image is expanded to fill the top of the screen instead of just a box",
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "몰입 모드"
+          }
+        }
+      }
     },
     "Integration" : {
       "localizations" : {

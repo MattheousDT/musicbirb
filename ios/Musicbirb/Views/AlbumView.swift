@@ -20,6 +20,8 @@ struct AlbumView: View {
 	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
+		@Bindable var settings = settings
+
 		Group {
 			Boundary($albumDetails) { album in
 				ZStack(alignment: .top) {
@@ -117,14 +119,11 @@ struct AlbumView: View {
 					ToolbarItem(placement: .topBarTrailing) {
 						Menu {
 							if horizontalSizeClass != .regular {
-								Button(action: {
-									withAnimation(.spring()) { settings.immersiveHeader.toggle() }
-								}) {
-									Label(
-										settings.immersiveHeader ? "Full Artwork Header" : "Immersive Header",
-										systemImage: settings.immersiveHeader ? "text.below.photo" : "photo"
-									)
-								}
+								Toggle(
+									"Immersive Mode",
+									systemImage: "photo",
+									isOn: $settings.immersiveHeader.animation(.spring)
+								)
 								Divider()
 							}
 							Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
@@ -134,7 +133,7 @@ struct AlbumView: View {
 								Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
 							}
 						} label: {
-							Label("More options", systemImage: "ellipsis.circle")
+							Label("More options", systemImage: "ellipsis")
 								.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 						}
 					}
@@ -160,11 +159,21 @@ struct AlbumView: View {
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle(albumDetails?.title ?? "")
 		.toolbar {
-			ToolbarItem(placement: .principal) {
+			ToolbarItem(placement: .title) {
 				Text(albumDetails?.title ?? "")
 					.font(.headline)
 					.opacity(titleScrollOffset < 0 ? 1 : 0)
 					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+			}
+			if #available(iOS 26, *) {
+				ToolbarItem(placement: .subtitle) {
+					if let artist = albumDetails?.artist {
+						Text(artist)
+							.font(.subheadline)
+							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+					}
+				}
 			}
 		}
 		.navigationDestination(item: $selectedArtistId) { id in

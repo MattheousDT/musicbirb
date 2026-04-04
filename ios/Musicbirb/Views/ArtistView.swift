@@ -79,11 +79,21 @@ struct ArtistView: View {
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle(artistDetails?.name ?? "")
 		.toolbar {
-			ToolbarItem(placement: .principal) {
+			ToolbarItem(placement: .title) {
 				Text(artistDetails?.name ?? "")
 					.font(.headline)
 					.opacity(titleScrollOffset < 0 ? 1 : 0)
 					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+			}
+			if #available(iOS 26, *) {
+				ToolbarItem(placement: .subtitle) {
+					if let albumCount = artistDetails?.albumCount {
+						Text("\(Int(albumCount)) releases")
+							.font(.subheadline)
+							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+					}
+				}
 			}
 		}
 		.navigationDestination(item: $selectedAlbumId) { id in

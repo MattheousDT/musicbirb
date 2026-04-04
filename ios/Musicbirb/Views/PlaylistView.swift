@@ -30,17 +30,26 @@ struct PlaylistView: View {
 	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
-		// Moving content to a separate property to drastically reduce type-check complexity
 		viewContent
 			.ignoresSafeArea(edges: .top)
 			.navigationBarTitleDisplayMode(.inline)
 			.navigationTitle(playlistDetails?.name ?? "")
 			.toolbar {
-				ToolbarItem(placement: .principal) {
+				ToolbarItem(placement: .title) {
 					Text(playlistDetails?.name ?? "")
 						.font(.headline)
 						.opacity(titleScrollOffset < 0 ? 1 : 0)
 						.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+				}
+				if #available(iOS 26, *) {
+					ToolbarItem(placement: .subtitle) {
+						if let playlist = playlistDetails {
+							Text(headerMeta(playlist))
+								.font(.subheadline)
+								.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+								.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+						}
+					}
 				}
 			}
 			.overlay {
@@ -215,6 +224,8 @@ struct PlaylistView: View {
 
 	@ViewBuilder
 	private func trailingToolbarMenu(_ playlist: PlaylistDetails) -> some View {
+		@Bindable var settings = settings
+
 		if editMode.isEditing {
 			Button(action: { withAnimation { editMode = .inactive } }) {
 				Text("Done").bold()
@@ -222,12 +233,11 @@ struct PlaylistView: View {
 		} else {
 			Menu {
 				if horizontalSizeClass != .regular {
-					Button(action: { withAnimation(.spring()) { settings.immersiveHeader.toggle() } }) {
-						Label(
-							settings.immersiveHeader ? "Full Artwork Header" : "Immersive Header",
-							systemImage: settings.immersiveHeader ? "text.below.photo" : "photo"
-						)
-					}
+					Toggle(
+						"Immersive Mode",
+						systemImage: "photo",
+						isOn: $settings.immersiveHeader.animation(.spring)
+					)
 					Divider()
 				}
 				Button(action: { playbackViewModel.queuePlaylist(id: playlistId, next: true) }) {
@@ -246,7 +256,7 @@ struct PlaylistView: View {
 					}
 				}
 			} label: {
-				Label("More options", systemImage: "ellipsis.circle")
+				Label("More options", systemImage: "ellipsis")
 					.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 			}
 		}
