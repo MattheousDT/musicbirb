@@ -11,23 +11,15 @@ pub struct SubsonicAlbum {
 #[macros::async_ffi]
 impl AlbumProvider for SubsonicAlbum {
 	async fn get_album_tracks(&self, album_id: &AlbumId) -> Result<Vec<Track>, MusicbirbError> {
-		let album = self
-			.ctx
-			.client
-			.get_album(&album_id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
+		let res = self.ctx.get_rest_response("getAlbum", &[("id", &album_id.0)]).await?;
+		let album = res.album.ok_or_else(|| MusicbirbError::Api("Album not found".into()))?;
 
 		Ok(album.song.into_iter().map(Track::from).collect())
 	}
 
 	async fn get_album_details(&self, album_id: &AlbumId) -> Result<AlbumDetails, MusicbirbError> {
-		let album = self
-			.ctx
-			.client
-			.get_album(&album_id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to get album details: {}", e)))?;
+		let res = self.ctx.get_rest_response("getAlbum", &[("id", &album_id.0)]).await?;
+		let album = res.album.ok_or_else(|| MusicbirbError::Api("Album not found".into()))?;
 
 		Ok(AlbumDetails::from(album))
 	}

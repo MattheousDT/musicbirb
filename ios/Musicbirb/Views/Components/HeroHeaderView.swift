@@ -22,6 +22,8 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 
 	let artworkLoader: ArtworkColorLoader
 
+	@State private var isDescriptionExpanded: Bool = false
+
 	private var isImmersive: Bool {
 		if horizontalSizeClass == .regular {
 			false
@@ -118,12 +120,11 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 
 				subtitle
 					.multilineTextAlignment(.center)
-					.foregroundStyle(.primary.opacity(0.9))
 
 				if let meta = meta, !meta.isEmpty {
 					Text(meta)
 						.font(.system(size: 14, weight: .bold))
-						.foregroundStyle(.primary.opacity(0.6))
+						.foregroundStyle(.primary.opacity(0.7))
 				}
 
 				if let desc = description, !desc.isEmpty {
@@ -133,9 +134,15 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 					)
 					.font(.system(size: 14))
 					.foregroundStyle(.primary.opacity(0.7))
-					.lineLimit(3)
-					.multilineTextAlignment(.center)
+					.lineLimit(isDescriptionExpanded ? nil : 4)
+					.multilineTextAlignment(horizontalSizeClass == .regular ? .leading : .center)
 					.padding(.horizontal, 32)
+					.contentShape(Rectangle())
+					.onTapGesture {
+						withAnimation(.easeOut) {
+							isDescriptionExpanded.toggle()
+						}
+					}
 				}
 
 				actions
@@ -234,7 +241,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				if let meta = meta, !meta.isEmpty {
 					Text(meta)
 						.font(.system(size: 17, weight: .semibold))
-						.foregroundStyle(.primary.opacity(0.6))
+						.foregroundStyle(.primary.opacity(0.7))
 				}
 
 				if let desc = description, !desc.isEmpty {
@@ -244,8 +251,15 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 					)
 					.font(.system(size: 16))
 					.foregroundStyle(.primary.opacity(0.7))
-					.lineLimit(4)
+					.lineLimit(isDescriptionExpanded ? nil : 4)
+					.multilineTextAlignment(horizontalSizeClass == .regular ? .leading : .center)
 					.padding(.top, 4)
+					.contentShape(Rectangle())
+					.onTapGesture {
+						withAnimation(.easeOut) {
+							isDescriptionExpanded.toggle()
+						}
+					}
 				}
 
 				actions

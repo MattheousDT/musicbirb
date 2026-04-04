@@ -20,7 +20,13 @@ extension Album {
 			playCount: details.playCount,
 			createdTimestamp: details.createdTimestamp,
 			starredTimestamp: details.starredTimestamp,
-			songCount: details.songCount
+			songCount: details.songCount,
+			starred: details.starred,
+			userRating: details.userRating,
+			releaseType: details.releaseType,
+			musicbrainzId: details.musicbrainzId,
+			lastfmUrl: nil,
+			genre: details.genre
 		)
 	}
 }

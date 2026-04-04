@@ -12,7 +12,7 @@ struct AlbumListItem: View {
 			SmoothImage(
 				url: Config.getCoverUrl(id: album.coverArt, size: Int(48 * displayScale)),
 				contentMode: .fill,
-				placeholderColor: Color(UIColor.systemGray5)
+				placeholderColor: .primary.opacity(0.2)
 			)
 			.frame(width: 48, height: 48)
 			.clipShape(

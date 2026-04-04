@@ -1,7 +1,7 @@
 use crate::MusicbirbError;
 use crate::providers::*;
-use std::sync::Arc;
-use submarine::{Client, auth::AuthBuilder};
+use reqwest::{Client, Url};
+use std::sync::{Arc, RwLock};
 
 use activity::*;
 use album::*;
@@ -11,8 +11,6 @@ use playlist::*;
 use search::*;
 use track::*;
 
-pub mod models;
-
 pub mod activity;
 pub mod album;
 pub mod artist;
@@ -21,10 +19,104 @@ pub mod playlist;
 pub mod search;
 pub mod track;
 
+pub mod dto;
+pub mod models;
+pub mod navidrome_dto;
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum ServerType {
+	Subsonic,
+	Navidrome,
+}
+
 pub struct SubsonicContext {
-	pub client: Client,
-	pub http_client: reqwest::Client,
+	pub server_type: ServerType,
+	pub base_url: String,
 	pub username: String,
+	pub pass_or_token: String,
+	pub client: Client,
+	pub nd_jwt: RwLock<Option<String>>,
+	pub nd_id: RwLock<Option<String>>,
+}
+
+impl SubsonicContext {
+	pub fn build_rest_url(&self, endpoint: &str, params: &[(&str, &str)]) -> Url {
+		let mut url = Url::parse(&format!("{}/rest/{}", self.base_url.trim_end_matches('/'), endpoint)).unwrap();
+
+		let salt = "musicbirb_salt";
+		let token = format!("{:x}", md5::compute(format!("{}{}", self.pass_or_token, salt)));
+
+		url.query_pairs_mut()
+			.append_pair("u", &self.username)
+			.append_pair("t", &token)
+			.append_pair("s", salt)
+			.append_pair("v", "1.16.1")
+			.append_pair("c", "Musicbirb")
+			.append_pair("f", "json");
+
+		for (k, v) in params {
+			url.query_pairs_mut().append_pair(k, v);
+		}
+		url
+	}
+
+	pub async fn get_rest_response(
+		&self,
+		endpoint: &str,
+		params: &[(&str, &str)],
+	) -> Result<dto::SubsonicResponse, MusicbirbError> {
+		let url = self.build_rest_url(endpoint, params);
+		let resp = self
+			.client
+			.get(url)
+			.send()
+			.await
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+
+		let root: dto::SubsonicResponseRoot = resp
+			.json()
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Parse error: {}", e)))?;
+
+		if root.subsonic_response.status == "failed" {
+			let msg = root.subsonic_response.error.map(|e| e.message).unwrap_or_default();
+			return Err(MusicbirbError::Api(format!("Subsonic API error: {}", msg)));
+		}
+
+		Ok(root.subsonic_response)
+	}
+
+	// Specifically for Navidrome rich extended endpoints
+	pub async fn get_nd_api<T: serde::de::DeserializeOwned>(
+		&self,
+		endpoint: &str,
+		params: &[(&str, &str)],
+	) -> Result<T, MusicbirbError> {
+		let mut url = Url::parse(&format!("{}/api/{}", self.base_url.trim_end_matches('/'), endpoint)).unwrap();
+		for (k, v) in params {
+			url.query_pairs_mut().append_pair(k, v);
+		}
+
+		let token = self.nd_jwt.read().unwrap().clone().unwrap_or_default();
+		let nd_id = self.nd_id.read().unwrap().clone().unwrap_or_default();
+
+		let resp = self
+			.client
+			.get(url)
+			.header("x-nd-authorization", format!("Bearer {}", token))
+			.header("x-nd-client-unique-id", nd_id)
+			.send()
+			.await
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+
+		if !resp.status().is_success() {
+			return Err(MusicbirbError::Api(format!("Navidrome API error: {}", resp.status())));
+		}
+
+		resp.json()
+			.await
+			.map_err(|e| MusicbirbError::Api(format!("Navidrome JSON Error: {}", e)))
+	}
 }
 
 pub struct SubsonicProvider {
@@ -32,22 +124,26 @@ pub struct SubsonicProvider {
 }
 
 impl SubsonicProvider {
-	pub fn new(url: &str, username: &str, password: &str) -> Result<Self, MusicbirbError> {
-		let auth = AuthBuilder::new(username, "1.16.1")
-			.client_name("musicbirb")
-			.hashed(password);
+	pub fn new(url: &str, username: &str, password: &str, server_type_str: &str) -> Result<Self, MusicbirbError> {
+		let server_type = if server_type_str.to_lowercase() == "navidrome" {
+			ServerType::Navidrome
+		} else {
+			ServerType::Subsonic
+		};
 
-		let client = Client::new(url, auth);
-
-		let http_client = reqwest::ClientBuilder::new()
+		let client = reqwest::ClientBuilder::new()
 			.build()
-			.map_err(|e| MusicbirbError::Network(format!("HTTP Client Init Error: {}", e)))?;
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
 
 		Ok(Self {
 			ctx: Arc::new(SubsonicContext {
-				client,
-				http_client,
+				server_type,
+				base_url: url.to_string(),
 				username: username.to_string(),
+				pass_or_token: password.to_string(),
+				client,
+				nd_jwt: RwLock::new(None),
+				nd_id: RwLock::new(None),
 			}),
 		})
 	}
@@ -59,19 +155,33 @@ pub fn create_subsonic_provider(
 	url: String,
 	username: String,
 	password: String,
+	server_type: String,
 ) -> Result<Arc<dyn Provider>, MusicbirbError> {
-	let provider = SubsonicProvider::new(&url, &username, &password)?;
+	let provider = SubsonicProvider::new(&url, &username, &password, &server_type)?;
 	Ok(Arc::new(provider))
 }
 
 #[macros::async_ffi]
 impl Provider for SubsonicProvider {
 	async fn ping(&self) -> Result<(), MusicbirbError> {
-		self.ctx
-			.client
-			.get_user(self.ctx.username.clone())
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Validation failed: {}", e)))?;
+		if self.ctx.server_type == ServerType::Navidrome {
+			// Navidrome specific JWT retrieval for rich API access
+			let req = navidrome_dto::NavidromeLoginRequest {
+				username: &self.ctx.username,
+				password: &self.ctx.pass_or_token,
+			};
+			let url = format!("{}/auth/login", self.ctx.base_url.trim_end_matches('/'));
+			if let Ok(resp) = self.ctx.client.post(&url).json(&req).send().await {
+				if resp.status().is_success() {
+					if let Ok(json) = resp.json::<navidrome_dto::NavidromeLoginResponse>().await {
+						*self.ctx.nd_jwt.write().unwrap() = Some(json.token);
+						*self.ctx.nd_id.write().unwrap() = Some(json.id);
+					}
+				}
+			}
+		}
+
+		self.ctx.get_rest_response("ping", &[]).await?;
 		Ok(())
 	}
 

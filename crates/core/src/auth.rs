@@ -37,7 +37,7 @@ impl Authenticator {
 	}
 
 	pub fn get_supported_providers(&self) -> Vec<String> {
-		vec!["subsonic".into(), "jellyfin".into(), "plex".into()]
+		vec!["subsonic".into(), "navidrome".into(), "jellyfin".into(), "plex".into()]
 	}
 
 	pub fn credential_to_json(&self, cred: AuthCredential) -> String {
@@ -50,7 +50,7 @@ impl Authenticator {
 
 	pub async fn init_auth(&self, provider: String, _server_url: String) -> Result<AuthStep, MusicbirbError> {
 		match provider.as_str() {
-			"subsonic" | "jellyfin" => Ok(AuthStep::UserPass),
+			"subsonic" | "navidrome" | "jellyfin" => Ok(AuthStep::UserPass),
 			"plex" => {
 				// TODO: Implement Plex PIN generation via https://plex.tv/api/v2/pins
 				Err(MusicbirbError::Internal("Plex OAuth flow not yet implemented".into()))
@@ -68,11 +68,12 @@ impl Authenticator {
 	) -> Result<AuthResult, MusicbirbError> {
 		match provider.as_str() {
 			#[cfg(feature = "subsonic")]
-			"subsonic" => {
+			"subsonic" | "navidrome" => {
 				let p: Arc<dyn Provider> = Arc::new(crate::providers::subsonic::SubsonicProvider::new(
 					&server_url,
 					&username,
 					&password,
+					&provider,
 				)?);
 				p.ping().await?;
 				Ok(AuthResult {
@@ -124,12 +125,13 @@ impl Authenticator {
 	) -> Result<Arc<dyn Provider>, MusicbirbError> {
 		match provider.as_str() {
 			#[cfg(feature = "subsonic")]
-			"subsonic" => {
+			"subsonic" | "navidrome" => {
 				if let AuthCredential::Password(pass) = credential {
 					let p: Arc<dyn Provider> = Arc::new(crate::providers::subsonic::SubsonicProvider::new(
 						&server_url,
 						&username,
 						&pass,
+						&provider,
 					)?);
 					p.ping().await?;
 					Ok(p)

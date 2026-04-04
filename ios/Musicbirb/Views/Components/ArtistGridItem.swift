@@ -1,12 +1,16 @@
 import SwiftUI
 
 struct ArtistGridItem: View {
+	@Environment(\.displayScale) private var displayScale
+
 	let artist: Artist
 
 	var body: some View {
 		VStack(spacing: 8) {
 			SmoothImage(
-				url: Config.getCoverUrl(id: artist.coverArt, size: 300), contentMode: .fill
+				url: Config.getCoverUrl(id: artist.coverArt, size: Int(120 * displayScale)),
+				contentMode: .fill,
+				placeholderColor: .primary.opacity(0.2)
 			)
 			.aspectRatio(1, contentMode: .fill)
 			.frame(width: 120, height: 120)

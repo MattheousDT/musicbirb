@@ -19,7 +19,7 @@ struct AlbumGridItem: View {
 							url: Config.getCoverUrl(
 								id: album.coverArt, size: Int(geometry.size.width * displayScale)),
 							contentMode: .fill,
-							placeholderColor: Color(UIColor.systemGray5)
+							placeholderColor: .primary.opacity(0.2)
 						)
 					}
 				)
@@ -27,7 +27,6 @@ struct AlbumGridItem: View {
 					RoundedRectangle(
 						cornerRadius: 16 * settings.cornerRounding.multiplier, style: .continuous)
 				)
-				.shadow(color: .black.opacity(0.05), radius: 8, y: 4)
 
 			VStack(alignment: .leading, spacing: 2) {
 				Text(album.title)
@@ -43,7 +42,7 @@ struct AlbumGridItem: View {
 					].compactMap { $0 }.joined(separator: " • "),
 				)
 				.font(.system(size: 13, weight: .semibold))
-				.foregroundColor(.secondary)
+				.foregroundColor(.primary.opacity(0.7))
 				.lineLimit(1)
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)  // Explicitly clamps constraints so grid columns truncate instead of stretch

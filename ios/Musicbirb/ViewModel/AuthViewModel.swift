@@ -43,7 +43,7 @@ class AuthViewModel: @unchecked Sendable {
 
 		if let acc = activeAccount ?? (accounts.count == 1 ? accounts.first : nil) {
 			if let passData = KeychainHelper.shared.read(
-				service: "musicbirb_subsonic", account: acc.id),
+				service: "musicbirb_\(acc.provider)", account: acc.id),
 				let passString = String(data: passData, encoding: .utf8)
 			{
 				self.isAuthenticating = true
@@ -126,14 +126,15 @@ class AuthViewModel: @unchecked Sendable {
 				return
 			}
 
-			let safeUrlUser = "\(user)@\(url)"
+			// Include providerId in the safeId to allow multiple provider types for the same URL
+			let safeUrlUser = "\(providerId):\(user)@\(url)"
 			let safeId = String(safeUrlUser.map { $0.isLetter || $0.isNumber ? $0 : "_" })
 
 			let newAccount = AccountConfig(id: safeId, provider: providerId, url: url, username: user)
 
 			let credJson = authenticator.credentialToJson(cred: credentialToSave)
 			if let passData = credJson.data(using: .utf8) {
-				KeychainHelper.shared.save(passData, service: "musicbirb_subsonic", account: safeId)
+				KeychainHelper.shared.save(passData, service: "musicbirb_\(providerId)", account: safeId)
 			}
 
 			if !accounts.contains(where: { $0.id == safeId }) {
@@ -154,7 +155,7 @@ class AuthViewModel: @unchecked Sendable {
 		let authenticator = Authenticator()
 
 		if let passData = KeychainHelper.shared.read(
-			service: "musicbirb_subsonic", account: account.id),
+			service: "musicbirb_\(account.provider)", account: account.id),
 			let passString = String(data: passData, encoding: .utf8)
 		{
 			do {
@@ -192,7 +193,7 @@ class AuthViewModel: @unchecked Sendable {
 
 	@MainActor
 	func removeAccount(_ account: AccountConfig) async {
-		KeychainHelper.shared.delete(service: "musicbirb_subsonic", account: account.id)
+		KeychainHelper.shared.delete(service: "musicbirb_\(account.provider)", account: account.id)
 		accounts.removeAll(where: { $0.id == account.id })
 
 		if activeAccount?.id == account.id {

@@ -3,7 +3,6 @@ use crate::error::MusicbirbError;
 use crate::models::{Album, Artist, SearchPreset, SearchQuery, SearchResults, Track};
 use crate::providers::SearchProvider;
 use std::sync::Arc;
-use submarine::api::get_album_list::Order;
 
 pub struct SubsonicSearch {
 	pub ctx: Arc<SubsonicContext>,
@@ -12,53 +11,33 @@ pub struct SubsonicSearch {
 #[macros::async_ffi]
 impl SearchProvider for SubsonicSearch {
 	async fn search(&self, query: SearchQuery) -> Result<SearchResults, MusicbirbError> {
+		let limit_str = query.limit.map(|l| l.to_string()).unwrap_or_else(|| "20".to_string());
+		let offset_str = query.offset.map(|o| o.to_string()).unwrap_or_else(|| "0".to_string());
+
 		if let Some(preset) = query.preset {
-			let limit = query.limit.map(|l| l as usize).or(Some(20));
-			let offset = query.offset.map(|o| o as usize);
-			match preset {
-				SearchPreset::LastPlayedAlbums => {
-					let list = self
-						.ctx
-						.client
-						.get_album_list2(Order::Recent, limit, offset, None::<String>)
-						.await
-						.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
-					return Ok(SearchResults {
-						albums: list.into_iter().map(Album::from).collect(),
-						tracks: vec![],
-						artists: vec![],
-					});
-				}
-				SearchPreset::RecentlyAddedAlbums => {
-					let list = self
-						.ctx
-						.client
-						.get_album_list2(Order::Newest, limit, offset, None::<String>)
-						.await
-						.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
-					return Ok(SearchResults {
-						albums: list.into_iter().map(Album::from).collect(),
-						tracks: vec![],
-						artists: vec![],
-					});
-				}
-				SearchPreset::NewlyReleasedAlbums => {
-					let list = self
-						.ctx
-						.client
-						.get_album_list2_by_year(Some(9999), Some(0), limit, offset, None::<String>)
-						.await
-						.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
-					return Ok(SearchResults {
-						albums: list.into_iter().map(Album::from).collect(),
-						tracks: vec![],
-						artists: vec![],
-					});
-				}
+			let preset_type = match preset {
+				SearchPreset::LastPlayedAlbums => "recent",
+				SearchPreset::RecentlyAddedAlbums => "newest",
+				SearchPreset::NewlyReleasedAlbums => "byYear",
+			};
+
+			let mut params = vec![("type", preset_type), ("size", &limit_str), ("offset", &offset_str)];
+
+			if preset == SearchPreset::NewlyReleasedAlbums {
+				params.push(("fromYear", "2999"));
+				params.push(("toYear", "0"));
 			}
+
+			let res = self.ctx.get_rest_response("getAlbumList2", &params).await?;
+			let albums = res.album_list2.map(|list| list.album).unwrap_or_default();
+
+			return Ok(SearchResults {
+				albums: albums.into_iter().map(Album::from).collect(),
+				tracks: vec![],
+				artists: vec![],
+			});
 		}
-		let limit = Some(((query.limit.or(Some(20)).unwrap() / 3) as f32).ceil() as i32);
-		let offset = query.offset;
+
 		let kw = query.keyword.unwrap_or_default();
 		if kw.is_empty() {
 			return Ok(SearchResults {
@@ -68,17 +47,41 @@ impl SearchProvider for SubsonicSearch {
 			});
 		}
 
+		let div_limit = ((query.limit.unwrap_or(20) as f32) / 3.0).ceil() as i32;
+		let div_limit_str = div_limit.to_string();
+
 		let res = self
 			.ctx
-			.client
-			.search3(&kw, limit, offset, limit, offset, limit, offset, None::<String>)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Search failed: {}", e)))?;
+			.get_rest_response(
+				"search3",
+				&[
+					("query", &kw),
+					("artistCount", &div_limit_str),
+					("artistOffset", &offset_str),
+					("albumCount", &div_limit_str),
+					("albumOffset", &offset_str),
+					("songCount", &div_limit_str),
+					("songOffset", &offset_str),
+				],
+			)
+			.await?;
 
-		Ok(SearchResults {
-			tracks: res.song.into_iter().map(Track::from).collect(),
-			albums: res.album.into_iter().map(Album::from).collect(),
-			artists: res.artist.into_iter().map(Artist::from).collect(),
-		})
+		// Since both SearchResult2 and SearchResult3 now use the same SearchResult struct type,
+		// they can be combined using .or() correctly.
+		let search_res = res.search_result3.or(res.search_result2);
+
+		if let Some(s) = search_res {
+			Ok(SearchResults {
+				tracks: s.song.into_iter().map(Track::from).collect(),
+				albums: s.album.into_iter().map(Album::from).collect(),
+				artists: s.artist.into_iter().map(Artist::from).collect(),
+			})
+		} else {
+			Ok(SearchResults {
+				albums: vec![],
+				tracks: vec![],
+				artists: vec![],
+			})
+		}
 	}
 }

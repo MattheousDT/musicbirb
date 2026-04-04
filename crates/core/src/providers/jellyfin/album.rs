@@ -49,6 +49,10 @@ impl AlbumProvider for JellyfinAlbum {
 			created_timestamp: None,
 			starred_timestamp: None,
 			songs,
+			starred: None,
+			user_rating: None,
+			release_type: None,
+			musicbrainz_id: None,
 		})
 	}
 }

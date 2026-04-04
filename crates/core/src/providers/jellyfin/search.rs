@@ -89,6 +89,9 @@ impl SearchProvider for JellyfinSearch {
 							name: item.name.unwrap_or_else(|| "Unknown".to_string()),
 							cover_art: Some(CoverArtId(item.id)),
 							artist_image_url: None,
+							starred: None,
+							musicbrainz_id: None,
+							lastfm_url: None,
 						});
 					}
 					_ => {}

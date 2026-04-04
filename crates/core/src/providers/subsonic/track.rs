@@ -11,13 +11,9 @@ pub struct SubsonicTrack {
 #[macros::async_ffi]
 impl TrackProvider for SubsonicTrack {
 	async fn get_track(&self, track_id: &TrackId) -> Result<Track, MusicbirbError> {
-		let data = self
-			.ctx
-			.client
-			.get_song(&track_id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to fetch track: {}", e)))?;
+		let res = self.ctx.get_rest_response("getSong", &[("id", &track_id.0)]).await?;
+		let song = res.song.ok_or_else(|| MusicbirbError::Api("Song not found".into()))?;
 
-		Ok(Track::from(data))
+		Ok(Track::from(song))
 	}
 }

@@ -60,7 +60,7 @@ struct TrackItemRow: View {
 
 					Text(subtitleMode == .artist ? track.artist : track.album)
 						.font(.system(size: 14, weight: .medium))
-						.foregroundColor(.secondary)
+						.foregroundColor(.primary.opacity(0.7))
 						.lineLimit(1)
 				}
 				.frame(maxWidth: .infinity, alignment: .leading)

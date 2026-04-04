@@ -17,6 +17,12 @@ impl From<BaseItemDto> for Album {
 			created_timestamp: None,
 			starred_timestamp: None,
 			song_count: None,
+			starred: None,
+			user_rating: None,
+			release_type: None,
+			musicbrainz_id: None,
+			lastfm_url: None,
+			genre: None,
 		}
 	}
 }
@@ -46,6 +52,14 @@ impl From<BaseItemDto> for Track {
 			starred_timestamp: None,
 			content_type: None,
 			suffix: None,
+			starred: None,
+			user_rating: None,
+			musicbrainz_id: None,
+			lastfm_url: None,
+			replay_gain: None,
+			bpm: None,
+			comment: None,
+			sort_name: None,
 		}
 	}
 }
@@ -62,6 +76,7 @@ impl From<BaseItemDto> for Playlist {
 			public: None,
 			created_timestamp: 0,
 			changed_timestamp: 0,
+			comment: None,
 		}
 	}
 }

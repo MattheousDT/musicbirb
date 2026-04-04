@@ -11,22 +11,22 @@ pub struct SubsonicPlaylist {
 #[macros::async_ffi]
 impl PlaylistProvider for SubsonicPlaylist {
 	async fn get_playlists(&self) -> Result<Vec<Playlist>, MusicbirbError> {
-		let list = self
+		let res = self
 			.ctx
-			.client
-			.get_playlists(Some(&self.ctx.username))
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to get playlists: {}", e)))?;
+			.get_rest_response("getPlaylists", &[("username", &self.ctx.username)])
+			.await?;
+		let list = res.playlists.map(|p| p.playlist).unwrap_or_default();
 		Ok(list.into_iter().map(Playlist::from).collect())
 	}
 
 	async fn get_playlist_tracks(&self, playlist_id: &PlaylistId) -> Result<Vec<Track>, MusicbirbError> {
-		let playlist = self
+		let res = self
 			.ctx
-			.client
-			.get_playlist(&playlist_id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
+			.get_rest_response("getPlaylist", &[("id", &playlist_id.0)])
+			.await?;
+		let playlist = res
+			.playlist
+			.ok_or_else(|| MusicbirbError::Api("Playlist not found".into()))?;
 
 		Ok(playlist.entry.into_iter().map(Track::from).collect())
 	}
@@ -37,19 +37,17 @@ impl PlaylistProvider for SubsonicPlaylist {
 		description: Option<String>,
 		public: bool,
 	) -> Result<Playlist, MusicbirbError> {
-		// Subsonic handles creation and setting public/comment separately in most clients
-		let pl_data = self
-			.ctx
-			.client
-			.create_playlist(name, vec![] as Vec<String>)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to create playlist: {}", e)))?;
+		let res = self.ctx.get_rest_response("createPlaylist", &[("name", name)]).await?;
 
-		let playlist = Playlist::from(pl_data.base);
+		let pl = res
+			.playlist
+			.ok_or_else(|| MusicbirbError::Api("Playlist created but not returned".into()))?;
+		let mut playlist = Playlist::from(pl.base);
 
 		if description.is_some() || public {
-			self.update_playlist(&playlist.id, None, description, Some(public))
+			self.update_playlist(&playlist.id, None, description.clone(), Some(public))
 				.await?;
+			playlist.public = Some(public);
 		}
 
 		Ok(playlist)
@@ -62,83 +60,63 @@ impl PlaylistProvider for SubsonicPlaylist {
 		description: Option<String>,
 		public: Option<bool>,
 	) -> Result<(), MusicbirbError> {
-		self.ctx
-			.client
-			.update_playlist(
-				&id.0,
-				name,
-				description,
-				public,
-				vec![] as Vec<String>,
-				vec![] as Vec<i64>,
-			)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to update playlist: {}", e)))?;
+		let mut params = vec![("playlistId", id.0.as_str())];
+
+		if let Some(n) = &name {
+			params.push(("name", n.as_str()));
+		}
+		if let Some(d) = &description {
+			params.push(("comment", d.as_str()));
+		}
+
+		let pub_str = public.map(|p| p.to_string());
+		if let Some(p) = &pub_str {
+			params.push(("public", p.as_str()));
+		}
+
+		self.ctx.get_rest_response("updatePlaylist", &params).await?;
 		Ok(())
 	}
 
 	async fn delete_playlist(&self, id: &PlaylistId) -> Result<(), MusicbirbError> {
-		self.ctx
-			.client
-			.delete_playlist(&id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to delete playlist: {}", e)))?;
+		self.ctx.get_rest_response("deletePlaylist", &[("id", &id.0)]).await?;
 		Ok(())
 	}
 
 	async fn add_to_playlist(&self, id: &PlaylistId, track_ids: Vec<TrackId>) -> Result<(), MusicbirbError> {
-		let ids_to_add: Vec<String> = track_ids.into_iter().map(|tid| tid.0).collect();
+		let mut params = vec![("playlistId", id.0.as_str())];
+		for tid in &track_ids {
+			params.push(("songIdToAdd", tid.0.as_str()));
+		}
 
-		self.ctx
-			.client
-			.update_playlist(
-				&id.0,
-				None::<String>,
-				None::<String>,
-				None,
-				ids_to_add,
-				vec![] as Vec<i64>,
-			)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to add to playlist: {}", e)))?;
+		self.ctx.get_rest_response("updatePlaylist", &params).await?;
 		Ok(())
 	}
 
 	async fn remove_from_playlist(&self, id: &PlaylistId, track_indices: Vec<u32>) -> Result<(), MusicbirbError> {
-		let indices: Vec<i64> = track_indices.into_iter().map(|i| i as i64).collect();
-		self.ctx
-			.client
-			.update_playlist(
-				&id.0,
-				None::<String>,
-				None::<String>,
-				None,
-				vec![] as Vec<String>,
-				indices,
-			)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed to remove from playlist: {}", e)))?;
+		let mut params = vec![("playlistId", id.0.as_str())];
+		let idx_strs: Vec<String> = track_indices.iter().map(|i| i.to_string()).collect();
+
+		for idx in &idx_strs {
+			params.push(("songIndexToRemove", idx.as_str()));
+		}
+
+		self.ctx.get_rest_response("updatePlaylist", &params).await?;
 		Ok(())
 	}
 
 	async fn replace_playlist_tracks(&self, id: &PlaylistId, track_ids: Vec<TrackId>) -> Result<(), MusicbirbError> {
 		let current_tracks = self.get_playlist_tracks(id).await?;
-		let indices_to_remove: Vec<i64> = (0..current_tracks.len() as i64).collect();
 
-		// Split into two atomic API calls since mutating indices while appending at the same time is prone to race conditions in some servers
-		if !indices_to_remove.is_empty() {
-			self.ctx
-				.client
-				.update_playlist(
-					&id.0,
-					None::<String>,
-					None::<String>,
-					None,
-					vec![] as Vec<String>,
-					indices_to_remove,
-				)
-				.await
-				.map_err(|e| MusicbirbError::Api(format!("Failed to clear playlist: {}", e)))?;
+		let mut remove_params = vec![("playlistId", id.0.as_str())];
+		let idx_strs: Vec<String> = (0..current_tracks.len()).map(|i| i.to_string()).collect();
+
+		for idx in &idx_strs {
+			remove_params.push(("songIndexToRemove", idx.as_str()));
+		}
+
+		if !idx_strs.is_empty() {
+			self.ctx.get_rest_response("updatePlaylist", &remove_params).await?;
 		}
 
 		if !track_ids.is_empty() {
@@ -149,13 +127,14 @@ impl PlaylistProvider for SubsonicPlaylist {
 	}
 
 	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError> {
-		let pl_data = self
+		let res = self
 			.ctx
-			.client
-			.get_playlist(&playlist_id.0)
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Failed: {}", e)))?;
+			.get_rest_response("getPlaylist", &[("id", &playlist_id.0)])
+			.await?;
+		let playlist = res
+			.playlist
+			.ok_or_else(|| MusicbirbError::Api("Playlist not found".into()))?;
 
-		Ok(PlaylistDetails::from(pl_data))
+		Ok(PlaylistDetails::from(playlist))
 	}
 }

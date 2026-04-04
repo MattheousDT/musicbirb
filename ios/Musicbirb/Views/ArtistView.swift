@@ -7,6 +7,7 @@ struct ArtistView: View {
 	@Environment(\.horizontalSizeClass) private var horizontalSizeClass
 	@Environment(\.colorScheme) private var colorScheme
 	@Environment(\.displayScale) private var displayScale
+	@Environment(\.openURL) private var openURL
 
 	let artistId: ArtistId
 
@@ -31,7 +32,10 @@ struct ArtistView: View {
 								coverArt: artist.coverArt,
 								title: artist.name,
 								subtitle: { EmptyView() },
-								meta: String(localized: "\(Int(artist.albumCount)) releases"),
+								meta: [
+									String(localized: "\(Int(artist.albumCount)) releases"),
+									String(localized: "\(Int(artist.songCount)) tracks"),
+								].compactMap { $0 }.joined(separator: " • "),
 								description: artist.biography,
 								imageShape: .circle,
 								actions: { EmptyView() },
@@ -79,6 +83,41 @@ struct ArtistView: View {
 		.navigationBarTitleDisplayMode(.inline)
 		.navigationTitle(artistDetails?.name ?? "")
 		.toolbar {
+			ToolbarItem(placement: .topBarTrailing) {
+				Menu {
+					if artistDetails?.lastfmUrl != nil || artistDetails?.musicbrainzId != nil {
+						Section("External Links") {
+							if let lastfmUrl = artistDetails?.lastfmUrl {
+								Button {
+									openURL(URL(string: lastfmUrl)!)
+								} label: {
+									// Label {
+									// 	Text("Open in Last.fm")
+									// } icon: {
+									// 	Image("lastfm")
+									// 		.resizable()
+									// 		.scaledToFit()
+									// 		.frame(maxWidth: 32, maxHeight: 32)
+									// }
+									Text("Open in Last.fm")
+								}
+							}
+							if let musicbrainzId = artistDetails?.musicbrainzId {
+								Button {
+									openURL(URL(string: "https://musicbrainz.org/artist/\(musicbrainzId)")!)
+								} label: {
+									Text("Open in Musicbrainz")
+								}
+							}
+						}
+					}
+				} label: {
+					Label("More options", systemImage: "ellipsis")
+						.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
+				}
+			}
+		}
+		.toolbar {
 			ToolbarItem(placement: .title) {
 				Text(artistDetails?.name ?? "")
 					.font(.headline)
@@ -87,11 +126,16 @@ struct ArtistView: View {
 			}
 			if #available(iOS 26, *) {
 				ToolbarItem(placement: .subtitle) {
-					if let albumCount = artistDetails?.albumCount {
-						Text("\(Int(albumCount)) releases")
-							.font(.subheadline)
-							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
-							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+					if let artist = artistDetails {
+						Text(
+							[
+								String(localized: "\(Int(artist.albumCount)) releases"),
+								String(localized: "\(Int(artist.songCount)) tracks"),
+							].compactMap { $0 }.joined(separator: " • ")
+						)
+						.font(.subheadline)
+						.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+						.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
 					}
 				}
 			}

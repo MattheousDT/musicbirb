@@ -588,6 +588,9 @@
         }
       }
     },
+    "External Links" : {
+
+    },
     "Find your favorite songs, albums, and artists." : {
       "localizations" : {
         "ko" : {
@@ -898,6 +901,12 @@
           }
         }
       }
+    },
+    "Open in Last.fm" : {
+
+    },
+    "Open in Musicbrainz" : {
+
     },
     "Original" : {
       "localizations" : {

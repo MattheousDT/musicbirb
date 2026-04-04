@@ -7,7 +7,7 @@ struct LoginView: View {
 	@State private var username = ""
 	@State private var password = ""
 
-	let providers = ["subsonic", "jellyfin"]
+	let providers = ["subsonic", "navidrome", "jellyfin"]
 	@State private var isLoggingIn = false
 
 	@Environment(\.dismiss) private var dismiss
@@ -56,7 +56,6 @@ struct LoginView: View {
 			.navigationTitle("Add an account")
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
-				// Only show Cancel if there are already other accounts to fall back to
 				if !authViewModel.accounts.isEmpty && authViewModel.activeAccount != nil {
 					ToolbarItem(placement: .cancellationAction) {
 						Button("Cancel") { dismiss() }

@@ -31,10 +31,14 @@ impl ArtistProvider for JellyfinArtist {
 			name: artist_dto.name.unwrap_or_else(|| "Unknown".to_string()),
 			cover_art: Some(CoverArtId(artist_dto.id)),
 			album_count: albums.len() as u32,
+			song_count: albums.iter().fold(0, |acc, e| acc + e.song_count.unwrap_or(0)),
 			albums,
 			biography: artist_dto.overview,
 			similar_artists: vec![],
 			top_songs: top_songs_res.items.into_iter().map(Track::from).collect(),
+			starred: None,
+			musicbrainz_id: None,
+			lastfm_url: None,
 		})
 	}
 }

@@ -12,34 +12,29 @@ pub struct SubsonicMedia {
 #[macros::async_ffi]
 impl MediaProvider for SubsonicMedia {
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
-		let url = self
-			.ctx
-			.client
-			.stream_url(&track_id.0, None, None::<String>, None, None::<String>, None, None)
-			.map_err(|e| MusicbirbError::Api(format!("Failed to build stream URL: {}", e)))?;
+		let url = self.ctx.build_rest_url("stream", &[("id", &track_id.0)]);
 		Ok(url.to_string())
 	}
 
 	fn get_cover_art_url(&self, cover_id: &CoverArtId, size: Option<u32>) -> Result<String, MusicbirbError> {
-		let url = self
-			.ctx
-			.client
-			.get_cover_art_url(&cover_id.0, size.map(|s| s as i32))
-			.map_err(|e| MusicbirbError::Api(e.to_string()))?;
+		let mut params = vec![("id", cover_id.0.as_str())];
+		let size_str = size.map(|s| s.to_string());
+
+		if let Some(s) = &size_str {
+			params.push(("size", s.as_str()));
+		}
+
+		let url = self.ctx.build_rest_url("getCoverArt", &params);
 		Ok(url.to_string())
 	}
 
 	async fn get_cover_art_bytes(&self, cover_id: &CoverArtId) -> Result<Vec<u8>, MusicbirbError> {
-		let url = self
-			.ctx
-			.client
-			.get_cover_art_url(&cover_id.0, Some(600))
-			.map_err(|e| MusicbirbError::Api(e.to_string()))?;
+		let url = self.get_cover_art_url(cover_id, Some(600))?;
 
 		let resp = self
 			.ctx
-			.http_client
-			.get(url.clone())
+			.client
+			.get(url)
 			.send()
 			.await
 			.map_err(|e| MusicbirbError::Network(e.to_string()))?;

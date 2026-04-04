@@ -12,24 +12,21 @@ pub struct SubsonicActivity {
 impl ActivityProvider for SubsonicActivity {
 	async fn now_playing(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
 		self.ctx
-			.client
-			.scrobble(vec![(track_id.0.clone(), None::<usize>)], Some(false))
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Now playing failed: {}", e)))?;
+			.get_rest_response("scrobble", &[("id", &track_id.0), ("submission", "false")])
+			.await?;
 		Ok(())
 	}
 
 	async fn scrobble(&self, tracks: Vec<TrackScrobble>) -> Result<(), MusicbirbError> {
-		let id_at_time: Vec<(String, Option<usize>)> = tracks
-			.into_iter()
-			.map(|t| (t.id.0, Some(t.timestamp as usize)))
-			.collect();
+		let mut params = vec![("submission", "true")];
+		let time_strs: Vec<String> = tracks.iter().map(|t| t.timestamp.to_string()).collect();
 
-		self.ctx
-			.client
-			.scrobble(id_at_time, Some(true))
-			.await
-			.map_err(|e| MusicbirbError::Api(format!("Scrobble failed: {}", e)))?;
+		for (i, track) in tracks.iter().enumerate() {
+			params.push(("id", track.id.0.as_str()));
+			params.push(("time", time_strs[i].as_str()));
+		}
+
+		self.ctx.get_rest_response("scrobble", &params).await?;
 		Ok(())
 	}
 }
