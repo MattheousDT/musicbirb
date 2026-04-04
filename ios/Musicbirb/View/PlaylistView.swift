@@ -191,13 +191,22 @@ struct PlaylistView: View {
 
 	@ViewBuilder
 	private var playlistActions: some View {
-		HStack(spacing: 16) {
+		HStack(alignment: .center) {
 			Button(action: {}) {
 				Image(systemName: "shuffle")
-					.font(.system(size: 20, weight: .bold))
-					.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
-					.frame(width: 50, height: 50)
-					.background(Color.primary.opacity(0.1), in: Circle())
+					.font(.system(size: 18, weight: .bold))
+			}
+			.tint(artworkLoader.primaryColor ?? .accentColor)
+			.buttonBorderShape(.circle)
+			.controlSize(.large)
+			.modify { content in
+				if #available(iOS 26, *) {
+					content
+						.buttonStyle(.glass)
+				} else {
+					content
+						.buttonStyle(.bordered)
+				}
 			}
 
 			Button(action: { playbackViewModel.playPlaylist(id: playlistId, startIndex: 0) }) {
@@ -206,18 +215,39 @@ struct PlaylistView: View {
 					Text("Play")
 				}
 				.font(.system(size: 18, weight: .bold))
-				.foregroundColor((artworkLoader.primaryColor?.luminance ?? 0) > 0.5 ? .black : .white)
-				.padding(.horizontal, 32)
-				.frame(height: 50)
-				.background(artworkLoader.primaryColor ?? .accentColor, in: Capsule())
+				.padding(.horizontal, 16)
+			}
+			.tint(artworkLoader.primaryColor ?? .accentColor)
+			.foregroundColor(
+				(artworkLoader.primaryColor?.luminance ?? 0) > 0.5 ? .black : .white
+			)
+			.buttonBorderShape(.capsule)
+			.controlSize(.large)
+			.modify { content in
+				if #available(iOS 26, *) {
+					content
+						.buttonStyle(.glassProminent)
+				} else {
+					content
+						.buttonStyle(.borderedProminent)
+				}
 			}
 
 			Button(action: { playbackViewModel.queuePlaylist(id: playlistId, next: true) }) {
 				Image(systemName: "text.line.first.and.arrowtriangle.forward")
-					.font(.system(size: 20, weight: .bold))
-					.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
-					.frame(width: 50, height: 50)
-					.background(Color.primary.opacity(0.1), in: Circle())
+					.font(.system(size: 18, weight: .bold))
+			}
+			.tint(artworkLoader.primaryColor ?? .accentColor)
+			.buttonBorderShape(.circle)
+			.controlSize(.large)
+			.modify { content in
+				if #available(iOS 26, *) {
+					content
+						.buttonStyle(.glass)
+				} else {
+					content
+						.buttonStyle(.bordered)
+				}
 			}
 		}
 	}

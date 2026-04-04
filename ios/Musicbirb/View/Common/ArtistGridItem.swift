@@ -11,7 +11,13 @@ struct ArtistGridItem: View {
 				url: Config.getCoverUrl(id: artist.coverArt, size: Int(120 * displayScale)),
 				contentMode: .fill,
 				placeholderColor: .primary.opacity(0.2)
-			)
+			).modify { content in
+				if #available(iOS 26, *) {
+					content.glassEffect(in: .circle)
+				} else {
+					content
+				}
+			}
 			.aspectRatio(1, contentMode: .fill)
 			.frame(width: 120, height: 120)
 			.clipShape(Circle())

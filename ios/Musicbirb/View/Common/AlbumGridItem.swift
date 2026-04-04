@@ -10,6 +10,7 @@ struct AlbumGridItem: View {
 	var showYear: Bool = true
 
 	var body: some View {
+		let cornerRadius = 16 * settings.cornerRounding.multiplier
 		VStack(alignment: .leading, spacing: 8) {
 			Color.clear
 				.aspectRatio(1, contentMode: .fill)
@@ -21,12 +22,17 @@ struct AlbumGridItem: View {
 							contentMode: .fill,
 							placeholderColor: .primary.opacity(0.2)
 						)
+						.modify { content in
+							if #available(iOS 26, *) {
+								content
+									.glassEffect(in: .rect(cornerRadius: cornerRadius, style: .continuous))
+							} else {
+								content
+							}
+						}
 					}
 				)
-				.clipShape(
-					RoundedRectangle(
-						cornerRadius: 16 * settings.cornerRounding.multiplier, style: .continuous)
-				)
+				.clipShape(.rect(cornerRadius: cornerRadius, style: .continuous))
 
 			VStack(alignment: .leading, spacing: 2) {
 				Text(album.title)

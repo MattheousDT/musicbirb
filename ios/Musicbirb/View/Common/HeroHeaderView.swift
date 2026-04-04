@@ -73,8 +73,20 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 							.resizable()
 							.aspectRatio(contentMode: imageShape == .circle ? .fill : .fit)
 							.frame(width: floatingImageSize, height: floatingImageSize)
+							.modify { content in
+								if #available(iOS 26, *) {
+									content
+										.glassEffect(
+											in: .rect(
+												cornerRadius: imageShape == .circle
+													? floatingImageSize / 2 : 24 * settings.cornerRounding.multiplier,
+												style: .continuous))
+								} else {
+									content
+								}
+							}
 							.clipShape(
-								RoundedRectangle(
+								.rect(
 									cornerRadius: imageShape == .circle
 										? floatingImageSize / 2 : 24 * settings.cornerRounding.multiplier,
 									style: .continuous
@@ -147,7 +159,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 
 				actions
 					.padding(.horizontal, 20)
-					.padding(.top, 12)
+					.padding(.top, 20)
 			}
 			.padding(.bottom, 24)
 		}
@@ -263,7 +275,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 				}
 
 				actions
-					.padding(.top, 12)
+					.padding(.top, 20)
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)
 		}
