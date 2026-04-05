@@ -7,14 +7,16 @@ struct AlbumListItem: View {
 
 	let album: Album
 
+	private let coverArtSize = 42.0
+
 	var body: some View {
 		HStack(spacing: 12) {
 			SmoothImage(
-				url: Config.getCoverUrl(id: album.coverArt, size: Int(48 * displayScale)),
+				url: Config.getCoverUrl(id: album.coverArt, size: Int(coverArtSize * displayScale)),
 				contentMode: .fill,
 				placeholderColor: .primary.opacity(0.2)
 			)
-			.frame(width: 48, height: 48)
+			.frame(width: coverArtSize, height: coverArtSize)
 			.clipShape(
 				RoundedRectangle(cornerRadius: 8 * settings.cornerRounding.multiplier, style: .continuous))
 

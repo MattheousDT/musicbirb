@@ -96,7 +96,6 @@ struct SearchView: View {
 										ForEach(Array(results.tracks.enumerated()), id: \.element.id) { index, track in
 											TrackItemRow(
 												track: track,
-												index: index + 1,
 												isActive: isPlaying(track)
 											) {
 												playTrack(track, from: results.tracks)

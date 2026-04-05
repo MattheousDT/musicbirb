@@ -173,7 +173,7 @@ struct ArtistView: View {
 					id: \.element.id
 				) { index, track in
 					TrackItemRow(
-						track: track, index: index + 1,
+						track: track,
 						isActive: playbackViewModel.currentTrack?.id == track.id,
 						accentColor: artworkLoader.primaryColor
 					) {

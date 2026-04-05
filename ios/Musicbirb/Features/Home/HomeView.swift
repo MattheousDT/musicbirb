@@ -97,7 +97,7 @@ struct HomeView: View {
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
 
-								PaginatedList(items: albums, itemsPerPage: 5, rowHeight: 72) { album in
+								PaginatedList(items: albums, itemsPerPage: 5, rowHeight: 66) { album in
 									NavigationLink(destination: AlbumView(albumId: album.id)) {
 										AlbumListItem(album: album)
 									}
@@ -124,7 +124,7 @@ struct HomeView: View {
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
 
-								PaginatedList(items: items, itemsPerPage: 5, rowHeight: 72) { playlist in
+								PaginatedList(items: items, itemsPerPage: 5, rowHeight: 66) { playlist in
 									NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
 										PlaylistItem(playlist: playlist)
 									}

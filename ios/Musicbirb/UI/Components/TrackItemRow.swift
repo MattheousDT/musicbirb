@@ -26,31 +26,51 @@ extension EnvironmentValues {
 }
 
 struct TrackItemRow: View {
+	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.trackRowSubtitle) private var subtitleMode
 	@Environment(\.trackRowHorizontalPadding) private var horizontalPadding
 	@Environment(\.openAddToPlaylist) private var openAddToPlaylist
+	@Environment(\.displayScale) private var displayScale
 
 	let track: Track
-	let index: Int
+	var index: Int?
 	let isActive: Bool
 	var accentColor: Color? = .accentColor
 	let action: () -> Void
 
+	private let coverArtSize = 42.0
+
 	var body: some View {
 		Button(action: action) {
 			HStack(spacing: 14) {
-				Group {
+				ZStack {
+					if index == nil {
+						SmoothImage(
+							url: Config.getCoverUrl(id: track.coverArt, size: Int(coverArtSize * displayScale)),
+							contentMode: .fill,
+							placeholderColor: .primary.opacity(0.2)
+						)
+						.frame(width: coverArtSize, height: coverArtSize)
+						.clipShape(
+							RoundedRectangle(
+								cornerRadius: 8 * settings.cornerRounding.multiplier, style: .continuous)
+						)
+						.opacity(isActive ? 0.2 : 1)
+						.animation(.default, value: isActive)
+					} else if !isActive {
+						Text(verbatim: "\(index!)")
+							.font(.system(size: 15, weight: .regular))
+							.foregroundColor(Color(UIColor.tertiaryLabel))
+					}
+
 					if isActive {
 						Image(systemName: "speaker.wave.2.fill")
 							.font(.system(size: 14, weight: .semibold))
 							.foregroundColor(accentColor)
-					} else {
-						Text(verbatim: "\(index)")
-							.font(.system(size: 15, weight: .regular))
-							.foregroundColor(Color(UIColor.tertiaryLabel))
+							.transition(.symbolEffect)
 					}
 				}
-				.frame(width: 28, alignment: .center)
+				.frame(width: index == nil ? coverArtSize : 28, alignment: .center)
 
 				VStack(alignment: .leading, spacing: 2) {
 					Text(track.title)

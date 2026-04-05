@@ -146,7 +146,7 @@ struct HeroHeaderView<Subtitle: View, Actions: View>: View {
 					)
 					.font(.system(size: 14))
 					.foregroundStyle(.primary.opacity(0.7))
-					.lineLimit(isDescriptionExpanded ? nil : 4)
+					.lineLimit(isDescriptionExpanded ? nil : 2)
 					.multilineTextAlignment(horizontalSizeClass == .regular ? .leading : .center)
 					.padding(.horizontal, 32)
 					.contentShape(Rectangle())

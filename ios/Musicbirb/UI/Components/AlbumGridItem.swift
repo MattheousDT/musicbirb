@@ -19,7 +19,7 @@ struct AlbumGridItem: View {
 						SmoothImage(
 							url: Config.getCoverUrl(
 								id: album.coverArt, size: Int(geometry.size.width * displayScale)),
-							contentMode: .fill,
+							contentMode: .fit,
 							placeholderColor: .primary.opacity(0.2)
 						)
 						.modify { content in
