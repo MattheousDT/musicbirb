@@ -232,6 +232,7 @@ struct ArtistView: View {
 				}
 				.scrollTargetLayout()
 			}
+			.scrollClipDisabled()
 			.contentMargins(.horizontal, 20, for: .scrollContent)
 			.scrollTargetBehavior(.viewAligned)
 		}

@@ -40,6 +40,7 @@ struct HomeView: View {
 									}
 									.scrollTargetLayout()
 								}
+								.scrollClipDisabled()
 								.contentMargins(.horizontal, 16, for: .scrollContent)
 								.scrollTargetBehavior(.viewAligned)
 							}
@@ -74,6 +75,7 @@ struct HomeView: View {
 									}
 									.scrollTargetLayout()
 								}
+								.scrollClipDisabled()
 								.contentMargins(.horizontal, 16, for: .scrollContent)
 								.scrollTargetBehavior(.viewAligned)
 							}

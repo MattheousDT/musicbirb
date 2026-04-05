@@ -1,6 +1,6 @@
 use crate::art_cache::ArtCache;
 use crate::backend::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
-use crate::models::{CoverArtId, Track};
+use crate::models::{CoverArtId, ReplayGainMode, Track};
 use crate::providers::Provider;
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
 use crate::state::{CoreMessage, CoreState, PlaybackSync};
@@ -33,6 +33,7 @@ pub struct CoreActor {
 	scrobble_flush_timer: Option<Pin<Box<Sleep>>>,
 
 	auto_play: bool,
+	replay_gain_mode: ReplayGainMode,
 
 	#[cfg(feature = "os-media-controls")]
 	mpris: Option<MprisManager>,
@@ -58,6 +59,7 @@ impl CoreActor {
 			scrobble_flush_timer: Some(Box::pin(sleep(std::time::Duration::from_secs(60)))),
 
 			auto_play: true,
+			replay_gain_mode: ReplayGainMode::Auto,
 
 			#[cfg(feature = "os-media-controls")]
 			mpris: None,
@@ -163,6 +165,7 @@ impl CoreActor {
 				}
 
 				self.on_track_start(api);
+				self.apply_replay_gain(player).await;
 				self.dispatch_state(&p_state, state_tx);
 			}
 			BackendEvent::StatusUpdate(status) => {
@@ -207,6 +210,10 @@ impl CoreActor {
 
 		match msg {
 			CoreMessage::Shutdown => {}
+			CoreMessage::SetReplayGainMode(mode) => {
+				self.replay_gain_mode = mode;
+				self.apply_replay_gain(player).await;
+			}
 			CoreMessage::ProviderChanged => {
 				self.queue.clear();
 				self.queue_position = 0;
@@ -521,6 +528,50 @@ impl CoreActor {
 				}
 			}
 		}
+	}
+
+	/// Calculates and applies the ReplayGain volume multiplier based on the current settings and track.
+	async fn apply_replay_gain(&self, player: &Arc<dyn AudioBackend>) {
+		let gain = if let Some(track) = self.queue.get(self.queue_position) {
+			let rg = track.replay_gain.as_ref();
+			match self.replay_gain_mode {
+				ReplayGainMode::Disabled => 0.0,
+				ReplayGainMode::Track => rg
+					.and_then(|r| r.track_gain)
+					.or_else(|| rg.and_then(|r| r.album_gain))
+					.unwrap_or(0.0),
+				ReplayGainMode::Album => rg
+					.and_then(|r| r.album_gain)
+					.or_else(|| rg.and_then(|r| r.track_gain))
+					.unwrap_or(0.0),
+				ReplayGainMode::Auto => {
+					let is_consecutive = if self.queue_position > 0 {
+						if let Some(prev) = self.queue.get(self.queue_position - 1) {
+							!track.album.is_empty() && track.album == prev.album
+						} else {
+							false
+						}
+					} else {
+						false
+					};
+
+					if is_consecutive {
+						rg.and_then(|r| r.album_gain)
+							.or_else(|| rg.and_then(|r| r.track_gain))
+							.unwrap_or(0.0)
+					} else {
+						rg.and_then(|r| r.track_gain)
+							.or_else(|| rg.and_then(|r| r.album_gain))
+							.unwrap_or(0.0)
+					}
+				}
+			}
+		} else {
+			0.0
+		};
+
+		let factor = 10.0_f32.powf(gain / 20.0) as f64;
+		let _ = player.set_volume(100.0 * factor).await;
 	}
 
 	/// Handles initialization tasks when a track begins playback.

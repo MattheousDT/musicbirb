@@ -262,6 +262,12 @@ impl Musicbirb {
 
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------
 
+	pub fn set_replay_gain_mode(&self, mode: crate::models::ReplayGainMode) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetReplayGainMode(mode))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
 	pub fn clear_queue(&self) -> Result<(), MusicbirbError> {
 		self.tx
 			.send(CoreMessage::ClearQueue)

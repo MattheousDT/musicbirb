@@ -339,7 +339,7 @@ impl RodioBackend {
 								}
 							}
 							RodioCommand::SetVolume(volume) => {
-								let rodio_vol = (volume / 100.0).clamp(0.0, 1.0) as f32;
+								let rodio_vol = (volume / 100.0).max(0.0) as f32;
 								player_loop.set_volume(rodio_vol);
 								let mut s = state_clone.write().unwrap();
 								s.volume = volume;

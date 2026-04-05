@@ -54,6 +54,7 @@ struct SearchView: View {
 										}
 										.scrollTargetLayout()
 									}
+									.scrollClipDisabled()
 									.contentMargins(.horizontal, 16, for: .scrollContent)
 									.scrollTargetBehavior(.viewAligned)
 								}
@@ -98,7 +99,7 @@ struct SearchView: View {
 												track: track,
 												isActive: isPlaying(track)
 											) {
-												playTrack(track, from: results.tracks)
+												playTrack(track)
 											}
 											.environment(\.trackRowSubtitle, .artist)
 										}
@@ -154,9 +155,7 @@ struct SearchView: View {
 		return playbackViewModel.currentTrack?.id == track.id
 	}
 
-	private func playTrack(_ track: Track, from tracks: [Track]) {
-		let index = tracks.firstIndex(where: { $0.id == track.id }) ?? 0
-		playbackViewModel.playTracks(
-			ids: tracks.map { $0.id }, startIndex: UInt32(index))
+	private func playTrack(_ track: Track) {
+		playbackViewModel.playTracks(ids: [track.id])
 	}
 }

@@ -37,9 +37,18 @@ enum TranscodingMode: String, CaseIterable, Identifiable {
 	var id: String { self.rawValue }
 }
 
-enum ReplayGainMode: String, CaseIterable, Identifiable {
+enum ReplayGainSetting: String, CaseIterable, Identifiable {
 	case disabled, track, album, auto
 	var id: String { self.rawValue }
+
+	var coreMode: ReplayGainMode {
+		switch self {
+		case .disabled: return .disabled
+		case .track: return .track
+		case .album: return .album
+		case .auto: return .auto
+		}
+	}
 }
 
 @Observable
@@ -125,7 +134,7 @@ class SettingsViewModel: @unchecked Sendable {
 	}
 
 	// Playback
-	var replayGain: ReplayGainMode {
+	var replayGain: ReplayGainSetting {
 		didSet { defaults.set(replayGain.rawValue, forKey: "replayGain") }
 	}
 	var continuousPlay: Bool { didSet { defaults.set(continuousPlay, forKey: "continuousPlay") } }
@@ -174,7 +183,7 @@ class SettingsViewModel: @unchecked Sendable {
 		self.estimateContentLength = defaults.object(forKey: "estimateContentLength") as? Bool ?? true
 
 		self.replayGain =
-			ReplayGainMode(rawValue: defaults.string(forKey: "replayGain") ?? "auto") ?? .auto
+			ReplayGainSetting(rawValue: defaults.string(forKey: "replayGain") ?? "auto") ?? .auto
 		self.continuousPlay = defaults.object(forKey: "continuousPlay") as? Bool ?? true
 	}
 }

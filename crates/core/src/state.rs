@@ -70,4 +70,5 @@ pub enum CoreMessage {
 		id: CoverArtId,
 		bytes: Vec<u8>,
 	},
+	SetReplayGainMode(crate::models::ReplayGainMode),
 }

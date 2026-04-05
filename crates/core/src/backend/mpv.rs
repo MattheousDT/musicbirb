@@ -22,6 +22,8 @@ impl MpvBackend {
 			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 		mpv.set_property("gapless-audio", "yes")
 			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
+		mpv.set_property("volume-max", 200.0)
+			.map_err(|e| MusicbirbError::Player(format!("{:?}", e)))?;
 
 		Ok(Self { mpv: Arc::new(mpv) })
 	}

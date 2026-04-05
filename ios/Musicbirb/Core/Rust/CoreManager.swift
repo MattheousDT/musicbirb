@@ -18,6 +18,10 @@ class CoreManager: @unchecked Sendable {
 				cacheDir: cacheDir,
 				observer: observer
 			)
+
+			let modeStr = UserDefaults.standard.string(forKey: "replayGain") ?? "auto"
+			let modeSetting = ReplayGainSetting(rawValue: modeStr) ?? .auto
+			try? self.core?.setReplayGainMode(mode: modeSetting.coreMode)
 		} catch {
 			Log.rust.error("Failed to initialize Rust Core: \(error)")
 		}

@@ -88,6 +88,15 @@ impl From<CoverArtId> for String {
 #[cfg(feature = "ffi")]
 uniffi::custom_type!(CoverArtId, String);
 
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ReplayGainMode {
+	Disabled,
+	Track,
+	Album,
+	Auto,
+}
+
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReplayGain {
