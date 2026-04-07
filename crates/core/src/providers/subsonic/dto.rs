@@ -86,9 +86,11 @@ pub struct Album {
 	pub music_brainz_id: Option<String>,
 	#[serde(default)]
 	pub song: Vec<Child>,
+	pub is_compilation: Option<bool>,
+	pub release_types: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Child {
 	pub id: String,
@@ -122,9 +124,12 @@ pub struct Child {
 	pub music_brainz_id: Option<String>,
 	pub channel_count: Option<u32>,
 	pub replay_gain: Option<ReplayGainDto>,
+	// OpenSubsonic extensions
+	pub is_compilation: Option<bool>,
+	pub release_types: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplayGainDto {
 	pub track_gain: Option<f32>,

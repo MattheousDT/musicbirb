@@ -1,5 +1,7 @@
+use crate::models::{ReleaseSubtype, ReleaseType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize)]
 pub struct NavidromeLoginRequest<'a> {
@@ -19,7 +21,7 @@ pub struct NavidromeLoginResponse {
 	pub subsonic_token: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct NavidromeGenre {
 	pub id: String,
 	pub name: String,
@@ -48,7 +50,7 @@ pub struct NavidromeArtist {
 	pub play_date: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NavidromeAlbum {
 	pub id: String,
@@ -77,6 +79,66 @@ pub struct NavidromeAlbum {
 	pub full_text: Option<String>,
 	pub order_album_name: Option<String>,
 	pub order_album_artist_name: Option<String>,
+	pub type_: Option<String>,
+	pub tags: Option<HashMap<String, Vec<String>>>,
+}
+
+impl NavidromeAlbum {
+	pub fn get_release_type(&self) -> ReleaseType {
+		// Priority 1: Check the tags field (preferred for Navidrome)
+		if let Some(tags) = &self.tags {
+			if let Some(types) = tags.get("releasetype") {
+				if types.iter().any(|t| t.to_lowercase() == "single") {
+					return ReleaseType::Single;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "ep") {
+					return ReleaseType::Ep;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "album") {
+					return ReleaseType::Album;
+				}
+			}
+		}
+
+		// Priority 2: Fallback to the type_ field
+		match self.type_.as_deref().map(|s| s.to_lowercase()).as_deref() {
+			Some("ep") => ReleaseType::Ep,
+			Some("single") => ReleaseType::Single,
+			Some("album") => ReleaseType::Album,
+			_ => ReleaseType::Album,
+		}
+	}
+
+	pub fn get_release_subtype(&self) -> ReleaseSubtype {
+		if let Some(tags) = &self.tags {
+			if let Some(types) = tags.get("releasetype") {
+				if types.iter().any(|t| t.to_lowercase() == "soundtrack") {
+					return ReleaseSubtype::Soundtrack;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "live") {
+					return ReleaseSubtype::Live;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "compilation") {
+					return ReleaseSubtype::Compilation;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "remix") {
+					return ReleaseSubtype::Remix;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "demo") {
+					return ReleaseSubtype::Demo;
+				}
+				if types.iter().any(|t| t.to_lowercase() == "broadcast") {
+					return ReleaseSubtype::Broadcast;
+				}
+			}
+		}
+
+		if self.compilation.unwrap_or(false) {
+			return ReleaseSubtype::Compilation;
+		}
+
+		ReleaseSubtype::None
+	}
 }
 
 #[derive(Debug, Deserialize)]

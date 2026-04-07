@@ -1,6 +1,6 @@
 use super::JellyfinContext;
 use crate::error::MusicbirbError;
-use crate::models::{AlbumDetails, AlbumId, ArtistId, CoverArtId, Track};
+use crate::models::{AlbumDetails, AlbumId, ArtistId, CoverArtId, ReleaseSubtype, ReleaseType, Track};
 use crate::providers::AlbumProvider;
 use crate::providers::jellyfin::dto::{BaseItemDto, QueryResult};
 use std::sync::Arc;
@@ -51,8 +51,9 @@ impl AlbumProvider for JellyfinAlbum {
 			songs,
 			starred: None,
 			user_rating: None,
-			release_type: None,
+			release_type: ReleaseType::Album,
 			musicbrainz_id: None,
+			release_subtype: ReleaseSubtype::None,
 		})
 	}
 }

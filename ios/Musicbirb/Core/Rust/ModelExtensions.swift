@@ -24,6 +24,7 @@ extension Album {
 			starred: details.starred,
 			userRating: details.userRating,
 			releaseType: details.releaseType,
+			releaseSubtype: details.releaseSubtype,
 			musicbrainzId: details.musicbrainzId,
 			lastfmUrl: nil,
 			genre: details.genre

@@ -106,6 +106,30 @@ pub struct ReplayGain {
 	pub album_peak: Option<f32>,
 }
 
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ReleaseType {
+	#[default]
+	Album,
+	Ep,
+	Single,
+	Other,
+}
+
+#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ReleaseSubtype {
+	#[default]
+	None,
+	Live,
+	Compilation,
+	Demo,
+	Remix,
+	Soundtrack,
+	Broadcast,
+	Other,
+}
+
 #[cfg_attr(feature = "ffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Track {
@@ -155,7 +179,8 @@ pub struct Album {
 	pub song_count: Option<u32>,
 	pub starred: Option<bool>,
 	pub user_rating: Option<u8>,
-	pub release_type: Option<String>,
+	pub release_type: ReleaseType,
+	pub release_subtype: ReleaseSubtype,
 	//
 	pub musicbrainz_id: Option<String>,
 	pub lastfm_url: Option<String>,
@@ -180,7 +205,8 @@ pub struct AlbumDetails {
 	pub songs: Vec<Track>,
 	pub starred: Option<bool>,
 	pub user_rating: Option<u8>,
-	pub release_type: Option<String>,
+	pub release_type: ReleaseType,
+	pub release_subtype: ReleaseSubtype,
 	pub musicbrainz_id: Option<String>,
 }
 
@@ -204,10 +230,13 @@ pub struct ArtistDetails {
 	pub cover_art: Option<CoverArtId>,
 	pub album_count: u32,
 	pub song_count: u32,
+	pub appears_on_count: u32,
 	pub albums: Vec<Album>,
+	pub appears_on: Vec<Album>,
 	pub biography: Option<String>,
 	pub similar_artists: Vec<Artist>,
 	pub top_songs: Vec<Track>,
+	pub starred_songs: Vec<Track>,
 	pub starred: Option<bool>,
 	pub musicbrainz_id: Option<String>,
 	pub lastfm_url: Option<String>,

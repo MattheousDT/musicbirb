@@ -96,17 +96,14 @@ pub trait AlbumProvider: Send + Sync {
 #[cfg_attr(feature = "ffi", uniffi::export)]
 #[macros::async_ffi]
 pub trait ArtistProvider: Send + Sync {
-	/// Fetches detailed artist metadata, including their albums, top songs, and biography.
+	/// Fetches basic artist metadata, biography, and similar artists.
 	async fn get_artist_details(&self, artist_id: &ArtistId) -> Result<ArtistDetails, MusicbirbError>;
 
-	// /// Stars a specific artist, marking them as a favorite.
-	// TODO: async fn star_artist(&self, id: &ArtistId) -> Result<(), MusicbirbError>;
+	/// Fetches global top songs for an artist.
+	async fn get_top_songs(&self, artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError>;
 
-	// /// Removes the starred status from a specific artist.
-	// TODO: async fn unstar_artist(&self, id: &ArtistId) -> Result<(), MusicbirbError>;
-
-	// /// Sets a 1-5 user rating for a specific artist.
-	// TODO: async fn set_artist_rating(&self, id: &ArtistId, rating: u8) -> Result<(), MusicbirbError>;
+	/// Fetches top songs for an artist based on the current user's play history.
+	async fn get_personal_top_songs(&self, artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError>;
 }
 
 /// Handles fetching, browsing, and editing playlists.
@@ -123,13 +120,7 @@ pub trait PlaylistProvider: Send + Sync {
 	/// Fetches detailed playlist metadata, including its tracks and track count.
 	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError>;
 
-	// /// Creates a new empty playlist on the server.
-	// TODO: async fn create_playlist(&self, name: &str) -> Result<Playlist, MusicbirbError>;
-
-	// /// Updates an existing playlist (e.g., adding/removing tracks, renaming).
-	// TODO: async fn update_playlist(&self, id: &PlaylistId, ... ) -> Result<(), MusicbirbError>;
-
-	// /// Creates a new empty playlist on the server.
+	/// Creates a new empty playlist on the server.
 	async fn create_playlist(
 		&self,
 		name: &str,

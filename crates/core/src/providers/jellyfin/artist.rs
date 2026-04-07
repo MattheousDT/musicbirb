@@ -31,6 +31,7 @@ impl ArtistProvider for JellyfinArtist {
 			name: artist_dto.name.unwrap_or_else(|| "Unknown".to_string()),
 			cover_art: Some(CoverArtId(artist_dto.id)),
 			album_count: albums.len() as u32,
+			appears_on_count: 0,
 			song_count: albums.iter().fold(0, |acc, e| acc + e.song_count.unwrap_or(0)),
 			albums,
 			biography: artist_dto.overview,
@@ -39,6 +40,16 @@ impl ArtistProvider for JellyfinArtist {
 			starred: None,
 			musicbrainz_id: None,
 			lastfm_url: None,
+			appears_on: vec![],
+			starred_songs: vec![],
 		})
+	}
+
+	async fn get_top_songs(&self, _artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError> {
+		todo!()
+	}
+
+	async fn get_personal_top_songs(&self, _artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError> {
+		todo!()
 	}
 }

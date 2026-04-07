@@ -1,4 +1,7 @@
-use crate::{Album, AlbumId, ArtistId, CoverArtId, Playlist, PlaylistId, Track, TrackId, providers::jellyfin::dto::*};
+use crate::{
+	Album, AlbumId, ArtistId, CoverArtId, Playlist, PlaylistId, ReleaseSubtype, ReleaseType, Track, TrackId,
+	providers::jellyfin::dto::*,
+};
 
 impl From<BaseItemDto> for Album {
 	fn from(item: BaseItemDto) -> Self {
@@ -19,7 +22,8 @@ impl From<BaseItemDto> for Album {
 			song_count: None,
 			starred: None,
 			user_rating: None,
-			release_type: None,
+			release_type: ReleaseType::Album,
+			release_subtype: ReleaseSubtype::None,
 			musicbrainz_id: None,
 			lastfm_url: None,
 			genre: None,
