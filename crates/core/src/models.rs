@@ -13,7 +13,7 @@ impl From<TrackId> for String {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 uniffi::custom_type!(TrackId, String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -31,7 +31,7 @@ impl From<AlbumId> for String {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 uniffi::custom_type!(AlbumId, String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -49,7 +49,7 @@ impl From<ArtistId> for String {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 uniffi::custom_type!(ArtistId, String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -67,7 +67,7 @@ impl From<PlaylistId> for String {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 uniffi::custom_type!(PlaylistId, String);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -85,10 +85,10 @@ impl From<CoverArtId> for String {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 uniffi::custom_type!(CoverArtId, String);
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ReplayGainMode {
 	Disabled,
@@ -97,7 +97,7 @@ pub enum ReplayGainMode {
 	Auto,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReplayGain {
 	pub track_gain: Option<f32>,
@@ -106,7 +106,7 @@ pub struct ReplayGain {
 	pub album_peak: Option<f32>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ReleaseType {
 	#[default]
@@ -116,7 +116,7 @@ pub enum ReleaseType {
 	Other,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ReleaseSubtype {
 	#[default]
@@ -130,7 +130,7 @@ pub enum ReleaseSubtype {
 	Other,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Track {
 	pub id: TrackId,
@@ -163,7 +163,7 @@ pub struct Track {
 	pub sort_name: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Album {
 	pub id: AlbumId,
@@ -187,7 +187,7 @@ pub struct Album {
 	pub genre: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlbumDetails {
 	pub id: AlbumId,
@@ -210,7 +210,7 @@ pub struct AlbumDetails {
 	pub musicbrainz_id: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Artist {
 	pub id: ArtistId,
@@ -222,7 +222,7 @@ pub struct Artist {
 	pub lastfm_url: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArtistDetails {
 	pub id: ArtistId,
@@ -242,7 +242,7 @@ pub struct ArtistDetails {
 	pub lastfm_url: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Playlist {
 	pub id: PlaylistId,
@@ -257,7 +257,7 @@ pub struct Playlist {
 	pub comment: Option<String>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlaylistDetails {
 	pub id: PlaylistId,
@@ -273,14 +273,14 @@ pub struct PlaylistDetails {
 	pub songs: Vec<Track>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackScrobble {
 	pub id: TrackId,
 	pub timestamp: u64,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum SearchPreset {
 	LastPlayedAlbums,
@@ -288,7 +288,7 @@ pub enum SearchPreset {
 	NewlyReleasedAlbums,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct SearchQuery {
 	pub keyword: Option<String>,
@@ -297,7 +297,7 @@ pub struct SearchQuery {
 	pub offset: Option<i32>,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct SearchResults {
 	pub tracks: Vec<Track>,

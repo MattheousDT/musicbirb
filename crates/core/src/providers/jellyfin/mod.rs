@@ -109,11 +109,15 @@ impl JellyfinContext {
 
 pub struct JellyfinProvider {
 	ctx: Arc<JellyfinContext>,
+	global_client: Arc<moka_query::GlobalQueryClient>,
 }
 
 impl JellyfinProvider {
 	pub fn new(ctx: JellyfinContext) -> Self {
-		Self { ctx: Arc::new(ctx) }
+		Self {
+			ctx: Arc::new(ctx),
+			global_client: Arc::new(moka_query::GlobalQueryClient::new()),
+		}
 	}
 }
 
@@ -131,38 +135,56 @@ impl Provider for JellyfinProvider {
 	}
 
 	fn track(&self) -> Arc<dyn TrackProvider> {
-		Arc::new(JellyfinTrack {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedTrackProvider::new(
+			Arc::new(JellyfinTrack {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 
 	fn album(&self) -> Arc<dyn AlbumProvider> {
-		Arc::new(JellyfinAlbum {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedAlbumProvider::new(
+			Arc::new(JellyfinAlbum {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 
 	fn artist(&self) -> Arc<dyn ArtistProvider> {
-		Arc::new(JellyfinArtist {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedArtistProvider::new(
+			Arc::new(JellyfinArtist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 
 	fn playlist(&self) -> Arc<dyn PlaylistProvider> {
-		Arc::new(JellyfinPlaylist {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedPlaylistProvider::new(
+			Arc::new(JellyfinPlaylist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 
 	fn activity(&self) -> Arc<dyn ActivityProvider> {
-		Arc::new(JellyfinActivity {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedActivityProvider::new(
+			Arc::new(JellyfinActivity {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 
 	fn search(&self) -> Arc<dyn SearchProvider> {
-		Arc::new(JellyfinSearch {
-			ctx: Arc::clone(&self.ctx),
-		})
+		Arc::new(crate::providers::CachedSearchProvider::new(
+			Arc::new(JellyfinSearch {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.global_client),
+		))
 	}
 }

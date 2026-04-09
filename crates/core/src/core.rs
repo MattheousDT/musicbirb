@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 #[uniffi::export]
 pub fn init_client(
 	provider: Option<Arc<dyn crate::Provider>>,
@@ -87,14 +87,14 @@ pub fn init_client(
 	Ok(core)
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct Musicbirb {
 	api: Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
 }
 
-#[cfg_attr(feature = "ffi", uniffi::export)]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 #[macros::async_ffi]
 impl Musicbirb {
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
@@ -375,12 +375,12 @@ impl Musicbirb {
 		let actor = CoreActor::new(data_dir, cache_dir);
 		let tx_clone = tx.clone();
 
-		#[cfg(feature = "ffi")]
+		#[cfg(feature = "uniffi")]
 		crate::RUNTIME.spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_lock, player).await;
 		});
 
-		#[cfg(not(feature = "ffi"))]
+		#[cfg(not(feature = "uniffi"))]
 		tokio::spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_lock, player).await;
 		});

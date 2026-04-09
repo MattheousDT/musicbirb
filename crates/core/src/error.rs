@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 #[derive(Error, Debug)]
 pub enum MusicbirbError {
 	#[error("Subsonic API error: {0}")]

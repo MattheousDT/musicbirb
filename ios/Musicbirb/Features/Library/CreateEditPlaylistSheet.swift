@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct CreateEditPlaylistSheet: View {
@@ -6,11 +5,11 @@ struct CreateEditPlaylistSheet: View {
 
 	@Environment(\.dismiss) private var dismiss
 	@Environment(CoreManager.self) private var coreManager
-	@UseMutation var saveMutation
 
 	@State private var name: String = ""
 	@State private var description: String = ""
 	@State private var isPublic: Bool = false
+	@State private var isSaving = false
 
 	var isEditing: Bool { existingPlaylist != nil }
 
@@ -32,15 +31,11 @@ struct CreateEditPlaylistSheet: View {
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
-					Button("Cancel") { dismiss() }
-						.disabled(saveMutation.isLoading)
+					Button("Cancel") { dismiss() }.disabled(isSaving)
 				}
 				ToolbarItem(placement: .confirmationAction) {
-					Button("Save") {
-						performSave()
-					}
-					.disabled(
-						name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saveMutation.isLoading)
+					Button("Save") { performSave() }
+						.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
 				}
 			}
 			.onAppear {
@@ -50,11 +45,7 @@ struct CreateEditPlaylistSheet: View {
 					isPublic = existing.public ?? false
 				}
 			}
-			.overlay {
-				if saveMutation.isLoading {
-					ProgressHUD(title: "Saving...")
-				}
-			}
+			.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
 		}
 	}
 
@@ -65,27 +56,21 @@ struct CreateEditPlaylistSheet: View {
 		let pid = existingPlaylist?.id
 
 		Task {
-			await saveMutation.asyncPerform {
+			isSaving = true
+			do {
 				if let id = pid {
-					try await coreManager.core?.updatePlaylist(
-						id: id, name: cleanName, description: descOpt, isPublic: isPublic)
+					try await coreManager.core?.getProvider().playlist().updatePlaylist(
+						id: id, name: cleanName, description: descOpt, public: isPublic)
 				} else {
-					_ = try await coreManager.core?.createPlaylist(
-						name: cleanName, description: descOpt, isPublic: isPublic)
+					_ = try await coreManager.core?.getProvider().playlist().createPlaylist(
+						name: cleanName, description: descOpt, public: isPublic)
 				}
-			} onCompleted: { client in
-				Task {
-					await client.invalidate(["playlists"])
-
-					if let id = pid {
-						await client.invalidate(["playlists", id])
-						await client.invalidate(["playlists", id, "artwork"])
-					}
-
-					await MainActor.run {
-						dismiss()
-					}
-				}
+			} catch {
+				print(error)
+			}
+			await MainActor.run {
+				isSaving = false
+				dismiss()
 			}
 		}
 	}

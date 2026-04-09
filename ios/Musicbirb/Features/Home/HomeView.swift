@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct HomeView: View {
@@ -6,12 +5,10 @@ struct HomeView: View {
 	@Environment(AuthViewModel.self) private var authViewModel
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 
-	@UseQuery<[Album]> var lastPlayed
-	@UseQuery<[Album]> var recent
-	@UseQuery<[Album]> var newReleases
-	@UseQuery<[Playlist]> var playlists
-
-	@UseMutation var cacheMutator
+	@State private var lastPlayed: [Album]?
+	@State private var recent: [Album]?
+	@State private var newReleases: [Album]?
+	@State private var playlists: [Playlist]?
 
 	@State private var showQueueSheet = false
 	@State private var showSettings = false
@@ -20,14 +17,12 @@ struct HomeView: View {
 		NavigationStack {
 			ScrollView {
 				VStack(alignment: .leading, spacing: 32) {
-
-					Boundary($lastPlayed) { albums in
+					if let albums = lastPlayed {
 						if !albums.isEmpty {
 							VStack(alignment: .leading, spacing: 12) {
 								Text("Last Played")
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
-
 								ScrollView(.horizontal, showsIndicators: false) {
 									LazyHStack(spacing: 16) {
 										ForEach(albums, id: \.id) { album in
@@ -45,24 +40,16 @@ struct HomeView: View {
 								.scrollTargetBehavior(.viewAligned)
 							}
 						}
-					} fallback: {
+					} else {
 						ProgressView().frame(maxWidth: .infinity, minHeight: 140)
-					} errorFallback: { _ in
-						EmptyView()
-					}
-					.query($lastPlayed, queryKey: "home_lastPlayed", options: QueryOptions(staleTime: 300)) {
-						try await coreManager.core!.getProvider().search().search(
-							query: SearchQuery(keyword: nil, preset: .lastPlayedAlbums, limit: nil, offset: nil)
-						).albums
 					}
 
-					Boundary($recent) { albums in
+					if let albums = recent {
 						if !albums.isEmpty {
 							VStack(alignment: .leading, spacing: 12) {
 								Text("Recently Added")
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
-
 								ScrollView(.horizontal, showsIndicators: false) {
 									LazyHStack(spacing: 16) {
 										ForEach(albums, id: \.id) { album in
@@ -80,25 +67,16 @@ struct HomeView: View {
 								.scrollTargetBehavior(.viewAligned)
 							}
 						}
-					} fallback: {
+					} else {
 						ProgressView().frame(maxWidth: .infinity, minHeight: 140)
-					} errorFallback: { _ in
-						EmptyView()
-					}
-					.query($recent, queryKey: "home_recent", options: QueryOptions(staleTime: 300)) {
-						try await coreManager.core!.getProvider().search().search(
-							query: SearchQuery(
-								keyword: nil, preset: .recentlyAddedAlbums, limit: nil, offset: nil)
-						).albums
 					}
 
-					Boundary($newReleases) { albums in
+					if let albums = newReleases {
 						if !albums.isEmpty {
 							VStack(alignment: .leading, spacing: 12) {
 								Text("New Releases")
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
-
 								PaginatedList(items: albums, itemsPerPage: 5, rowHeight: 66) { album in
 									NavigationLink(destination: AlbumView(albumId: album.id)) {
 										AlbumListItem(album: album)
@@ -107,25 +85,16 @@ struct HomeView: View {
 								}
 							}
 						}
-					} fallback: {
+					} else {
 						ProgressView().frame(maxWidth: .infinity, minHeight: 140)
-					} errorFallback: { _ in
-						EmptyView()
-					}
-					.query($newReleases, queryKey: "home_new", options: QueryOptions(staleTime: 300)) {
-						try await coreManager.core!.getProvider().search().search(
-							query: SearchQuery(
-								keyword: nil, preset: .newlyReleasedAlbums, limit: nil, offset: nil)
-						).albums
 					}
 
-					Boundary($playlists) { items in
+					if let items = playlists {
 						if !items.isEmpty {
 							VStack(alignment: .leading, spacing: 12) {
 								Text("Playlists")
 									.font(.system(size: 22, weight: .black))
 									.padding(.horizontal, 16)
-
 								PaginatedList(items: items, itemsPerPage: 5, rowHeight: 66) { playlist in
 									NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
 										PlaylistItem(playlist: playlist)
@@ -134,15 +103,9 @@ struct HomeView: View {
 								}
 							}
 						}
-					} fallback: {
+					} else {
 						ProgressView().frame(maxWidth: .infinity, minHeight: 140)
-					} errorFallback: { _ in
-						EmptyView()
 					}
-					.query($playlists, queryKey: ["playlists"], options: QueryOptions(staleTime: 300)) {
-						try await coreManager.core!.getProvider().playlist().getPlaylists()
-					}
-
 				}
 				.padding(.vertical, 16)
 			}
@@ -169,30 +132,46 @@ struct HomeView: View {
 					}
 				}
 			}
-			.refreshable {
-				await invalidateAll()
+			.task {
+				guard let provider = try? await coreManager.core?.getProvider().search() else { return }
+				let stream = observeSearchSearch(
+					provider: provider,
+					query: SearchQuery(keyword: nil, preset: .lastPlayedAlbums, limit: nil, offset: nil))
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.lastPlayed = d.albums }
+				}
 			}
-			.onChange(of: authViewModel.activeAccount?.id) { _, _ in
-				Task { await invalidateAll() }
+			.task {
+				guard let provider = try? await coreManager.core?.getProvider().search() else { return }
+				let stream = observeSearchSearch(
+					provider: provider,
+					query: SearchQuery(keyword: nil, preset: .recentlyAddedAlbums, limit: nil, offset: nil))
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.recent = d.albums }
+				}
 			}
-			.fullScreenCover(isPresented: $showSettings) {
-				SettingsView()
+			.task {
+				guard let provider = try? await coreManager.core?.getProvider().search() else { return }
+				let stream = observeSearchSearch(
+					provider: provider,
+					query: SearchQuery(keyword: nil, preset: .newlyReleasedAlbums, limit: nil, offset: nil))
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.newReleases = d.albums }
+				}
 			}
-			.sheet(isPresented: $showQueueSheet) {
-				QueueSheet().presentationDragIndicator(.visible)
+			.task {
+				guard let provider = try? await coreManager.core?.getProvider().playlist() else { return }
+				let stream = observePlaylistGetPlaylists(provider: provider)
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.playlists = d }
+				}
 			}
-		}
-	}
-
-	private func invalidateAll() async {
-		await cacheMutator.asyncPerform {
-		} onCompleted: { client in
-			Task {
-				await client.invalidate("home_lastPlayed")
-				await client.invalidate("home_recent")
-				await client.invalidate("home_new")
-				await client.invalidate(["playlists"])
-			}
+			.fullScreenCover(isPresented: $showSettings) { SettingsView() }
+			.sheet(isPresented: $showQueueSheet) { QueueSheet().presentationDragIndicator(.visible) }
 		}
 	}
 }

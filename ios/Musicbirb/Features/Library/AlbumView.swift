@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct AlbumView: View {
@@ -12,8 +11,7 @@ struct AlbumView: View {
 
 	let albumId: AlbumId
 
-	@UseQuery<AlbumDetails> var albumDetails
-	@UseQuery<ArtworkResult> var artworkData
+	@State private var albumDetails: AlbumDetails?
 
 	@State private var selectedArtistId: ArtistId?
 	@State private var artworkLoader = ArtworkColorLoader()
@@ -23,7 +21,7 @@ struct AlbumView: View {
 		@Bindable var settings = settings
 
 		Group {
-			Boundary($albumDetails) { album in
+			if let album = albumDetails {
 				ZStack(alignment: .top) {
 					(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
 						.ignoresSafeArea()
@@ -67,11 +65,9 @@ struct AlbumView: View {
 										.controlSize(.large)
 										.modify { content in
 											if #available(iOS 26, *) {
-												content
-													.buttonStyle(.glass)
+												content.buttonStyle(.glass)
 											} else {
-												content
-													.buttonStyle(.bordered)
+												content.buttonStyle(.bordered)
 											}
 										}
 
@@ -91,11 +87,9 @@ struct AlbumView: View {
 										.controlSize(.large)
 										.modify { content in
 											if #available(iOS 26, *) {
-												content
-													.buttonStyle(.glassProminent)
+												content.buttonStyle(.glassProminent)
 											} else {
-												content
-													.buttonStyle(.borderedProminent)
+												content.buttonStyle(.borderedProminent)
 											}
 										}
 
@@ -108,11 +102,9 @@ struct AlbumView: View {
 										.controlSize(.large)
 										.modify { content in
 											if #available(iOS 26, *) {
-												content
-													.buttonStyle(.glass)
+												content.buttonStyle(.glass)
 											} else {
-												content
-													.buttonStyle(.bordered)
+												content.buttonStyle(.bordered)
 											}
 										}
 									}
@@ -166,22 +158,16 @@ struct AlbumView: View {
 						}
 					}
 				}
-				.query(
-					$artworkData, queryKey: ["albums", albumId, "artwork"],
-					options: QueryOptions(staleTime: .infinity)
-				) {
+				.task(id: album.coverArt) {
 					let size =
 						horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-					guard let url = Config.getCoverUrl(id: album.coverArt, size: size) else {
-						throw URLError(.badURL)
-					}
-					return try await ArtworkService.fetchAndExtract(url: url)
-				}
-				.task(id: artworkData) {
-					if let result = artworkData {
+					guard let url = Config.getCoverUrl(id: album.coverArt, size: size) else { return }
+					if let result = try? await ArtworkService.fetchAndExtract(url: url) {
 						artworkLoader.apply(result: result, scheme: colorScheme)
 					}
 				}
+			} else {
+				ProgressView()
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
@@ -204,14 +190,15 @@ struct AlbumView: View {
 				}
 			}
 		}
-		.navigationDestination(item: $selectedArtistId) { id in
-			ArtistView(artistId: id)
-		}
-		.onChange(of: colorScheme) { _, newScheme in
-			artworkLoader.updateTheme(for: newScheme)
-		}
-		.query($albumDetails, queryKey: ["albums", albumId], options: QueryOptions(staleTime: 300)) {
-			try await coreManager.core!.getProvider().album().getAlbumDetails(albumId: albumId)
+		.navigationDestination(item: $selectedArtistId) { id in ArtistView(artistId: id) }
+		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
+		.task(id: albumId) {
+			guard let provider = try? await coreManager.core?.getProvider().album() else { return }
+			let stream = observeAlbumGetAlbumDetails(provider: provider, albumId: albumId)
+			while !Task.isCancelled {
+				guard let state = await stream.next() else { break }
+				if case .data(let d) = state { self.albumDetails = d }
+			}
 		}
 	}
 }

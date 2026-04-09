@@ -2,6 +2,8 @@
 members =[
     "crates/core",
     "crates/ffi",
-    "crates/ui"
+    "crates/macros",
+    "crates/moka-query",
+    "crates/moka-query-macros",
 ]
 resolver = "2"

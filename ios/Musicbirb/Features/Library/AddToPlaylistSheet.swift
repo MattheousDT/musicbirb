@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct AddToPlaylistSheet: View {
@@ -12,9 +11,7 @@ struct AddToPlaylistSheet: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.dismiss) private var dismiss
 
-	@UseQuery<[Playlist]> var playlists
-	@UseMutation var toggleMutation
-
+	@State private var playlists: [Playlist]?
 	@State private var trackIdsToAdd: [TrackId] = []
 	@State private var playlistPresence: [String: Bool] = [:]
 	@State private var isWorking: [String: Bool] = [:]
@@ -22,11 +19,11 @@ struct AddToPlaylistSheet: View {
 
 	var body: some View {
 		NavigationStack {
-			Boundary($playlists) { allPlaylists in
-				let username = authViewModel.activeAccount?.username.lowercased()
-				let owned = allPlaylists.filter { $0.owner?.lowercased() == username }
+			Group {
+				if let allPlaylists = playlists {
+					let username = authViewModel.activeAccount?.username.lowercased()
+					let owned = allPlaylists.filter { $0.owner?.lowercased() == username }
 
-				Group {
 					if owned.isEmpty {
 						ContentUnavailableView(
 							"No Playlists",
@@ -70,14 +67,19 @@ struct AddToPlaylistSheet: View {
 							}
 							.foregroundColor(.primary)
 						}
+						.task(id: owned.count) { await calculatePresence(owned: owned) }
 					}
-				}
-				.task(id: allPlaylists.count) {
-					await calculatePresence(owned: owned)
+				} else {
+					ProgressView()
 				}
 			}
-			.query($playlists, queryKey: ["playlists"]) {
-				try await coreManager.core!.getProvider().playlist().getPlaylists()
+			.task {
+				guard let provider = try? await coreManager.core?.getProvider().playlist() else { return }
+				let stream = observePlaylistGetPlaylists(provider: provider)
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.playlists = d }
+				}
 			}
 			.navigationTitle("Add to Playlist")
 			.navigationBarTitleDisplayMode(.inline)
@@ -121,13 +123,12 @@ struct AddToPlaylistSheet: View {
 			self.trackIdsToAdd = currentTrackIds
 		}
 
-		let core = coreManager.core
+		guard let core = coreManager.core else { return }
 
 		await withTaskGroup(of: (String, Bool).self) { group in
 			for pl in owned {
 				group.addTask {
-					let tracks = try? await core?.getProvider().playlist().getPlaylistTracks(
-						playlistId: pl.id)
+					let tracks = try? await core.getProvider().playlist().getPlaylistTracks(playlistId: pl.id)
 					let plTrackIds = Set(tracks?.map { $0.id } ?? [])
 					let isPresent =
 						!currentTrackIds.isEmpty && currentTrackIds.allSatisfy { plTrackIds.contains($0) }
@@ -147,33 +148,26 @@ struct AddToPlaylistSheet: View {
 		let allowDuplicates = settings.allowDuplicatesInPlaylists
 		let playlistId = playlist.id
 
-		isWorking[playlist.id] = true
+		isWorking[playlistId] = true
 
 		Task {
-			await toggleMutation.asyncPerform {
+			do {
 				if !isPresent {
-					return try await core.addTracksToPlaylist(
+					let skipped = try await core.addTracksToPlaylist(
 						id: playlistId, trackIds: targetIds, allowDuplicates: allowDuplicates)
+					if skipped > 0 { await MainActor.run { onResult(skipped) } }
 				} else {
 					let currentTracks = try await core.getProvider().playlist().getPlaylistTracks(
 						playlistId: playlistId)
 					let toRemove = Set(targetIds)
 					let newIds = currentTracks.filter { !toRemove.contains($0.id) }.map { $0.id }
-					try await core.replacePlaylistTracks(id: playlistId, trackIds: newIds)
-					return UInt32(0)
+					try await core.getProvider().playlist().replacePlaylistTracks(
+						id: playlistId, trackIds: newIds)
 				}
-			} onCompleted: { skipped, client in
-				Task {
-					await client.invalidate(["playlists"])
-					await client.invalidate(["playlists", playlistId])
-					await client.invalidate(["playlists", playlistId, "artwork"])
-
-					await MainActor.run {
-						playlistPresence[playlistId] = !isPresent
-						isWorking[playlistId] = false
-						if skipped > 0 { onResult(skipped) }
-					}
-				}
+			} catch { print(error) }
+			await MainActor.run {
+				playlistPresence[playlistId] = !isPresent
+				isWorking[playlistId] = false
 			}
 		}
 	}

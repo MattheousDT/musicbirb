@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct ArtistView: View {
@@ -11,9 +10,8 @@ struct ArtistView: View {
 
 	let artistId: ArtistId
 
-	@UseQuery<ArtistDetails> var artistDetails
-	@UseQuery<[Track]> var topSongs
-	@UseQuery<ArtworkResult> var artworkData
+	@State private var artistDetails: ArtistDetails?
+	@State private var topSongs: [Track]?
 
 	@State private var selectedAlbumId: AlbumId?
 	@State private var selectedSimilarArtistId: ArtistId?
@@ -28,22 +26,22 @@ struct ArtistView: View {
 
 	var body: some View {
 		Group {
-			Boundary($artistDetails) { artist in
+			if let artist = artistDetails {
 				ZStack(alignment: .top) {
 					backgroundColor
 					mainContent(artist)
 				}
-				.query(
-					$artworkData, queryKey: ["artists", artistId, "artwork"],
-					options: QueryOptions(staleTime: .infinity)
-				) {
-					try await fetchArtwork(artist: artist)
-				}
-				.task(id: artworkData) {
-					if let result = artworkData {
+				.task(id: artist.coverArt) {
+					let size =
+						horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+					guard let cover = artist.coverArt, let url = Config.getCoverUrl(id: cover, size: size)
+					else { return }
+					if let result = try? await ArtworkService.fetchAndExtract(url: url) {
 						artworkLoader.apply(result: result, scheme: colorScheme)
 					}
 				}
+			} else {
+				ProgressView()
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
@@ -62,36 +60,38 @@ struct ArtistView: View {
 				selectedSimilarArtistId: $selectedSimilarArtistId
 			)
 		)
-		.onChange(of: colorScheme) { _, newScheme in
-			artworkLoader.updateTheme(for: newScheme)
+		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
+		.task(id: artistId) {
+			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
+			let stream = observeArtistGetArtistDetails(provider: provider, artistId: artistId)
+			while !Task.isCancelled {
+				guard let state = await stream.next() else { break }
+				if case .data(let d) = state { self.artistDetails = d }
+			}
 		}
-		.query($artistDetails, queryKey: ["artists", artistId], options: QueryOptions(staleTime: 300)) {
-			let core = coreManager.core!
-			return try await core.getProvider().artist().getArtistDetails(artistId: artistId)
-		}
-		.query(
-			$topSongs, queryKey: ["artists", artistId, "topSongs", topSongsMode],
-			options: QueryOptions(staleTime: 300)
-		) {
-			let core = coreManager.core!
-			let provider = try await core.getProvider().artist()
-			return try await topSongsMode == .global
-				? provider.getTopSongs(artistId: artistId)
-				: provider.getPersonalTopSongs(artistId: artistId)
+		.task(id: topSongsMode) {
+			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
+			self.topSongs = nil
+
+			if topSongsMode == .global {
+				let stream = observeArtistGetTopSongs(provider: provider, artistId: artistId)
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.topSongs = d }
+				}
+			} else {
+				let stream = observeArtistGetPersonalTopSongs(provider: provider, artistId: artistId)
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.topSongs = d }
+				}
+			}
 		}
 	}
 
 	private var backgroundColor: some View {
 		(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
 			.ignoresSafeArea()
-	}
-
-	private func fetchArtwork(artist: ArtistDetails) async throws -> ArtworkResult {
-		guard let cover = artist.coverArt else { throw CancellationError() }
-		let size =
-			horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-		guard let url = Config.getCoverUrl(id: cover, size: size) else { throw URLError(.badURL) }
-		return try await ArtworkService.fetchAndExtract(url: url)
 	}
 
 	@ViewBuilder
@@ -153,26 +153,12 @@ struct ArtistView: View {
 			let singles = releases.filter { $0.releaseType == .single }
 			let others = releases.filter { $0.releaseType == .other }
 
-			if !albums.isEmpty {
-				releasesGridSection(title: "Albums", albums: albums)
-			}
-
-			if !eps.isEmpty {
-				releasesGridSection(title: "EPs", albums: eps)
-			}
-
-			if !singles.isEmpty {
-				releasesGridSection(title: "Singles", albums: singles)
-			}
-
-			if !others.isEmpty {
-				releasesGridSection(title: "Other Releases", albums: others)
-			}
+			if !albums.isEmpty { releasesGridSection(title: "Albums", albums: albums) }
+			if !eps.isEmpty { releasesGridSection(title: "EPs", albums: eps) }
+			if !singles.isEmpty { releasesGridSection(title: "Singles", albums: singles) }
+			if !others.isEmpty { releasesGridSection(title: "Other Releases", albums: others) }
 		}
-
-		if !appearsOn.isEmpty {
-			releasesGridSection(title: "Appears On", albums: appearsOn)
-		}
+		if !appearsOn.isEmpty { releasesGridSection(title: "Appears On", albums: appearsOn) }
 	}
 
 	@ViewBuilder
@@ -252,9 +238,7 @@ struct ArtistView: View {
 					track: track,
 					isActive: playbackViewModel.currentTrack?.id == track.id,
 					accentColor: artworkLoader.primaryColor
-				) {
-					playbackViewModel.playTracks(ids: songs.map { $0.id }, startIndex: UInt32(index))
-				}
+				) { playbackViewModel.playTracks(ids: songs.map { $0.id }, startIndex: UInt32(index)) }
 				.environment(\.trackRowSubtitle, .album)
 				.environment(\.trackRowHorizontalPadding, 20)
 				.transition(
@@ -365,11 +349,7 @@ private struct ArtistNavigationModifier: ViewModifier {
 
 	func body(content: Content) -> some View {
 		content
-			.navigationDestination(item: $selectedAlbumId) { id in
-				AlbumView(albumId: id)
-			}
-			.navigationDestination(item: $selectedSimilarArtistId) { id in
-				ArtistView(artistId: id)
-			}
+			.navigationDestination(item: $selectedAlbumId) { id in AlbumView(albumId: id) }
+			.navigationDestination(item: $selectedSimilarArtistId) { id in ArtistView(artistId: id) }
 	}
 }

@@ -10,7 +10,7 @@ pub mod rodio;
 
 /// Represents the current playback status of the audio backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum PlayerStatus {
 	/// Playback is completely stopped or no media is loaded.
 	Stopped,

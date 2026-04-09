@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct PlaylistView: View {
@@ -13,11 +12,8 @@ struct PlaylistView: View {
 
 	let playlistId: PlaylistId
 
-	@UseQuery<PlaylistDetails> var playlistDetails
-	@UseQuery<ArtworkResult> var artworkData
-
-	@UseMutation var cacheMutator
-
+	@State private var playlistDetails: PlaylistDetails?
+	@State private var artworkData: ArtworkResult?
 	@State private var editMode: EditMode = .inactive
 	@State private var localSongs: [Track] = []
 	@State private var originalSongIds: [TrackId] = []
@@ -52,12 +48,9 @@ struct PlaylistView: View {
 					}
 				}
 			}
-			.overlay {
-				if isSaving { ProgressHUD(title: "Saving...") }
-			}
+			.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
 			.sheet(isPresented: $showEditDetails) {
-				CreateEditPlaylistSheet(existingPlaylist: playlistDetails)
-					.presentationDetents([.medium])
+				CreateEditPlaylistSheet(existingPlaylist: playlistDetails).presentationDetents([.medium])
 			}
 			.alert("Delete Playlist", isPresented: $showDeleteConfirm) {
 				Button("Cancel", role: .cancel) {}
@@ -68,23 +61,22 @@ struct PlaylistView: View {
 			.onChange(of: editMode) { old, new in
 				if old == .active && new == .inactive { savePlaylistChanges() }
 			}
-			.onChange(of: colorScheme) { _, newScheme in
-				artworkLoader.updateTheme(for: newScheme)
-			}
-			.query(
-				$playlistDetails, queryKey: ["playlists", playlistId], options: QueryOptions(staleTime: 300)
-			) {
-				try await coreManager.core!.getProvider().playlist().getPlaylistDetails(
-					playlistId: playlistId)
+			.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
+			.task(id: playlistId) {
+				guard let provider = try? await coreManager.core?.getProvider().playlist() else { return }
+				let stream = observePlaylistGetPlaylistDetails(provider: provider, playlistId: playlistId)
+				while !Task.isCancelled {
+					guard let state = await stream.next() else { break }
+					if case .data(let d) = state { self.playlistDetails = d }
+				}
 			}
 	}
 
 	@ViewBuilder
 	private var viewContent: some View {
-		Boundary($playlistDetails) { playlist in
+		if let playlist = playlistDetails {
 			ZStack(alignment: .top) {
-				(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
-					.ignoresSafeArea()
+				(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground)).ignoresSafeArea()
 
 				List {
 					HeroHeaderView(
@@ -116,24 +108,13 @@ struct PlaylistView: View {
 					titleScrollOffset = value
 				}
 			}
-			.toolbar {
-				ToolbarItem(placement: .topBarTrailing) {
-					trailingToolbarMenu(playlist)
-				}
-			}
-			.query(
-				$artworkData, queryKey: ["playlists", playlistId, "artwork"],
-				options: QueryOptions(staleTime: .infinity)
-			) {
+			.toolbar { ToolbarItem(placement: .topBarTrailing) { trailingToolbarMenu(playlist) } }
+			.task(id: playlist.coverArt) {
 				let size =
 					horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-				guard let url = Config.getCoverUrl(id: playlist.coverArt, size: size) else {
-					throw URLError(.badURL)
-				}
-				return try await ArtworkService.fetchAndExtract(url: url)
-			}
-			.task(id: artworkData) {
-				if let result = artworkData {
+				guard let url = Config.getCoverUrl(id: playlist.coverArt, size: size) else { return }
+				if let result = try? await ArtworkService.fetchAndExtract(url: url) {
+					self.artworkData = result
 					artworkLoader.apply(result: result, scheme: colorScheme)
 				}
 			}
@@ -143,6 +124,8 @@ struct PlaylistView: View {
 					originalSongIds = playlist.songs.map { $0.id }
 				}
 			}
+		} else {
+			ProgressView()
 		}
 	}
 
@@ -166,7 +149,8 @@ struct PlaylistView: View {
 	private var trackListSection: some View {
 		ForEach(Array(localSongs.enumerated()), id: \.element.id) { index, track in
 			TrackItemRow(
-				track: track, index: index + 1,
+				track: track,
+				index: index + 1,
 				isActive: playbackViewModel.currentTrack?.id == track.id,
 				accentColor: artworkLoader.primaryColor
 			) {
@@ -305,39 +289,26 @@ struct PlaylistView: View {
 		if newIds == originalSongIds { return }
 
 		isSaving = true
-		let pid = playlistId
 		Task {
-			await cacheMutator.asyncPerform {
-				try await core.replacePlaylistTracks(id: pid, trackIds: newIds)
-			} onCompleted: { client in
-				Task {
-					await client.invalidate(["playlists"])
-					await client.invalidate(["playlists", pid])
-					await client.invalidate(["playlists", pid, "artwork"])
-					await MainActor.run {
-						originalSongIds = newIds
-						isSaving = false
-					}
-				}
-			}
+			do {
+				try await core.getProvider().playlist().replacePlaylistTracks(
+					id: playlistId, trackIds: newIds)
+				originalSongIds = newIds
+			} catch { print(error) }
+			await MainActor.run { isSaving = false }
 		}
 	}
 
 	private func deletePlaylist() {
 		guard let core = coreManager.core else { return }
+
 		isSaving = true
-		let pid = playlistId
+
 		Task {
-			await cacheMutator.asyncPerform {
-				try await core.deletePlaylist(id: pid)
-			} onCompleted: { client in
-				Task {
-					await client.invalidate(["playlists"])
-					await MainActor.run {
-						isSaving = false
-						dismiss()
-					}
-				}
+			try? await core.getProvider().playlist().deletePlaylist(id: playlistId)
+			await MainActor.run {
+				isSaving = false
+				dismiss()
 			}
 		}
 	}

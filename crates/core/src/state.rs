@@ -36,7 +36,7 @@ impl Default for CoreState {
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 #[derive(uniffi::Record, Debug, Clone)]
 pub struct PlaybackState {
 	pub queue_position: u32,
