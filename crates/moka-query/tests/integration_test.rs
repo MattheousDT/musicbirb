@@ -14,14 +14,14 @@ pub trait ArtistProvider: Send + Sync {
 #[moka_query_proxy(namespace = "NoArgs")]
 pub trait NoArgsProvider: Send + Sync {
 	#[query(key = "FetchAll")]
-	async fn fetch_all(&self) -> Result<String, String>;
+	async fn fetch_no_args(&self) -> Result<String, String>;
 }
 
 struct MockNoArgsProvider;
 
 #[async_trait::async_trait]
 impl NoArgsProvider for MockNoArgsProvider {
-	async fn fetch_all(&self) -> Result<String, String> {
+	async fn fetch_no_args(&self) -> Result<String, String> {
 		Ok("All Data".to_string())
 	}
 }
@@ -31,15 +31,15 @@ async fn test_no_args_compilation_and_execution() {
 	let global_client = Arc::new(GlobalQueryClient::new());
 	let provider = CachedNoArgsProvider::new(Arc::new(MockNoArgsProvider), global_client);
 
-	let stream = provider.observe_fetch_all();
+	let stream = provider.observe_fetch_no_args();
 
 	let state = stream.next().await.unwrap();
-	assert!(matches!(state, ObserveFetchAllState::Loading));
+	assert!(matches!(state, ObserveFetchNoArgsState::Loading));
 
 	let state = stream.next().await.unwrap();
 	assert_eq!(
 		state,
-		ObserveFetchAllState::Data {
+		ObserveFetchNoArgsState::Data {
 			data: "All Data".to_string()
 		}
 	);
@@ -56,7 +56,7 @@ async fn test_optimistic_update_success_flow() {
 	}
 	#[async_trait::async_trait]
 	impl NoArgsProvider for FlowProvider {
-		async fn fetch_all(&self) -> Result<String, String> {
+		async fn fetch_no_args(&self) -> Result<String, String> {
 			let mut c = self.count.lock().unwrap();
 			*c += 1;
 			Ok(self.data.lock().unwrap().clone())
@@ -72,16 +72,16 @@ async fn test_optimistic_update_success_flow() {
 		global_client,
 	);
 
-	let stream = provider.observe_fetch_all();
+	let stream = provider.observe_fetch_no_args();
 	let _ = stream.next().await; // Loading
 	let _ = stream.next().await; // "Server V1"
 	assert_eq!(*call_count.lock().unwrap(), 1);
 
 	// 1. Trigger Optimistic Update
-	provider.set_cached_fetch_all("Optimistic Guess".to_string()).await;
+	provider.set_cached_fetch_no_args("Optimistic Guess".to_string()).await;
 	assert_eq!(
 		stream.next().await.unwrap(),
-		ObserveFetchAllState::Data {
+		ObserveFetchNoArgsState::Data {
 			data: "Optimistic Guess".to_string()
 		}
 	);
@@ -95,7 +95,7 @@ async fn test_optimistic_update_success_flow() {
 	// 3. Stream should re-fetch and overwrite optimistic data with Server V2
 	assert_eq!(
 		stream.next().await.unwrap(),
-		ObserveFetchAllState::Data {
+		ObserveFetchNoArgsState::Data {
 			data: "Server V2".to_string()
 		}
 	);
@@ -111,7 +111,7 @@ async fn test_optimistic_update_rollback_flow() {
 	}
 	#[async_trait::async_trait]
 	impl NoArgsProvider for RollbackProvider {
-		async fn fetch_all(&self) -> Result<String, String> {
+		async fn fetch_no_args(&self) -> Result<String, String> {
 			Ok(self.data.lock().unwrap().clone())
 		}
 	}
@@ -124,16 +124,16 @@ async fn test_optimistic_update_rollback_flow() {
 		global_client,
 	);
 
-	let stream = provider.observe_fetch_all();
+	let stream = provider.observe_fetch_no_args();
 	let _ = stream.next().await; // Loading
 	let _ = stream.next().await; // "Stable Server Data"
 
 	// 1. Trigger Optimistic Update
-	provider.set_cached_fetch_all("Bad Guess".to_string()).await;
+	provider.set_cached_fetch_no_args("Bad Guess".to_string()).await;
 	let state = stream.next().await.unwrap();
 	assert_eq!(
 		state,
-		ObserveFetchAllState::Data {
+		ObserveFetchNoArgsState::Data {
 			data: "Bad Guess".to_string()
 		}
 	);
@@ -145,7 +145,7 @@ async fn test_optimistic_update_rollback_flow() {
 	let state = stream.next().await.unwrap();
 	assert_eq!(
 		state,
-		ObserveFetchAllState::Data {
+		ObserveFetchNoArgsState::Data {
 			data: "Stable Server Data".to_string()
 		}
 	);

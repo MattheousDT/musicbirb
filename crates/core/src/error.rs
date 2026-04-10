@@ -1,3 +1,4 @@
+use moka_query::client::MokaRetryable;
 use thiserror::Error;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
@@ -17,4 +18,15 @@ pub enum MusicbirbError {
 
 	#[error("Authentication error: {0}")]
 	Auth(String),
+}
+
+impl MokaRetryable for MusicbirbError {
+	fn is_transient(&self) -> bool {
+		match self {
+			// Network errors are usually transient
+			MusicbirbError::Network(_) => true,
+			// Internal or specific API errors (like 404) might not be
+			_ => false,
+		}
+	}
 }

@@ -86,17 +86,27 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 			let mut is_mutation = false;
 			let mut query_key_template = String::new();
 			let mut invalidates_patterns = Vec::new();
+			let mut retries: u32 = 0;
 
 			for attr in &method.attrs {
 				if attr.path().is_ident("query") {
 					is_query = true;
 					if let Meta::List(meta) = &attr.meta {
-						let expr: syn::ExprAssign = syn::parse2(meta.tokens.clone()).unwrap();
-						if let Expr::Lit(ExprLit {
-							lit: Lit::Str(lit_str), ..
-						}) = *expr.right
-						{
-							query_key_template = lit_str.value();
+						let nested = meta
+							.parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
+							.unwrap();
+						for m in nested {
+							if let Meta::NameValue(nv) = m {
+								if nv.path.is_ident("key") {
+									if let Expr::Lit(ExprLit { lit: Lit::Str(s), .. }) = nv.value {
+										query_key_template = s.value();
+									}
+								} else if nv.path.is_ident("retries") {
+									if let Expr::Lit(ExprLit { lit: Lit::Int(i), .. }) = nv.value {
+										retries = i.base10_parse().unwrap_or(0);
+									}
+								}
+							}
 						}
 					}
 				} else if attr.path().is_ident("mutation") {
@@ -309,7 +319,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					pub fn #observe_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let key = format!(#full_key);
 						let inner = self.inner.clone();
-						let stream = self.global_client.clone().observe(key.clone(), move || {
+						let stream = self.global_client.clone().observe(key.clone(), #retries, move || {
 							let inner = inner.clone();
 							#( let #arg_names = #arg_names.clone(); )*
 							async move { #( #captures )* inner.#method_name(#(#arg_names),*).await }

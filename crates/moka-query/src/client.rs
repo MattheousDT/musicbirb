@@ -5,6 +5,17 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
+use tokio::time::{Duration, sleep};
+
+/// Trait to determine if an error should trigger a retry.
+pub trait MokaRetryable {
+	fn is_transient(&self) -> bool {
+		true
+	}
+}
+
+// Default implementation for String so simple errors retry by default
+impl MokaRetryable for String {}
 
 /// Global Client that orchestrates caching, deduplication, and reactivity.
 pub struct GlobalQueryClient {
@@ -76,13 +87,17 @@ impl GlobalQueryClient {
 	}
 
 	/// Subscribes to a stream of state updates for a specific cache key.
-	/// Changed to be synchronous since it just builds and returns the stream immediately!
-	pub fn observe<T, F, Fut, E>(self: Arc<Self>, key: String, fetcher: F) -> impl futures::Stream<Item = QueryState<T>>
+	pub fn observe<T, F, Fut, E>(
+		self: Arc<Self>,
+		key: String,
+		retries: u32,
+		fetcher: F,
+	) -> impl futures::Stream<Item = QueryState<T>>
 	where
 		T: Any + Send + Sync + Clone + 'static,
 		F: Fn() -> Fut + Send + Sync + 'static,
 		Fut: Future<Output = Result<T, E>> + Send + 'static,
-		E: std::fmt::Display,
+		E: std::fmt::Display + MokaRetryable + Send + Sync + 'static,
 	{
 		self.active_keys.write().unwrap().insert(key.clone());
 
@@ -96,13 +111,35 @@ impl GlobalQueryClient {
 					yield QueryState::Loading;
 				}
 
-				let fetch_key = key.clone();
-				let fetch_result = self.cache.try_get_with(fetch_key, async {
-					match fetcher().await {
-						Ok(res) => Ok(Arc::new(res) as Arc<dyn Any + Send + Sync>),
-						Err(e) => Err(e.to_string()),
+				let mut retry_count = 0;
+				let mut current_delay = Duration::from_millis(500);
+
+				let fetch_result = loop {
+					let fetch_key = key.clone();
+					let res = self.cache.try_get_with(fetch_key, async {
+						fetcher().await
+							.map(|res| Arc::new(res) as Arc<dyn Any + Send + Sync>)
+					}).await;
+
+					match res {
+						Ok(data) => break Ok(data),
+						Err(e) => {
+							// Check if we should retry:
+							// 1. We have retries left
+							// 2. The error isn't explicitly fatal
+							if retry_count < retries && e.is_transient() {
+								retry_count += 1;
+								sleep(current_delay).await;
+								current_delay = (current_delay * 2).min(Duration::from_secs(30));
+
+								// Explicitly invalidate from cache to force try_get_with to run again
+								self.cache.invalidate(&key).await;
+								continue;
+							}
+							break Err(e);
+						}
 					}
-				}).await;
+				};
 
 				match fetch_result {
 					Ok(data) => {
