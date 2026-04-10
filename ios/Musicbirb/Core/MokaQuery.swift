@@ -36,6 +36,21 @@ public struct UseQuery<Value>: DynamicProperty {
 	public var projectedValue: Binding<MokaState<Value>> { $state }
 }
 
+// MARK: - Mutation Stream Protocols
+
+public protocol MokaMutationStreamProtocol {
+	associatedtype RawState
+	func next() async -> RawState?
+}
+
+// Auto-conformance for generated mutation streams (extend as we add more)
+extension MutateCreatePlaylistStream: MokaMutationStreamProtocol {}
+extension MutateUpdatePlaylistStream: MokaMutationStreamProtocol {}
+extension MutateDeletePlaylistStream: MokaMutationStreamProtocol {}
+extension MutateAddToPlaylistStream: MokaMutationStreamProtocol {}
+extension MutateRemoveFromPlaylistStream: MokaMutationStreamProtocol {}
+extension MutateReplacePlaylistTracksStream: MokaMutationStreamProtocol {}
+
 @propertyWrapper
 public struct UseMutation<Value>: DynamicProperty {
 	public enum MutationState {
@@ -48,6 +63,17 @@ public struct UseMutation<Value>: DynamicProperty {
 	public init() {}
 	public var wrappedValue: MutationState { state }
 	public var projectedValue: Binding<MutationState> { $state }
+
+	@MainActor
+	public func execute<Stream: MokaMutationStreamProtocol>(_ stream: Stream) async {
+		self.state = .loading
+		while let raw = await stream.next() {
+			let mapped = MokaDefaults.mapMutationState(raw: raw, valueType: Value.self)
+			self.state = mapped
+			if case .success = mapped { break }
+			if case .error = mapped { break }
+		}
+	}
 }
 
 // MARK: - Suspense Component
@@ -240,5 +266,45 @@ public enum MokaDefaults {
 			return .error(errorMsg, previous: prevData)
 		}
 		return previous
+	}
+
+	public static func mapMutationState<RawState, Value>(raw: RawState, valueType: Value.Type)
+		-> UseMutation<Value>.MutationState
+	{
+		let mirror = Mirror(reflecting: raw)
+		let rawStr = String(describing: raw).lowercased()
+
+		guard let child = mirror.children.first else {
+			if rawStr.contains("loading") {
+				return .loading
+			}
+			// When the result has no inner data (e.g., Result<(), Error>), UniFFI generates a pure enum `Data`
+			if rawStr == "data" {
+				if Value.self == Void.self {
+					return .success(() as! Value)
+				}
+			}
+			return .idle
+		}
+
+		if child.label?.lowercased() == "data" {
+			if let val = child.value as? Value { return .success(val) }
+			if let tupleChild = Mirror(reflecting: child.value).children.first,
+				let val = tupleChild.value as? Value
+			{
+				return .success(val)
+			}
+		} else if child.label?.lowercased() == "error" {
+			var errorMsg = "Unknown Error"
+			if let msg = child.value as? String {
+				errorMsg = msg
+			} else if let tupleChild = Mirror(reflecting: child.value).children.first,
+				let msg = tupleChild.value as? String
+			{
+				errorMsg = msg
+			}
+			return .error(errorMsg)
+		}
+		return .idle
 	}
 }

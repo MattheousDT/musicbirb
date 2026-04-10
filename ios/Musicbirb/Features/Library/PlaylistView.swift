@@ -18,8 +18,14 @@ struct PlaylistView: View {
 	@State private var editMode: EditMode = .inactive
 	@State private var localSongs: [Track] = []
 	@State private var originalSongIds: [TrackId] = []
-	@State private var isSaving = false
 	@State private var showEditDetails = false
+
+	@UseMutation<Void> var replaceTracksMutation
+	@UseMutation<Void> var deletePlaylistMutation
+
+	var isSaving: Bool {
+		replaceTracksMutation.isLoading || deletePlaylistMutation.isLoading
+	}
 	@State private var showDeleteConfirm = false
 	@State private var artworkLoader = ArtworkColorLoader()
 	@State private var titleScrollOffset: CGFloat = .infinity
@@ -287,27 +293,34 @@ struct PlaylistView: View {
 		let newIds = localSongs.map { $0.id }
 		if newIds == originalSongIds { return }
 
-		isSaving = true
 		Task {
 			do {
-				try await core.getProvider().playlist().replacePlaylistTracks(
+				let stream = try await core.getProvider().playlist().executeReplacePlaylistTracks(
 					id: playlistId, trackIds: newIds)
-				originalSongIds = newIds
-			} catch { print(error) }
-			await MainActor.run { isSaving = false }
+				await _replaceTracksMutation.execute(stream)
+
+				if case .success = replaceTracksMutation {
+					await MainActor.run { originalSongIds = newIds }
+				}
+			} catch {
+				print("Failed to get provider for track replacement: \(error)")
+			}
 		}
 	}
 
 	private func deletePlaylist() {
 		guard let core = coreManager.core else { return }
 
-		isSaving = true
-
 		Task {
-			try? await core.getProvider().playlist().deletePlaylist(id: playlistId)
-			await MainActor.run {
-				isSaving = false
-				dismiss()
+			do {
+				let stream = try await core.getProvider().playlist().executeDeletePlaylist(id: playlistId)
+				await _deletePlaylistMutation.execute(stream)
+
+				if case .success = deletePlaylistMutation {
+					await MainActor.run { dismiss() }
+				}
+			} catch {
+				print("Failed to get provider for playlist deletion: \(error)")
 			}
 		}
 	}

@@ -33,11 +33,11 @@ impl PlaylistProvider for SubsonicPlaylist {
 
 	async fn create_playlist(
 		&self,
-		name: &str,
+		name: String,
 		description: Option<String>,
 		public: bool,
 	) -> Result<Playlist, MusicbirbError> {
-		let res = self.ctx.get_rest_response("createPlaylist", &[("name", name)]).await?;
+		let res = self.ctx.get_rest_response("createPlaylist", &[("name", &name)]).await?;
 
 		let pl = res
 			.playlist

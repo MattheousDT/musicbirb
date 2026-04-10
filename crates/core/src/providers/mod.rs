@@ -105,10 +105,10 @@ pub trait PlaylistProvider: Send + Sync {
 	async fn get_playlist_details(&self, playlist_id: &PlaylistId) -> Result<PlaylistDetails, MusicbirbError>;
 
 	/// Creates a new empty playlist on the server.
-	#[mutation(invalidates =["Playlist/*"])]
+	#[mutation(invalidates = ["Playlist/*"])]
 	async fn create_playlist(
 		&self,
-		name: &str,
+		name: String,
 		description: Option<String>,
 		public: bool,
 	) -> Result<Playlist, MusicbirbError>;

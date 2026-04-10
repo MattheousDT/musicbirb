@@ -9,7 +9,13 @@ struct CreateEditPlaylistSheet: View {
 	@State private var name: String = ""
 	@State private var description: String = ""
 	@State private var isPublic: Bool = false
-	@State private var isSaving: Bool = false
+
+	@UseMutation<Playlist> var createPlaylistMutation
+	@UseMutation<Void> var updatePlaylistMutation
+
+	var isSaving: Bool {
+		createPlaylistMutation.isLoading || updatePlaylistMutation.isLoading
+	}
 
 	var isEditing: Bool { existingPlaylist != nil }
 
@@ -57,21 +63,30 @@ struct CreateEditPlaylistSheet: View {
 			description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
 		let pid = existingPlaylist?.id
 
-		isSaving = true
+		guard let core = coreManager.core else { return }
+
 		Task {
 			do {
 				if let id = pid {
-					try await coreManager.core?.getProvider().playlist().updatePlaylist(
+					let stream = try await core.getProvider().playlist().executeUpdatePlaylist(
 						id: id, name: cleanName, description: descOpt, public: isPublic)
+					await _updatePlaylistMutation.execute(stream)
+
+					if case .success = updatePlaylistMutation {
+						await MainActor.run { dismiss() }
+					}
 				} else {
-					_ = try await coreManager.core?.getProvider().playlist().createPlaylist(
+					let stream = try await core.getProvider().playlist().executeCreatePlaylist(
 						name: cleanName, description: descOpt, public: isPublic)
+					await _createPlaylistMutation.execute(stream)
+
+					if case .success = createPlaylistMutation {
+						await MainActor.run { dismiss() }
+					}
 				}
-				await MainActor.run { dismiss() }
 			} catch {
-				print(error)
+				print("Failed to get provider for mutation: \(error)")
 			}
-			await MainActor.run { isSaving = false }
 		}
 	}
 }

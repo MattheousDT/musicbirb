@@ -145,18 +145,33 @@ struct AddToPlaylistSheet: View {
 		Task {
 			do {
 				if !isPresent {
-					let skipped = try await core.addTracksToPlaylist(
-						id: playlistId, trackIds: targetIds, allowDuplicates: allowDuplicates)
+					var finalIds = targetIds
+					var skipped: UInt32 = 0
+
+					if !allowDuplicates {
+						let currentTracks =
+							(try? await core.getProvider().playlist().getPlaylistTracks(playlistId: playlistId))
+							?? []
+						let existingIds = Set(currentTracks.map { $0.id })
+						finalIds = targetIds.filter { !existingIds.contains($0) }
+						skipped = UInt32(targetIds.count - finalIds.count)
+					}
+
+					if !finalIds.isEmpty {
+						_ = try? await core.getProvider().playlist().addToPlaylist(
+							id: playlistId, trackIds: finalIds)
+					}
 					if skipped > 0 { await MainActor.run { onResult(skipped) } }
 				} else {
-					let currentTracks = try await core.getProvider().playlist().getPlaylistTracks(
-						playlistId: playlistId)
+					let currentTracks =
+						(try? await core.getProvider().playlist().getPlaylistTracks(playlistId: playlistId))
+						?? []
 					let toRemove = Set(targetIds)
 					let newIds = currentTracks.filter { !toRemove.contains($0.id) }.map { $0.id }
-					try await core.getProvider().playlist().replacePlaylistTracks(
+					_ = try? await core.getProvider().playlist().replacePlaylistTracks(
 						id: playlistId, trackIds: newIds)
 				}
-			} catch { print(error) }
+			}
 
 			await MainActor.run {
 				playlistPresence[playlistId] = !isPresent

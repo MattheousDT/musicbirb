@@ -240,3 +240,30 @@ async fn test_caching_and_invalidation() {
 	// The backend should have been fetched exactly 1 more time for the refetch
 	assert_eq!(*call_count.lock().unwrap(), 2);
 }
+
+#[tokio::test]
+async fn test_mutation_stream_flow() {
+	let call_count = Arc::new(Mutex::new(0));
+	let data = Arc::new(Mutex::new("Unstarred".to_string()));
+
+	let raw_provider = MockArtistProvider {
+		call_count: call_count.clone(),
+		data: data.clone(),
+	};
+
+	let global_client = Arc::new(GlobalQueryClient::new());
+	let provider = CachedArtistProvider::new(Arc::new(raw_provider), global_client);
+
+	let stream = provider.execute_star_artist("123".to_string());
+
+	// 1. Initial execution yields Loading
+	let state = stream.next().await.unwrap();
+	assert_eq!(state, MutateStarArtistState::Loading);
+
+	// 2. Awaits completion and yields Data (No interior struct data since the return type was Unit)
+	let state = stream.next().await.unwrap();
+	assert_eq!(state, MutateStarArtistState::Data);
+
+	// 3. Verify backend mutation executed correctly
+	assert_eq!(*data.lock().unwrap(), "Starred");
+}

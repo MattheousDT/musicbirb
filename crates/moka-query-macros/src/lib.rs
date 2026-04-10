@@ -8,9 +8,24 @@ use syn::{
 
 fn strip_reference(ty: &Type) -> Type {
 	if let Type::Reference(type_ref) = ty {
+		let inner = &*type_ref.elem;
+		// Special case: &str must become String for UniFFI and ownership
+		if let Type::Path(p) = inner {
+			if p.path.is_ident("str") {
+				return syn::parse_quote!(String);
+			}
+		}
 		*type_ref.elem.clone()
 	} else {
 		ty.clone()
+	}
+}
+
+fn is_unit_type(ty: &Type) -> bool {
+	if let Type::Tuple(tuple) = ty {
+		tuple.elems.is_empty()
+	} else {
+		false
 	}
 }
 
@@ -152,6 +167,100 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 							#( self.global_client.invalidate_pattern(#invalidates_patterns).await; )*
 						}
 						res
+					}
+				});
+
+				let method_camel = method_name
+					.to_string()
+					.split('_')
+					.map(|s| format!("{}{}", &s[..1].to_uppercase(), &s[1..]))
+					.collect::<String>();
+				let stream_struct_name = format_ident!("Mutate{}Stream", method_camel);
+				let state_enum_name = format_ident!("Mutate{}State", method_camel);
+				let execute_method_name = format_ident!("execute_{}", method_name);
+
+				let inner_ok_type_opt = extract_ok_type(output);
+				let mut ok_type_for_enum = quote! { () };
+				let mut is_unit = true;
+
+				if let Some(ty) = &inner_ok_type_opt {
+					if !is_unit_type(ty) {
+						ok_type_for_enum = quote! { #ty };
+						is_unit = false;
+					}
+				}
+
+				let data_variant = if is_unit {
+					quote! { Data }
+				} else {
+					quote! { Data { data: #ok_type_for_enum } }
+				};
+
+				let data_yield = if is_unit {
+					quote! {
+						let _ = data; // Suppress unused warnings
+						yield #state_enum_name::Data;
+					}
+				} else {
+					quote! { yield #state_enum_name::Data { data }; }
+				};
+
+				let captures: Vec<_> = arg_names
+					.iter()
+					.zip(arg_is_ref.iter())
+					.map(|(name, is_ref)| {
+						if *is_ref {
+							quote! { let #name = #name.clone(); let #name = &#name; }
+						} else {
+							quote! { let #name = #name.clone(); }
+						}
+					})
+					.collect();
+
+				uniffi_inherent_methods.push(quote! {
+					pub fn #execute_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
+						let inner = self.inner.clone();
+						let global_client = self.global_client.clone();
+						#( let #arg_names = #arg_names.clone(); )*
+
+						let stream = moka_query::async_stream::stream! {
+							yield #state_enum_name::Loading;
+							#( #captures )*
+							let res = inner.#method_name(#(#arg_names),*).await;
+							match res {
+								Ok(data) => {
+									#( global_client.invalidate_pattern(#invalidates_patterns).await; )*
+									#data_yield
+								}
+								Err(err) => yield #state_enum_name::Error { message: err.to_string() }
+							}
+						};
+
+						std::sync::Arc::new(#stream_struct_name {
+							inner: tokio::sync::Mutex::new(Box::pin(stream)),
+						})
+					}
+				});
+
+				generated_types.push(quote! {
+					#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+					#[derive(Debug, Clone, PartialEq)]
+					pub enum #state_enum_name {
+						Loading, #data_variant, Error { message: String },
+					}
+
+					#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+					pub struct #stream_struct_name {
+						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = #state_enum_name> + Send>>>,
+					}
+
+					#[cfg_attr(feature = "uniffi", uniffi::export)]
+					impl #stream_struct_name {
+						pub async fn next(&self) -> Option<#state_enum_name> {
+							use futures::StreamExt;
+							let mut stream = self.inner.lock().await;
+							stream.next().await
+						}
 					}
 				});
 			} else if is_async {
