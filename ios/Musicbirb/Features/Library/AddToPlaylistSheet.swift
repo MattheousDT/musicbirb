@@ -11,7 +11,8 @@ struct AddToPlaylistSheet: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.dismiss) private var dismiss
 
-	@State private var playlists: [Playlist]?
+	@State private var playlists: MokaState<[Playlist]> = .idle
+
 	@State private var trackIdsToAdd: [TrackId] = []
 	@State private var playlistPresence: [String: Bool] = [:]
 	@State private var isWorking: [String: Bool] = [:]
@@ -20,7 +21,7 @@ struct AddToPlaylistSheet: View {
 	var body: some View {
 		NavigationStack {
 			Group {
-				if let allPlaylists = playlists {
+				if let allPlaylists = playlists.data {
 					let username = authViewModel.activeAccount?.username.lowercased()
 					let owned = allPlaylists.filter { $0.owner?.lowercased() == username }
 
@@ -69,16 +70,14 @@ struct AddToPlaylistSheet: View {
 						}
 						.task(id: owned.count) { await calculatePresence(owned: owned) }
 					}
-				} else {
+				} else if playlists.isLoading {
 					ProgressView()
-				}
-			}
-			.task {
-				guard let provider = try? await coreManager.core?.getProvider().playlist() else { return }
-				let stream = observePlaylistGetPlaylists(provider: provider)
-				while !Task.isCancelled {
-					guard let state = await stream.next() else { break }
-					if case .data(let d) = state { self.playlists = d }
+				} else if let error = playlists.error {
+					ContentUnavailableView(
+						"Error",
+						systemImage: "exclamationmark.triangle",
+						description: Text(error)
+					)
 				}
 			}
 			.navigationTitle("Add to Playlist")
@@ -108,6 +107,11 @@ struct AddToPlaylistSheet: View {
 				CreateEditPlaylistSheet()
 					.presentationDetents([.medium])
 			}
+			.mokaQuery(
+				{ try await coreManager.core?.getProvider().playlist().observeGetPlaylists() },
+				next: { await $0.next() },
+				bind: $playlists
+			)
 		}
 	}
 
@@ -165,6 +169,7 @@ struct AddToPlaylistSheet: View {
 						id: playlistId, trackIds: newIds)
 				}
 			} catch { print(error) }
+
 			await MainActor.run {
 				playlistPresence[playlistId] = !isPresent
 				isWorking[playlistId] = false

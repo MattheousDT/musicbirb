@@ -193,7 +193,7 @@ impl Provider for SubsonicProvider {
 		})
 	}
 
-	fn track(&self) -> Arc<dyn TrackProvider> {
+	fn track(&self) -> Arc<CachedTrackProvider> {
 		Arc::new(crate::providers::CachedTrackProvider::new(
 			Arc::new(SubsonicTrack {
 				ctx: Arc::clone(&self.ctx),
@@ -202,8 +202,8 @@ impl Provider for SubsonicProvider {
 		))
 	}
 
-	fn album(&self) -> Arc<dyn AlbumProvider> {
-		Arc::new(crate::providers::CachedAlbumProvider::new(
+	fn album(&self) -> Arc<CachedAlbumProvider> {
+		Arc::new(CachedAlbumProvider::new(
 			Arc::new(SubsonicAlbum {
 				ctx: Arc::clone(&self.ctx),
 			}),
@@ -211,8 +211,8 @@ impl Provider for SubsonicProvider {
 		))
 	}
 
-	fn artist(&self) -> Arc<dyn ArtistProvider> {
-		Arc::new(crate::providers::CachedArtistProvider::new(
+	fn artist(&self) -> Arc<CachedArtistProvider> {
+		Arc::new(CachedArtistProvider::new(
 			Arc::new(SubsonicArtist {
 				ctx: Arc::clone(&self.ctx),
 			}),
@@ -220,8 +220,8 @@ impl Provider for SubsonicProvider {
 		))
 	}
 
-	fn playlist(&self) -> Arc<dyn PlaylistProvider> {
-		Arc::new(crate::providers::CachedPlaylistProvider::new(
+	fn playlist(&self) -> Arc<CachedPlaylistProvider> {
+		Arc::new(CachedPlaylistProvider::new(
 			Arc::new(SubsonicPlaylist {
 				ctx: Arc::clone(&self.ctx),
 			}),
@@ -229,8 +229,8 @@ impl Provider for SubsonicProvider {
 		))
 	}
 
-	fn activity(&self) -> Arc<dyn ActivityProvider> {
-		Arc::new(crate::providers::CachedActivityProvider::new(
+	fn activity(&self) -> Arc<CachedActivityProvider> {
+		Arc::new(CachedActivityProvider::new(
 			Arc::new(SubsonicActivity {
 				ctx: Arc::clone(&self.ctx),
 			}),
@@ -238,8 +238,8 @@ impl Provider for SubsonicProvider {
 		))
 	}
 
-	fn search(&self) -> Arc<dyn SearchProvider> {
-		Arc::new(crate::providers::CachedSearchProvider::new(
+	fn search(&self) -> Arc<CachedSearchProvider> {
+		Arc::new(CachedSearchProvider::new(
 			Arc::new(SubsonicSearch {
 				ctx: Arc::clone(&self.ctx),
 			}),

@@ -57,12 +57,22 @@ async fn test_caching_and_invalidation() {
 	let state = stream1.next().await.unwrap();
 	assert!(matches!(state, ObserveGetArtistDetailsState::Loading));
 
-    let state = stream1.next().await.unwrap();
-	assert_eq!(state, ObserveGetArtistDetailsState::Data { data: "123: Unstarred".to_string() });
+	let state = stream1.next().await.unwrap();
+	assert_eq!(
+		state,
+		ObserveGetArtistDetailsState::Data {
+			data: "123: Unstarred".to_string()
+		}
+	);
 
 	// stream2 hits the cache! It goes straight to Data without triggering an API call.
 	let state2 = stream2.next().await.unwrap();
-	assert_eq!(state2, ObserveGetArtistDetailsState::Data { data: "123: Unstarred".to_string() });
+	assert_eq!(
+		state2,
+		ObserveGetArtistDetailsState::Data {
+			data: "123: Unstarred".to_string()
+		}
+	);
 
 	// We verify the backend was only invoked once! (Deduplication)
 	assert_eq!(*call_count.lock().unwrap(), 1);
@@ -72,10 +82,20 @@ async fn test_caching_and_invalidation() {
 
 	// Since "Artist/*" was invalidated, BOTH streams will receive a fresh Data packet with the new state.
 	let state_updated1 = stream1.next().await.unwrap();
-	assert_eq!(state_updated1, ObserveGetArtistDetailsState::Data { data: "123: Starred".to_string() });
+	assert_eq!(
+		state_updated1,
+		ObserveGetArtistDetailsState::Data {
+			data: "123: Starred".to_string()
+		}
+	);
 
 	let state_updated2 = stream2.next().await.unwrap();
-	assert_eq!(state_updated2, ObserveGetArtistDetailsState::Data { data: "123: Starred".to_string() });
+	assert_eq!(
+		state_updated2,
+		ObserveGetArtistDetailsState::Data {
+			data: "123: Starred".to_string()
+		}
+	);
 
 	// The backend should have been fetched exactly 1 more time for the refetch
 	assert_eq!(*call_count.lock().unwrap(), 2);

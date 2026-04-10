@@ -9,7 +9,7 @@ struct CreateEditPlaylistSheet: View {
 	@State private var name: String = ""
 	@State private var description: String = ""
 	@State private var isPublic: Bool = false
-	@State private var isSaving = false
+	@State private var isSaving: Bool = false
 
 	var isEditing: Bool { existingPlaylist != nil }
 
@@ -45,7 +45,9 @@ struct CreateEditPlaylistSheet: View {
 					isPublic = existing.public ?? false
 				}
 			}
-			.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
+			.overlay {
+				if isSaving { ProgressHUD(title: "Saving...") }
+			}
 		}
 	}
 
@@ -55,8 +57,8 @@ struct CreateEditPlaylistSheet: View {
 			description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
 		let pid = existingPlaylist?.id
 
+		isSaving = true
 		Task {
-			isSaving = true
 			do {
 				if let id = pid {
 					try await coreManager.core?.getProvider().playlist().updatePlaylist(
@@ -65,13 +67,11 @@ struct CreateEditPlaylistSheet: View {
 					_ = try await coreManager.core?.getProvider().playlist().createPlaylist(
 						name: cleanName, description: descOpt, public: isPublic)
 				}
+				await MainActor.run { dismiss() }
 			} catch {
 				print(error)
 			}
-			await MainActor.run {
-				isSaving = false
-				dismiss()
-			}
+			await MainActor.run { isSaving = false }
 		}
 	}
 }

@@ -13,8 +13,8 @@ pub mod subsonic;
 
 /// The primary gateway to backend APIs.
 /// Providers return Arc-wrapped domain sub-providers to keep logic modular.
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-#[macros::async_ffi]
+#[cfg_attr(feature = "uniffi", uniffi::export(with_foreign))]
+#[async_trait::async_trait]
 pub trait Provider: Send + Sync {
 	/// Validates that the provider's connection and tokens are still active.
 	async fn ping(&self) -> Result<(), MusicbirbError>;
@@ -22,17 +22,17 @@ pub trait Provider: Send + Sync {
 	/// Access methods for streaming and raw media bytes (e.g., covers)
 	fn media(&self) -> Arc<dyn MediaProvider>;
 	/// Access methods for singular tracks and track-level interactions
-	fn track(&self) -> Arc<dyn TrackProvider>;
+	fn track(&self) -> Arc<CachedTrackProvider>;
 	/// Access methods for albums
-	fn album(&self) -> Arc<dyn AlbumProvider>;
+	fn album(&self) -> Arc<CachedAlbumProvider>;
 	/// Access methods for artists
-	fn artist(&self) -> Arc<dyn ArtistProvider>;
+	fn artist(&self) -> Arc<CachedArtistProvider>;
 	/// Access methods for playlists
-	fn playlist(&self) -> Arc<dyn PlaylistProvider>;
+	fn playlist(&self) -> Arc<CachedPlaylistProvider>;
 	/// Access methods for scrobbling and presence
-	fn activity(&self) -> Arc<dyn ActivityProvider>;
+	fn activity(&self) -> Arc<CachedActivityProvider>;
 	/// Access methods for discovery and generalized searching
-	fn search(&self) -> Arc<dyn SearchProvider>;
+	fn search(&self) -> Arc<CachedSearchProvider>;
 }
 
 /// Handles low-level stream URLs and fetching raw image bytes.

@@ -11,7 +11,7 @@ struct AlbumView: View {
 
 	let albumId: AlbumId
 
-	@State private var albumDetails: AlbumDetails?
+	@State private var albumDetails: MokaState<AlbumDetails> = .idle
 
 	@State private var selectedArtistId: ArtistId?
 	@State private var artworkLoader = ArtworkColorLoader()
@@ -21,7 +21,7 @@ struct AlbumView: View {
 		@Bindable var settings = settings
 
 		Group {
-			if let album = albumDetails {
+			if let album = albumDetails.data {
 				ZStack(alignment: .top) {
 					(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
 						.ignoresSafeArea()
@@ -166,22 +166,25 @@ struct AlbumView: View {
 						artworkLoader.apply(result: result, scheme: colorScheme)
 					}
 				}
-			} else {
+			} else if albumDetails.isLoading {
 				ProgressView()
+			} else if let error = albumDetails.error {
+				ContentUnavailableView(
+					"Error", systemImage: "exclamationmark.triangle", description: Text(error))
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
-		.navigationTitle(albumDetails?.title ?? "")
+		.navigationTitle(albumDetails.data?.title ?? "")
 		.toolbar {
 			ToolbarItem(placement: .title) {
-				Text(albumDetails?.title ?? "")
+				Text(albumDetails.data?.title ?? "")
 					.font(.headline)
 					.opacity(titleScrollOffset < 0 ? 1 : 0)
 					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
 			}
 			if #available(iOS 26, *) {
 				ToolbarItem(placement: .subtitle) {
-					if let artist = albumDetails?.artist {
+					if let artist = albumDetails.data?.artist {
 						Text(artist)
 							.font(.subheadline)
 							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
@@ -192,13 +195,13 @@ struct AlbumView: View {
 		}
 		.navigationDestination(item: $selectedArtistId) { id in ArtistView(artistId: id) }
 		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-		.task(id: albumId) {
-			guard let provider = try? await coreManager.core?.getProvider().album() else { return }
-			let stream = observeAlbumGetAlbumDetails(provider: provider, albumId: albumId)
-			while !Task.isCancelled {
-				guard let state = await stream.next() else { break }
-				if case .data(let d) = state { self.albumDetails = d }
-			}
-		}
+		.mokaQuery(
+			id: albumId,
+			{
+				try await coreManager.core?.getProvider().album().observeGetAlbumDetails(albumId: albumId)
+			},
+			next: { await $0.next() },
+			bind: $albumDetails
+		)
 	}
 }

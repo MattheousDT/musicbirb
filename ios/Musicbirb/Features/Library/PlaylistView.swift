@@ -12,7 +12,7 @@ struct PlaylistView: View {
 
 	let playlistId: PlaylistId
 
-	@State private var playlistDetails: PlaylistDetails?
+	@State private var playlistDetails: MokaState<PlaylistDetails> = .idle
 	@State private var artworkData: ArtworkResult?
 	@State private var editMode: EditMode = .inactive
 	@State private var localSongs: [Track] = []
@@ -26,106 +26,118 @@ struct PlaylistView: View {
 	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
-		viewContent
-			.ignoresSafeArea(edges: .top)
-			.navigationBarTitleDisplayMode(.inline)
-			.navigationTitle(playlistDetails?.name ?? "")
-			.toolbar {
-				ToolbarItem(placement: .title) {
-					Text(playlistDetails?.name ?? "")
-						.font(.headline)
-						.opacity(titleScrollOffset < 0 ? 1 : 0)
-						.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
-				}
-				if #available(iOS 26, *) {
-					ToolbarItem(placement: .subtitle) {
-						if let playlist = playlistDetails {
-							Text(headerMeta(playlist))
-								.font(.subheadline)
-								.opacity(titleScrollOffset < 0 ? 0.8 : 0)
-								.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
-						}
+		Group {
+			if let playlist = playlistDetails.data {
+				viewContent(playlist)
+			} else if let error = playlistDetails.error {
+				ContentUnavailableView(
+					"Error",
+					systemImage: "exclamationmark.triangle",
+					description: Text(error)
+				)
+			} else {
+				ProgressView()
+			}
+		}
+		.ignoresSafeArea(edges: .top)
+		.navigationBarTitleDisplayMode(.inline)
+		.navigationTitle(playlistDetails.data?.name ?? "")
+		.toolbar {
+			ToolbarItem(placement: .title) {
+				Text(playlistDetails.data?.name ?? "")
+					.font(.headline)
+					.opacity(titleScrollOffset < 0 ? 1 : 0)
+					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+			}
+			if #available(iOS 26, *) {
+				ToolbarItem(placement: .subtitle) {
+					if let playlist = playlistDetails.data {
+						Text(headerMeta(playlist))
+							.font(.subheadline)
+							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
 					}
 				}
 			}
-			.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
-			.sheet(isPresented: $showEditDetails) {
-				CreateEditPlaylistSheet(existingPlaylist: playlistDetails).presentationDetents([.medium])
-			}
-			.alert("Delete Playlist", isPresented: $showDeleteConfirm) {
-				Button("Cancel", role: .cancel) {}
-				Button("Delete", role: .destructive) { deletePlaylist() }
-			} message: {
-				Text("Are you sure you want to delete this playlist? This action cannot be undone.")
-			}
-			.onChange(of: editMode) { old, new in
-				if old == .active && new == .inactive { savePlaylistChanges() }
-			}
-			.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-			.task(id: playlistId) {
-				guard let provider = try? await coreManager.core?.getProvider().playlist() else { return }
-				let stream = observePlaylistGetPlaylistDetails(provider: provider, playlistId: playlistId)
-				while !Task.isCancelled {
-					guard let state = await stream.next() else { break }
-					if case .data(let d) = state { self.playlistDetails = d }
-				}
-			}
+		}
+		.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
+		.sheet(isPresented: $showEditDetails) {
+			CreateEditPlaylistSheet(existingPlaylist: playlistDetails.data)
+				.presentationDetents([.medium])
+		}
+		.alert("Delete Playlist", isPresented: $showDeleteConfirm) {
+			Button("Cancel", role: .cancel) {}
+			Button("Delete", role: .destructive) { deletePlaylist() }
+		} message: {
+			Text("Are you sure you want to delete this playlist? This action cannot be undone.")
+		}
+		.onChange(of: editMode) { old, new in
+			if old == .active && new == .inactive { savePlaylistChanges() }
+		}
+		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
+		.mokaQuery(
+			id: playlistId,
+			{
+				try await coreManager.core?.getProvider().playlist().observeGetPlaylistDetails(
+					playlistId: playlistId)
+			},
+			next: { await $0.next() },
+			bind: $playlistDetails
+		)
 	}
 
 	@ViewBuilder
-	private var viewContent: some View {
-		if let playlist = playlistDetails {
-			ZStack(alignment: .top) {
-				(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground)).ignoresSafeArea()
+	private func viewContent(_ playlist: PlaylistDetails) -> some View {
+		ZStack(alignment: .top) {
+			(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground)).ignoresSafeArea()
 
-				List {
-					HeroHeaderView(
-						coverArt: playlist.coverArt,
-						title: playlist.name,
-						subtitle: {
-							headerSubtitle(playlist)
-						},
-						meta: headerMeta(playlist),
-						description: playlist.comment,
-						imageShape: .roundedRectangle,
-						actions: { playlistActions },
-						artworkLoader: artworkLoader
-					)
-					.listRowInsets(EdgeInsets())
-					.listRowSeparator(.hidden)
-					.listRowBackground(Color.clear)
-					.buttonStyle(.plain)
+			List {
+				HeroHeaderView(
+					coverArt: playlist.coverArt,
+					title: playlist.name,
+					subtitle: { headerSubtitle(playlist) },
+					meta: headerMeta(playlist),
+					description: playlist.comment,
+					imageShape: .roundedRectangle,
+					actions: { playlistActions },
+					artworkLoader: artworkLoader
+				)
+				.listRowInsets(EdgeInsets())
+				.listRowSeparator(.hidden)
+				.listRowBackground(Color.clear)
+				.buttonStyle(.plain)
 
-					trackListSection
-				}
-				.listStyle(.plain)
-				.scrollContentBackground(.hidden)
-				.contentMargins(.horizontal, 0, for: .scrollContent)
-				.environment(\.editMode, $editMode)
-				.coordinateSpace(name: "scroll")
-				.onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-					if value == .infinity && titleScrollOffset < 0 { return }
-					titleScrollOffset = value
-				}
+				trackListSection
 			}
-			.toolbar { ToolbarItem(placement: .topBarTrailing) { trailingToolbarMenu(playlist) } }
-			.task(id: playlist.coverArt) {
-				let size =
-					horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-				guard let url = Config.getCoverUrl(id: playlist.coverArt, size: size) else { return }
-				if let result = try? await ArtworkService.fetchAndExtract(url: url) {
-					self.artworkData = result
-					artworkLoader.apply(result: result, scheme: colorScheme)
-				}
+			.listStyle(.plain)
+			.scrollContentBackground(.hidden)
+			.contentMargins(
+				.horizontal, 0, for: .scrollContent
+			)
+			.environment(\.editMode, $editMode)
+			.coordinateSpace(name: "scroll")
+			.onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+				if value == .infinity && titleScrollOffset < 0 { return }
+				titleScrollOffset = value
 			}
-			.task(id: playlist.songs.map { $0.id }) {
-				if !editMode.isEditing {
-					localSongs = playlist.songs
-					originalSongIds = playlist.songs.map { $0.id }
-				}
+		}
+		.toolbar {
+			ToolbarItem(placement: .topBarTrailing) { trailingToolbarMenu(playlist) }
+		}
+		.task(id: playlist.coverArt) {
+			let size =
+				horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+			guard let url = Config.getCoverUrl(id: playlist.coverArt, size: size) else { return }
+			if let result = try? await ArtworkService.fetchAndExtract(url: url) {
+				self.artworkData = result
+				artworkLoader.apply(result: result, scheme: colorScheme)
 			}
-		} else {
-			ProgressView()
+		}
+		.task(id: playlist.songs.map { $0.id }) {
+			if !editMode.isEditing {
+				localSongs = playlist.songs
+				originalSongIds = playlist.songs.map { $0.id }
+			}
 		}
 	}
 

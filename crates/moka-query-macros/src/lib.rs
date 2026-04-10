@@ -32,7 +32,7 @@ fn extract_ok_type(ret: &ReturnType) -> Option<Type> {
 
 #[proc_macro_attribute]
 pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
-	let mut input_trait = parse_macro_input!(item as ItemTrait);
+	let input_trait = parse_macro_input!(item as ItemTrait);
 
 	let mut namespace = String::new();
 	let meta_parser = syn::meta::parser(|meta| {
@@ -52,10 +52,9 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 	let mut generated_types = Vec::new();
 	let mut trait_impl_methods = Vec::new();
-	let mut trait_observe_defs = Vec::new();
-	let mut ffi_global_functions = Vec::new();
+	let mut uniffi_inherent_methods = Vec::new();
 
-	for item in &mut input_trait.items {
+	for item in &input_trait.items {
 		if let TraitItem::Fn(method) = item {
 			let sig = &method.sig;
 			let method_name = &sig.ident;
@@ -77,20 +76,24 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 				if attr.path().is_ident("query") {
 					is_query = true;
 					if let Meta::List(meta) = &attr.meta {
-						let tokens = meta.tokens.clone();
-						let expr: syn::ExprAssign = syn::parse2(tokens).expect("Expected `key = \"...\"`");
-						if let Expr::Lit(ExprLit { lit: Lit::Str(lit_str), .. }) = *expr.right {
+						let expr: syn::ExprAssign = syn::parse2(meta.tokens.clone()).unwrap();
+						if let Expr::Lit(ExprLit {
+							lit: Lit::Str(lit_str), ..
+						}) = *expr.right
+						{
 							query_key_template = lit_str.value();
 						}
 					}
 				} else if attr.path().is_ident("mutation") {
 					is_mutation = true;
 					if let Meta::List(meta) = &attr.meta {
-						let tokens = meta.tokens.clone();
-						let expr: syn::ExprAssign = syn::parse2(tokens).expect("Expected `invalidates = [...]`");
+						let expr: syn::ExprAssign = syn::parse2(meta.tokens.clone()).unwrap();
 						if let Expr::Array(ExprArray { elems, .. }) = *expr.right {
 							for elem in elems {
-								if let Expr::Lit(ExprLit { lit: Lit::Str(lit_str), .. }) = elem {
+								if let Expr::Lit(ExprLit {
+									lit: Lit::Str(lit_str), ..
+								}) = elem
+								{
 									invalidates_patterns.push(lit_str.value());
 								}
 							}
@@ -98,8 +101,6 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					}
 				}
 			}
-
-			method.attrs.retain(|attr| !attr.path().is_ident("query") && !attr.path().is_ident("mutation"));
 
 			let mut arg_names = Vec::new();
 			let mut arg_types_owned = Vec::new();
@@ -117,6 +118,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 			let generics = &sig.generics;
 
+			// 1. STANDARD TRAIT IMPLS (For Rust internals)
 			if is_mutation {
 				trait_impl_methods.push(quote! {
 					async fn #method_name #generics (#inputs) #output {
@@ -141,22 +143,39 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 				});
 			}
 
+			// 2. UNIFFI INHERENT EXPORTS (Bypasses all Trait limitations in Swift!)
+			if is_mutation {
+				uniffi_inherent_methods.push(quote! {
+					pub #sig {
+						let res = self.inner.#method_name(#(#arg_names),*).await;
+						if res.is_ok() {
+							#( self.global_client.invalidate_pattern(#invalidates_patterns).await; )*
+						}
+						res
+					}
+				});
+			} else if is_async {
+				uniffi_inherent_methods.push(quote! {
+					pub #sig { self.inner.#method_name(#(#arg_names),*).await }
+				});
+			} else {
+				uniffi_inherent_methods.push(quote! {
+					pub #sig { self.inner.#method_name(#(#arg_names),*) }
+				});
+			}
+
+			// 3. GENERATE THE OBSERVE METHODS natively on the struct
 			if is_query {
-				let inner_ok_type = extract_ok_type(output).expect("Query methods must return a Result<T, E>");
+				let inner_ok_type = extract_ok_type(output).unwrap();
 				let observe_method_name = format_ident!("observe_{}", method_name);
 				let full_key = format!("{}/{}", namespace, query_key_template);
-
 				let method_camel = method_name
 					.to_string()
 					.split('_')
 					.map(|s| format!("{}{}", &s[..1].to_uppercase(), &s[1..]))
 					.collect::<String>();
-
 				let stream_struct_name = format_ident!("Observe{}Stream", method_camel);
 				let state_enum_name = format_ident!("Observe{}State", method_camel);
-
-				let trait_prefix = trait_name.to_string().replace("Provider", "");
-				let ffi_func_name = format_ident!("observe_{}_{}", trait_prefix.to_lowercase(), method_name);
 
 				let captures: Vec<_> = arg_names
 					.iter()
@@ -170,98 +189,32 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					})
 					.collect();
 
-				trait_observe_defs.push(quote! {
-					#[cfg(not(feature = "uniffi"))]
-					fn #observe_method_name(
-						&self,
-						#( #arg_names: #arg_types_owned ),*
-					) -> std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>> {
-						#( let _ = &#arg_names; )*
-						unimplemented!("observe methods are only implemented on the Cached proxy struct")
-					}
-				});
-
-				trait_observe_defs.push(quote! {
-					#[cfg(feature = "uniffi")]
-					fn #observe_method_name(
-						&self,
-						#( #arg_names: #arg_types_owned ),*
-					) -> std::sync::Arc<#stream_struct_name> {
-						#( let _ = &#arg_names; )*
-						unimplemented!("observe methods are only implemented on the Cached proxy struct")
-					}
-				});
-
-				trait_impl_methods.push(quote! {
-					#[cfg(not(feature = "uniffi"))]
-					fn #observe_method_name(
-						&self,
-						#( #arg_names: #arg_types_owned ),*
-					) -> std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>> {
+				uniffi_inherent_methods.push(quote! {
+					pub fn #observe_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let key = format!(#full_key);
 						let inner = self.inner.clone();
-
 						let stream = self.global_client.clone().observe(key, move || {
 							let inner = inner.clone();
 							#( let #arg_names = #arg_names.clone(); )*
-							async move {
-								#( #captures )*
-								inner.#method_name(#(#arg_names),*).await
-							}
+							async move { #( #captures )* inner.#method_name(#(#arg_names),*).await }
 						});
-
-						Box::pin(stream)
-					}
-
-					#[cfg(feature = "uniffi")]
-					fn #observe_method_name(
-						&self,
-						#( #arg_names: #arg_types_owned ),*
-					) -> std::sync::Arc<#stream_struct_name> {
-						let key = format!(#full_key);
-						let inner = self.inner.clone();
-
-						let stream = self.global_client.clone().observe(key, move || {
-							let inner = inner.clone();
-							#( let #arg_names = #arg_names.clone(); )*
-							async move {
-								#( #captures )*
-								inner.#method_name(#(#arg_names),*).await
-							}
-						});
-
-						std::sync::Arc::new(#stream_struct_name {
-							inner: tokio::sync::Mutex::new(Box::pin(stream))
-						})
-					}
-				});
-
-				ffi_global_functions.push(quote! {
-					#[cfg(feature = "uniffi")]
-					#[uniffi::export]
-					pub fn #ffi_func_name(provider: std::sync::Arc<dyn #trait_name>, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
-						provider.#observe_method_name(#( #arg_names ),*)
+						std::sync::Arc::new(#stream_struct_name { inner: tokio::sync::Mutex::new(Box::pin(stream)) })
 					}
 				});
 
 				generated_types.push(quote! {
-					#[cfg(feature = "uniffi")]
-					#[derive(uniffi::Enum)]
+					#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 					#[derive(Debug, Clone, PartialEq)]
 					pub enum #state_enum_name {
-						Loading,
-						Data { data: #inner_ok_type },
-						Error { message: String },
+						Loading, Data { data: #inner_ok_type }, Error { message: String },
 					}
 
-					#[cfg(feature = "uniffi")]
-					#[derive(uniffi::Object)]
+					#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 					pub struct #stream_struct_name {
 						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>>>,
 					}
 
-					#[cfg(feature = "uniffi")]
-					#[uniffi::export]
+					#[cfg_attr(feature = "uniffi", uniffi::export)]
 					impl #stream_struct_name {
 						pub async fn next(&self) -> Option<#state_enum_name> {
 							use futures::StreamExt;
@@ -279,33 +232,47 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	}
 
-	for def in trait_observe_defs {
-		input_trait.items.push(syn::parse2(def).expect("Failed to parse generated observe definition"));
+	let mut cleaned_trait = input_trait.clone();
+	for item in &mut cleaned_trait.items {
+		if let TraitItem::Fn(method) = item {
+			method
+				.attrs
+				.retain(|attr| !attr.path().is_ident("query") && !attr.path().is_ident("mutation"));
+		}
 	}
 
 	let expanded = quote! {
 		#( #generated_types )*
 
 		#[async_trait::async_trait]
-		#input_trait
+		#cleaned_trait
 
-		#vis struct #proxy_name<T: #trait_name + 'static> {
-			inner: std::sync::Arc<T>,
+		#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+		#vis struct #proxy_name {
+			inner: std::sync::Arc<dyn #trait_name + Send + Sync>,
 			global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
 		}
 
-		impl<T: #trait_name + 'static> #proxy_name<T> {
-			pub fn new(inner: std::sync::Arc<T>, global_client: std::sync::Arc<moka_query::GlobalQueryClient>) -> Self {
+		impl #proxy_name {
+			pub fn new(inner: std::sync::Arc<dyn #trait_name + Send + Sync>, global_client: std::sync::Arc<moka_query::GlobalQueryClient>) -> Self {
 				Self { inner, global_client }
 			}
 		}
 
-		#[async_trait::async_trait]
-		impl<T: #trait_name + Send + Sync + 'static> #trait_name for #proxy_name<T> {
-			#( #trait_impl_methods )*
+		#[cfg_attr(feature = "uniffi", uniffi::export)]
+		impl #proxy_name {
+			#( #uniffi_inherent_methods )*
+
+			// Native Manual Invalidation!
+			pub async fn moka_invalidate(&self, pattern: String) {
+				self.global_client.invalidate_pattern(&pattern).await;
+			}
 		}
 
-		#( #ffi_global_functions )*
+		#[async_trait::async_trait]
+		impl #trait_name for #proxy_name {
+			#( #trait_impl_methods )*
+		}
 	};
 
 	TokenStream::from(expanded)

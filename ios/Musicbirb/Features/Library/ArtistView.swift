@@ -10,8 +10,8 @@ struct ArtistView: View {
 
 	let artistId: ArtistId
 
-	@State private var artistDetails: ArtistDetails?
-	@State private var topSongs: [Track]?
+	@State private var artistDetails: MokaState<ArtistDetails> = .idle
+	@State private var topSongs: MokaState<[Track]> = .idle
 
 	@State private var selectedAlbumId: AlbumId?
 	@State private var selectedSimilarArtistId: ArtistId?
@@ -24,68 +24,77 @@ struct ArtistView: View {
 		var description: String { self.rawValue }
 	}
 
-	var body: some View {
+	@ViewBuilder
+	private var viewContent: some View {
 		Group {
-			if let artist = artistDetails {
+			if let artist = artistDetails.data {
 				ZStack(alignment: .top) {
 					backgroundColor
 					mainContent(artist)
 				}
 				.task(id: artist.coverArt) {
-					let size =
-						horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-					guard let cover = artist.coverArt, let url = Config.getCoverUrl(id: cover, size: size)
-					else { return }
-					if let result = try? await ArtworkService.fetchAndExtract(url: url) {
-						artworkLoader.apply(result: result, scheme: colorScheme)
-					}
+					await loadArtwork(for: artist)
 				}
-			} else {
+			} else if artistDetails.isLoading {
 				ProgressView()
 			}
 		}
-		.navigationBarTitleDisplayMode(.inline)
-		.navigationTitle(artistDetails?.name ?? "")
-		.modifier(
-			ArtistToolbarModifier(
-				artistDetails: artistDetails,
-				primaryColor: artworkLoader.primaryColor,
-				titleScrollOffset: titleScrollOffset,
-				openURL: openURL
-			)
-		)
-		.modifier(
-			ArtistNavigationModifier(
-				selectedAlbumId: $selectedAlbumId,
-				selectedSimilarArtistId: $selectedSimilarArtistId
-			)
-		)
-		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-		.task(id: artistId) {
-			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
-			let stream = observeArtistGetArtistDetails(provider: provider, artistId: artistId)
-			while !Task.isCancelled {
-				guard let state = await stream.next() else { break }
-				if case .data(let d) = state { self.artistDetails = d }
-			}
-		}
-		.task(id: topSongsMode) {
-			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
-			self.topSongs = nil
+	}
 
-			if topSongsMode == .global {
-				let stream = observeArtistGetTopSongs(provider: provider, artistId: artistId)
-				while !Task.isCancelled {
-					guard let state = await stream.next() else { break }
-					if case .data(let d) = state { self.topSongs = d }
-				}
-			} else {
-				let stream = observeArtistGetPersonalTopSongs(provider: provider, artistId: artistId)
-				while !Task.isCancelled {
-					guard let state = await stream.next() else { break }
-					if case .data(let d) = state { self.topSongs = d }
-				}
-			}
+	var body: some View {
+		viewContent
+			.navigationBarTitleDisplayMode(.inline)
+			.navigationTitle(artistDetails.data?.name ?? "")
+			.modifier(
+				ArtistToolbarModifier(
+					artistDetails: artistDetails.data, primaryColor: artworkLoader.primaryColor,
+					titleScrollOffset: titleScrollOffset, openURL: openURL)
+			)
+			.modifier(
+				ArtistNavigationModifier(
+					selectedAlbumId: $selectedAlbumId,
+					selectedSimilarArtistId: $selectedSimilarArtistId
+				)
+			)
+			.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
+			.mokaQuery(
+				id: artistId,
+				{
+					try await coreManager.core?.getProvider().artist().observeGetArtistDetails(
+						artistId: artistId)
+				},
+				next: { await $0.next() },
+				bind: $artistDetails
+			)
+			.mokaQuery(
+				enabled: topSongsMode == .global,
+				id: artistId,
+				{
+					try await coreManager.core?.getProvider().artist().observeGetTopSongs(artistId: artistId)
+				},
+				next: { await $0.next() },
+				bind: $topSongs
+			)
+			.mokaQuery(
+				enabled: topSongsMode == .personal,
+				id: artistId,
+				{
+					try await coreManager.core?.getProvider().artist().observeGetPersonalTopSongs(
+						artistId: artistId)
+				},
+				next: { await $0.next() },
+				bind: $topSongs
+			)
+	}
+
+	private func loadArtwork(for artist: ArtistDetails) async {
+		let size =
+			horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+		guard let cover = artist.coverArt, let url = Config.getCoverUrl(id: cover, size: size) else {
+			return
+		}
+		if let result = try? await ArtworkService.fetchAndExtract(url: url) {
+			artworkLoader.apply(result: result, scheme: colorScheme)
 		}
 	}
 
@@ -180,6 +189,7 @@ struct ArtistView: View {
 			HStack {
 				Text("Top Songs")
 					.font(.system(size: 22, weight: .black))
+				if topSongs.isLoading { ProgressView().padding(.leading, 8) }
 				Spacer()
 				Picker("Mode", selection: $topSongsMode) {
 					Text("Global").tag(TopSongsMode.global)
@@ -192,7 +202,7 @@ struct ArtistView: View {
 			.padding(.top, 16)
 
 			Group {
-				if let songs = topSongs {
+				if let songs = topSongs.data {
 					if horizontalSizeClass == .regular {
 						songGrid(songs: songs, limit: 10)
 					} else if songs.count <= 5 {
@@ -214,13 +224,13 @@ struct ArtistView: View {
 						.frame(height: 350)
 						.tabViewStyle(.page(indexDisplayMode: .always))
 					}
-				} else {
+				} else if topSongs.isLoading {
 					ProgressView()
 						.frame(maxWidth: .infinity)
 						.padding()
 				}
 			}
-			.animation(.snappy(duration: 0.4, extraBounce: 0.1), value: topSongs)
+			.animation(.snappy(duration: 0.4, extraBounce: 0.1), value: topSongs.data != nil)
 		}
 		.padding(.bottom, 24)
 	}

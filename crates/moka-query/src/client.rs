@@ -48,12 +48,8 @@ impl GlobalQueryClient {
 	}
 
 	/// Subscribes to a stream of state updates for a specific cache key.
-    /// Changed to be synchronous since it just builds and returns the stream immediately!
-	pub fn observe<T, F, Fut, E>(
-		self: Arc<Self>,
-		key: String,
-		fetcher: F,
-	) -> impl futures::Stream<Item = QueryState<T>>
+	/// Changed to be synchronous since it just builds and returns the stream immediately!
+	pub fn observe<T, F, Fut, E>(self: Arc<Self>, key: String, fetcher: F) -> impl futures::Stream<Item = QueryState<T>>
 	where
 		T: Any + Send + Sync + Clone + 'static,
 		F: Fn() -> Fut + Send + Sync + 'static,
@@ -104,5 +100,7 @@ impl GlobalQueryClient {
 }
 
 impl Default for GlobalQueryClient {
-	fn default() -> Self { Self::new() }
+	fn default() -> Self {
+		Self::new()
+	}
 }

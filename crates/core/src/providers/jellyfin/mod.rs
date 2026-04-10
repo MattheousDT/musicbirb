@@ -134,7 +134,7 @@ impl Provider for JellyfinProvider {
 		})
 	}
 
-	fn track(&self) -> Arc<dyn TrackProvider> {
+	fn track(&self) -> Arc<CachedTrackProvider> {
 		Arc::new(crate::providers::CachedTrackProvider::new(
 			Arc::new(JellyfinTrack {
 				ctx: Arc::clone(&self.ctx),
@@ -143,7 +143,7 @@ impl Provider for JellyfinProvider {
 		))
 	}
 
-	fn album(&self) -> Arc<dyn AlbumProvider> {
+	fn album(&self) -> Arc<CachedAlbumProvider> {
 		Arc::new(crate::providers::CachedAlbumProvider::new(
 			Arc::new(JellyfinAlbum {
 				ctx: Arc::clone(&self.ctx),
@@ -152,7 +152,7 @@ impl Provider for JellyfinProvider {
 		))
 	}
 
-	fn artist(&self) -> Arc<dyn ArtistProvider> {
+	fn artist(&self) -> Arc<CachedArtistProvider> {
 		Arc::new(crate::providers::CachedArtistProvider::new(
 			Arc::new(JellyfinArtist {
 				ctx: Arc::clone(&self.ctx),
@@ -161,7 +161,7 @@ impl Provider for JellyfinProvider {
 		))
 	}
 
-	fn playlist(&self) -> Arc<dyn PlaylistProvider> {
+	fn playlist(&self) -> Arc<CachedPlaylistProvider> {
 		Arc::new(crate::providers::CachedPlaylistProvider::new(
 			Arc::new(JellyfinPlaylist {
 				ctx: Arc::clone(&self.ctx),
@@ -170,7 +170,7 @@ impl Provider for JellyfinProvider {
 		))
 	}
 
-	fn activity(&self) -> Arc<dyn ActivityProvider> {
+	fn activity(&self) -> Arc<CachedActivityProvider> {
 		Arc::new(crate::providers::CachedActivityProvider::new(
 			Arc::new(JellyfinActivity {
 				ctx: Arc::clone(&self.ctx),
@@ -179,7 +179,7 @@ impl Provider for JellyfinProvider {
 		))
 	}
 
-	fn search(&self) -> Arc<dyn SearchProvider> {
+	fn search(&self) -> Arc<CachedSearchProvider> {
 		Arc::new(crate::providers::CachedSearchProvider::new(
 			Arc::new(JellyfinSearch {
 				ctx: Arc::clone(&self.ctx),
