@@ -1,6 +1,9 @@
 use moka_query::{GlobalQueryClient, moka_query_proxy};
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!("moka_query_integration_test");
+
 // 1. Define the provider trait
 #[moka_query_proxy(namespace = "Artist")]
 pub trait ArtistProvider: Send + Sync {

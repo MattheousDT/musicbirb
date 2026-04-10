@@ -6,7 +6,7 @@ description = "Macro-driven, cross-platform state management & caching library f
 
 [features]
 default = []
-uniffi = ["dep:uniffi"]
+uniffi = ["moka-query-macros/uniffi", "dep:uniffi"]
 
 [dependencies]
 moka-query-macros = { path = "../moka-query-macros" }
@@ -19,3 +19,4 @@ async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1.50.0", features = ["full"] }
+thiserror = "2.0"

@@ -48,6 +48,7 @@ fn extract_ok_type(ret: &ReturnType) -> Option<Type> {
 #[proc_macro_attribute]
 pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let input_trait = parse_macro_input!(item as ItemTrait);
+	let is_uniffi = cfg!(feature = "uniffi");
 
 	let mut namespace = String::new();
 	let meta_parser = syn::meta::parser(|meta| {
@@ -168,10 +169,10 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 				});
 			}
 
-			// 2. UNIFFI INHERENT EXPORTS (Bypasses all Trait limitations in Swift!)
-			if is_mutation {
+			// 2. UNIFFI INHERENT EXPORTS (Bypasses all Trait limitations in FFI)
+			if is_mutation && is_uniffi {
 				uniffi_inherent_methods.push(quote! {
-					pub #sig {
+					pub async fn #method_name #generics (#inputs) #output {
 						let res = self.inner.#method_name(#(#arg_names),*).await;
 						if res.is_ok() {
 							#( self.global_client.invalidate_pattern(#invalidates_patterns).await; )*
@@ -179,7 +180,9 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 						res
 					}
 				});
+			}
 
+			if is_mutation {
 				let method_camel = method_name
 					.to_string()
 					.split('_')
@@ -252,19 +255,31 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					}
 				});
 
+				let enum_attr = if is_uniffi {
+					quote!(#[derive(uniffi::Enum)])
+				} else {
+					quote!()
+				};
+				let obj_attr = if is_uniffi {
+					quote!(#[derive(uniffi::Object)])
+				} else {
+					quote!()
+				};
+				let export_attr = if is_uniffi { quote!(#[uniffi::export]) } else { quote!() };
+
 				generated_types.push(quote! {
-					#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+					#enum_attr
 					#[derive(Debug, Clone, PartialEq)]
 					pub enum #state_enum_name {
 						Loading, #data_variant, Error { message: String },
 					}
 
-					#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+					#obj_attr
 					pub struct #stream_struct_name {
 						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = #state_enum_name> + Send>>>,
 					}
 
-					#[cfg_attr(feature = "uniffi", uniffi::export)]
+					#export_attr
 					impl #stream_struct_name {
 						pub async fn next(&self) -> Option<#state_enum_name> {
 							use futures::StreamExt;
@@ -273,13 +288,17 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 						}
 					}
 				});
-			} else if is_async {
+			} else if is_async && is_uniffi {
 				uniffi_inherent_methods.push(quote! {
-					pub #sig { self.inner.#method_name(#(#arg_names),*).await }
+					pub async fn #method_name #generics (#inputs) #output {
+						self.inner.#method_name(#(#arg_names),*).await
+					}
 				});
-			} else {
+			} else if !is_async && is_uniffi {
 				uniffi_inherent_methods.push(quote! {
-					pub #sig { self.inner.#method_name(#(#arg_names),*) }
+					pub fn #method_name #generics (#inputs) #output {
+						self.inner.#method_name(#(#arg_names),*)
+					}
 				});
 			}
 
@@ -332,21 +351,33 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					}
 				});
 
+				let enum_attr = if is_uniffi {
+					quote!(#[derive(uniffi::Enum)])
+				} else {
+					quote!()
+				};
+				let obj_attr = if is_uniffi {
+					quote!(#[derive(uniffi::Object)])
+				} else {
+					quote!()
+				};
+				let export_attr = if is_uniffi { quote!(#[uniffi::export]) } else { quote!() };
+
 				generated_types.push(quote! {
-					#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+					#enum_attr
 					#[derive(Debug, Clone, PartialEq)]
 					pub enum #state_enum_name {
 						Loading, Data { data: #inner_ok_type }, Error { message: String },
 					}
 
-					#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+					#obj_attr
 					pub struct #stream_struct_name {
 						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>>>,
 						global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
 						key: String,
 					}
 
-					#[cfg_attr(feature = "uniffi", uniffi::export)]
+					#export_attr
 					impl #stream_struct_name {
 						pub fn current_cached_state(&self) -> Option<#state_enum_name> {
 							match self.global_client.get_cached_state::<#inner_ok_type>(&self.key) {
@@ -382,13 +413,20 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	}
 
+	let proxy_obj_attr = if is_uniffi {
+		quote!(#[derive(uniffi::Object)])
+	} else {
+		quote!()
+	};
+	let proxy_export_attr = if is_uniffi { quote!(#[uniffi::export]) } else { quote!() };
+
 	let expanded = quote! {
 		#( #generated_types )*
 
 		#[async_trait::async_trait]
 		#cleaned_trait
 
-		#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+		#proxy_obj_attr
 		#vis struct #proxy_name {
 			inner: std::sync::Arc<dyn #trait_name + Send + Sync>,
 			global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
@@ -400,7 +438,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 			}
 		}
 
-		#[cfg_attr(feature = "uniffi", uniffi::export)]
+		#proxy_export_attr
 		impl #proxy_name {
 			#( #uniffi_inherent_methods )*
 

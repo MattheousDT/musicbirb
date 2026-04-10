@@ -2,6 +2,9 @@ use moka_query::{GlobalQueryClient, moka_query_proxy};
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!("moka_query_basic_example");
+
 #[moka_query_proxy(namespace = "Users")]
 pub trait UserProvider: Send + Sync {
 	#[query(key = "Profile({id})")]

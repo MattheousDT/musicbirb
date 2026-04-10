@@ -1,6 +1,9 @@
 use moka_query::{GlobalQueryClient, moka_query_proxy};
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!("moka_query_retry_test");
+
 #[moka_query_proxy(namespace = "Retry")]
 pub trait RetryTrait: Send + Sync {
 	#[query(key = "Test", retries = 3)]
@@ -80,17 +83,15 @@ async fn test_retry_exhaustion_flow() {
 	assert_eq!(*attempts.lock().unwrap(), 4);
 }
 
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum MyError {
+	#[error("Fatal")]
 	Fatal,
+	#[error("Transient")]
 	Transient,
 }
 
-impl std::fmt::Display for MyError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{:?}", self)
-	}
-}
 impl moka_query::client::MokaRetryable for MyError {
 	fn is_transient(&self) -> bool {
 		matches!(self, MyError::Transient)
