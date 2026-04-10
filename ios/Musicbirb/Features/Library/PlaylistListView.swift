@@ -2,31 +2,21 @@ import SwiftUI
 
 struct PlaylistListView: View {
 	@Environment(CoreManager.self) private var coreManager
-	@State private var playlists: MokaState<[Playlist]> = .idle
+	@UseQuery<[Playlist]> var playlists
 	@State private var showCreateSheet = false
 
 	var body: some View {
-		Group {
-			if let items = playlists.data {
-				if items.isEmpty {
-					ContentUnavailableView("No Playlists", systemImage: "music.note.list")
-				} else {
-					List(items) { playlist in
-						NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
-							PlaylistItem(playlist: playlist)
-						}
-						.listRowInsets(EdgeInsets())
+		Suspense($playlists) { playlists in
+			if playlists.isEmpty {
+				ContentUnavailableView("No Playlists", systemImage: "music.note.list")
+			} else {
+				List(playlists) { playlist in
+					NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
+						PlaylistItem(playlist: playlist)
 					}
-					.listStyle(.plain)
+					.listRowInsets(EdgeInsets())
 				}
-			} else if playlists.isLoading {
-				ProgressView()
-			} else if let error = playlists.error {
-				ContentUnavailableView(
-					"Error",
-					systemImage: "exclamationmark.triangle",
-					description: Text(error)
-				)
+				.listStyle(.plain)
 			}
 		}
 		.navigationTitle("Playlists")
@@ -38,10 +28,8 @@ struct PlaylistListView: View {
 		.sheet(isPresented: $showCreateSheet) {
 			CreateEditPlaylistSheet().presentationDetents([.medium])
 		}
-		.mokaQuery(
-			{ try await coreManager.core?.getProvider().playlist().observeGetPlaylists() },
-			next: { await $0.next() },
-			bind: $playlists
-		)
+		.query($playlists) {
+			try await self.coreManager.core?.getProvider().playlist().observeGetPlaylists()
+		}
 	}
 }

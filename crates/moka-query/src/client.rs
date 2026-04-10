@@ -17,7 +17,12 @@ impl GlobalQueryClient {
 	pub fn new() -> Self {
 		let (tx, _) = broadcast::channel(1024);
 		Self {
-			cache: Cache::builder().build(),
+			cache: Cache::builder()
+				// max 20,000 items
+				.max_capacity(20_000)
+				// 15 min TTL
+				.time_to_idle(std::time::Duration::from_secs(15 * 60))
+				.build(),
 			tx,
 			active_keys: Arc::new(RwLock::new(HashSet::new())),
 		}
@@ -45,6 +50,18 @@ impl GlobalQueryClient {
 			self.cache.invalidate(&k).await;
 		}
 		let _ = self.tx.send(pattern_str);
+	}
+
+	pub fn get_cached_state<T: Any + Send + Sync + Clone>(&self, key: &str) -> Option<QueryState<T>> {
+		use futures::FutureExt;
+		// Attempt to poll the cache get future synchronously.
+		// If it resolves immediately (data is present and not pending), return it.
+		if let Some(Some(data)) = self.cache.get(key).now_or_never() {
+			if let Ok(typed_data) = data.downcast::<T>() {
+				return Some(QueryState::Data((*typed_data).clone()));
+			}
+		}
+		None
 	}
 
 	/// Subscribes to a stream of state updates for a specific cache key.

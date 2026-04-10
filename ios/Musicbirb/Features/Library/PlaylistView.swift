@@ -12,31 +12,22 @@ struct PlaylistView: View {
 
 	let playlistId: PlaylistId
 
-	@State private var playlistDetails: MokaState<PlaylistDetails> = .idle
+	@UseQuery<PlaylistDetails> var playlistDetails
+
 	@State private var artworkData: ArtworkResult?
 	@State private var editMode: EditMode = .inactive
 	@State private var localSongs: [Track] = []
 	@State private var originalSongIds: [TrackId] = []
-
 	@State private var isSaving = false
 	@State private var showEditDetails = false
 	@State private var showDeleteConfirm = false
-
 	@State private var artworkLoader = ArtworkColorLoader()
 	@State private var titleScrollOffset: CGFloat = .infinity
 
 	var body: some View {
 		Group {
-			if let playlist = playlistDetails.data {
+			Suspense($playlistDetails) { playlist in
 				viewContent(playlist)
-			} else if let error = playlistDetails.error {
-				ContentUnavailableView(
-					"Error",
-					systemImage: "exclamationmark.triangle",
-					description: Text(error)
-				)
-			} else {
-				ProgressView()
 			}
 		}
 		.ignoresSafeArea(edges: .top)
@@ -75,15 +66,11 @@ struct PlaylistView: View {
 			if old == .active && new == .inactive { savePlaylistChanges() }
 		}
 		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-		.mokaQuery(
-			id: playlistId,
-			{
-				try await coreManager.core?.getProvider().playlist().observeGetPlaylistDetails(
-					playlistId: playlistId)
-			},
-			next: { await $0.next() },
-			bind: $playlistDetails
-		)
+		.query($playlistDetails, id: playlistId) {
+			try await coreManager.core?.getProvider().playlist().observeGetPlaylistDetails(
+				playlistId: playlistId
+			)
+		}
 	}
 
 	@ViewBuilder

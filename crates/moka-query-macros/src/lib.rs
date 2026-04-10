@@ -193,12 +193,16 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					pub fn #observe_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let key = format!(#full_key);
 						let inner = self.inner.clone();
-						let stream = self.global_client.clone().observe(key, move || {
+						let stream = self.global_client.clone().observe(key.clone(), move || {
 							let inner = inner.clone();
 							#( let #arg_names = #arg_names.clone(); )*
 							async move { #( #captures )* inner.#method_name(#(#arg_names),*).await }
 						});
-						std::sync::Arc::new(#stream_struct_name { inner: tokio::sync::Mutex::new(Box::pin(stream)) })
+						std::sync::Arc::new(#stream_struct_name {
+							inner: tokio::sync::Mutex::new(Box::pin(stream)),
+							global_client: self.global_client.clone(),
+							key,
+						})
 					}
 				});
 
@@ -212,10 +216,21 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 					pub struct #stream_struct_name {
 						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>>>,
+						global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
+						key: String,
 					}
 
 					#[cfg_attr(feature = "uniffi", uniffi::export)]
 					impl #stream_struct_name {
+						pub fn current_cached_state(&self) -> Option<#state_enum_name> {
+							match self.global_client.get_cached_state::<#inner_ok_type>(&self.key) {
+								Some(moka_query::QueryState::Loading) => Some(#state_enum_name::Loading),
+								Some(moka_query::QueryState::Data(d)) => Some(#state_enum_name::Data { data: d }),
+								Some(moka_query::QueryState::Error(e)) => Some(#state_enum_name::Error { message: e }),
+								None => None,
+							}
+						}
+
 						pub async fn next(&self) -> Option<#state_enum_name> {
 							use futures::StreamExt;
 							let mut stream = self.inner.lock().await;

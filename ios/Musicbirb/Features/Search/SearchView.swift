@@ -7,7 +7,7 @@ struct SearchView: View {
 
 	@State private var searchText = ""
 	@State private var searchIsActive = false
-	@State private var searchState: MokaState<SearchResults> = .idle
+	@UseQuery<SearchResults> var searchState
 
 	var body: some View {
 		NavigationStack {
@@ -20,12 +20,9 @@ struct SearchView: View {
 					prompt: "Songs, Albums, Artists"
 				)
 				.onAppear { searchIsActive = true }
-				.mokaQuery(
-					id: searchText,
-					{ try await self.initiateSearchStream() },
-					next: { await $0.next() },
-					bind: $searchState
-				)
+				.query($searchState, id: searchText) {
+					try await self.initiateSearchStream()
+				}
 		}
 	}
 
@@ -34,16 +31,15 @@ struct SearchView: View {
 		if searchText.isEmpty {
 			placeholderView
 		} else {
-			switch searchState {
-			case .idle, .loading(previous: nil):
-				ProgressView().scaleEffect(1.5).frame(maxWidth: .infinity, maxHeight: .infinity)
-			case .data(let results), .loading(previous: let results?):
+			Suspense($searchState) { results in
 				if results.artists.isEmpty && results.albums.isEmpty && results.tracks.isEmpty {
 					noResultsView
 				} else {
 					resultsList(results)
 				}
-			case .error(let message, _):
+			} loading: {
+				ProgressView().scaleEffect(1.5).frame(maxWidth: .infinity, maxHeight: .infinity)
+			} error: { message in
 				ContentUnavailableView(
 					"Search Error", systemImage: "exclamationmark.triangle", description: Text(message))
 			}

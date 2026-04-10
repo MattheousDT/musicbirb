@@ -26,7 +26,6 @@
 		271BDAA3445103C8B032C23E /* musicbirb.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD81B584E5F0E60A950D27BB /* musicbirb.xcframework */; };
 		6E2E784AB83ECE1E78B1F540 /* musicbirb.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DD81B584E5F0E60A950D27BB /* musicbirb.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C81476EF006C9CA1AE75E6CC /* musicbirb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F20B742F64CD436FD2BE42 /* musicbirb.swift */; };
-		C90CEAA42F802FA800762DC5 /* SwiftQuery in Frameworks */ = {isa = PBXBuildFile; productRef = C90CEAA32F802FA800762DC5 /* SwiftQuery */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,7 +85,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				271BDAA3445103C8B032C23E /* musicbirb.xcframework in Frameworks */,
-				C90CEAA42F802FA800762DC5 /* SwiftQuery in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,7 +140,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				C90CEAA62F80305C00762DC5 /* PBXTargetDependency */,
 				C90CEA8D2F7D7CC800762DC5 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
@@ -150,7 +147,6 @@
 			);
 			name = Musicbirb;
 			packageProductDependencies = (
-				C90CEAA32F802FA800762DC5 /* SwiftQuery */,
 			);
 			productName = Musicbirb;
 			productReference = 074D18E6C96C79E86092DBA8 /* Musicbirb.app */;
@@ -181,7 +177,6 @@
 			mainGroup = FE1EB79BCA94D1FB7B256F5D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6E1ED4D9EE87BE15A7675B97 /* Products */;
@@ -245,10 +240,6 @@
 			isa = PBXTargetDependency;
 			target = C90CEA872F7D7C4200762DC5 /* RustBuild */;
 			targetProxy = C90CEA8C2F7D7CC800762DC5 /* PBXContainerItemProxy */;
-		};
-		C90CEAA62F80305C00762DC5 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = C90CEAA52F80305C00762DC5 /* SwiftQuery */;
 		};
 /* End PBXTargetDependency section */
 
@@ -471,30 +462,6 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/MattheousDT/swift-query";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		C90CEAA32F802FA800762DC5 /* SwiftQuery */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */;
-			productName = SwiftQuery;
-		};
-		C90CEAA52F80305C00762DC5 /* SwiftQuery */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C90CEAA22F802FA800762DC5 /* XCRemoteSwiftPackageReference "swift-query" */;
-			productName = SwiftQuery;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EDC4AD04E3E411D0CC495BAE /* Project object */;
 }

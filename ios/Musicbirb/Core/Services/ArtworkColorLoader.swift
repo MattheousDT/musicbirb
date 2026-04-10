@@ -12,8 +12,20 @@ public struct ArtworkResult: @unchecked Sendable, Equatable {
 	}
 }
 
+public actor ArtworkCache {
+	public static let shared = ArtworkCache()
+	private var cache: [URL: ArtworkResult] = [:]
+
+	public func get(_ url: URL) -> ArtworkResult? { cache[url] }
+	public func set(_ url: URL, result: ArtworkResult) { cache[url] = result }
+}
+
 public enum ArtworkService {
 	public static func fetchAndExtract(url: URL) async throws -> ArtworkResult {
+		if let cached = await ArtworkCache.shared.get(url) {
+			return cached
+		}
+
 		let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad)
 		let (data, _) = try await URLSession.shared.data(for: request)
 
@@ -21,10 +33,13 @@ public enum ArtworkService {
 			throw URLError(.cannotDecodeRawData)
 		}
 
-		return await Task.detached {
+		let result = await Task.detached {
 			let extracted = extractColors(from: uiImage)
 			return ArtworkResult(image: uiImage, rawBackground: extracted.bg, rawAccent: extracted.accent)
 		}.value
+
+		await ArtworkCache.shared.set(url, result: result)
+		return result
 	}
 
 	private static func extractColors(from image: UIImage) -> (bg: Color, accent: Color) {

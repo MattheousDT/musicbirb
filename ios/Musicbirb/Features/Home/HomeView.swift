@@ -5,10 +5,10 @@ struct HomeView: View {
 	@Environment(AuthViewModel.self) private var authViewModel
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 
-	@State private var lastPlayed: MokaState<[Album]> = .idle
-	@State private var recent: MokaState<[Album]> = .idle
-	@State private var newReleases: MokaState<[Album]> = .idle
-	@State private var playlists: MokaState<[Playlist]> = .idle
+	@UseQuery<[Album]> var lastPlayed
+	@UseQuery<[Album]> var recent
+	@UseQuery<[Album]> var newReleases
+	@UseQuery<[Playlist]> var playlists
 
 	@State private var showQueueSheet = false
 	@State private var showSettings = false
@@ -53,30 +53,24 @@ struct HomeView: View {
 				.navigationTitle(Text("Home"))
 				.refreshable { await performRefresh() }
 				.toolbar { homeToolbar }
-				// 2. Chained queries with simplified helper calls
-				.mokaQuery(
-					{ try await self.searchStream(for: .lastPlayedAlbums) },
-					next: { await $0.next() },
-					map: mapSearchResult,
-					bind: $lastPlayed
-				)
-				.mokaQuery(
-					{ try await self.searchStream(for: .recentlyAddedAlbums) },
-					next: { await $0.next() },
-					map: mapSearchResult,
-					bind: $recent
-				)
-				.mokaQuery(
-					{ try await self.searchStream(for: .newlyReleasedAlbums) },
-					next: { await $0.next() },
-					map: mapSearchResult,
-					bind: $newReleases
-				)
-				.mokaQuery(
-					{ try await self.coreManager.core?.getProvider().playlist().observeGetPlaylists() },
-					next: { await $0.next() },
-					bind: $playlists
-				)
+				.query($lastPlayed) {
+					try await self.searchStream(for: .lastPlayedAlbums)
+				} map: {
+					mapSearchResult($0, $1)
+				}
+				.query($recent) {
+					try await self.searchStream(for: .recentlyAddedAlbums)
+				} map: {
+					mapSearchResult($0, $1)
+				}
+				.query($newReleases) {
+					try await self.searchStream(for: .newlyReleasedAlbums)
+				} map: {
+					mapSearchResult($0, $1)
+				}
+				.query($playlists) {
+					try await self.coreManager.core?.getProvider().playlist().observeGetPlaylists()
+				}
 				.fullScreenCover(isPresented: $showSettings) { SettingsView() }
 				.sheet(isPresented: $showQueueSheet) { QueueSheet().presentationDragIndicator(.visible) }
 		}

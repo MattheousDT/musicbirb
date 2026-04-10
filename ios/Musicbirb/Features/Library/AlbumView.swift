@@ -11,7 +11,7 @@ struct AlbumView: View {
 
 	let albumId: AlbumId
 
-	@State private var albumDetails: MokaState<AlbumDetails> = .idle
+	@UseQuery<AlbumDetails> var albumDetails
 
 	@State private var selectedArtistId: ArtistId?
 	@State private var artworkLoader = ArtworkColorLoader()
@@ -20,157 +20,150 @@ struct AlbumView: View {
 	var body: some View {
 		@Bindable var settings = settings
 
-		Group {
-			if let album = albumDetails.data {
-				ZStack(alignment: .top) {
-					(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
-						.ignoresSafeArea()
+		Suspense($albumDetails) { album in
+			ZStack(alignment: .top) {
+				(artworkLoader.backgroundColor ?? Color(UIColor.systemBackground))
+					.ignoresSafeArea()
 
-					ScrollView {
-						VStack(spacing: 0) {
-							HeroHeaderView(
-								coverArt: album.coverArt,
-								title: album.title,
-								subtitle: {
-									if let artistId = album.artistId {
-										Button(action: { selectedArtistId = artistId }) {
-											Text(album.artist)
-												.font(
-													.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold)
-												)
-												.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
-										}
-										.buttonStyle(.plain)
-									} else {
+				ScrollView {
+					VStack(spacing: 0) {
+						HeroHeaderView(
+							coverArt: album.coverArt,
+							title: album.title,
+							subtitle: {
+								if let artistId = album.artistId {
+									Button(action: { selectedArtistId = artistId }) {
 										Text(album.artist)
-											.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
+											.font(
+												.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold)
+											)
 											.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 									}
-								},
-								meta: [
-									horizontalSizeClass != .regular ? album.year.map(String.init) : nil,
-									String(localized: "\(Int(album.songCount)) tracks"),
-									String(localized: "\(Int(album.durationSecs / 60)) mins"),
-								].compactMap { $0 }.joined(separator: " • "),
-								description: nil,
-								imageShape: .roundedRectangle,
-								actions: {
-									HStack(alignment: .center) {
-										Button(action: {}) {
-											Image(systemName: "shuffle")
-												.font(.system(size: 18, weight: .bold))
-										}
-										.tint(artworkLoader.primaryColor ?? .accentColor)
-										.buttonBorderShape(.circle)
-										.controlSize(.large)
-										.modify { content in
-											if #available(iOS 26, *) {
-												content.buttonStyle(.glass)
-											} else {
-												content.buttonStyle(.bordered)
-											}
-										}
-
-										Button(action: { playbackViewModel.playAlbum(id: albumId, startIndex: 0) }) {
-											HStack(spacing: 8) {
-												Image(systemName: "play.fill")
-												Text("Play")
-											}
-											.font(.system(size: 18, weight: .bold))
-											.padding(.horizontal, 16)
-										}
-										.tint(artworkLoader.primaryColor ?? .accentColor)
-										.foregroundColor(
-											(artworkLoader.primaryColor?.luminance ?? 0) > 0.5 ? .black : .white
-										)
-										.buttonBorderShape(.capsule)
-										.controlSize(.large)
-										.modify { content in
-											if #available(iOS 26, *) {
-												content.buttonStyle(.glassProminent)
-											} else {
-												content.buttonStyle(.borderedProminent)
-											}
-										}
-
-										Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
-											Image(systemName: "plus")
-												.font(.system(size: 18, weight: .bold))
-										}
-										.tint(artworkLoader.primaryColor ?? .accentColor)
-										.buttonBorderShape(.circle)
-										.controlSize(.large)
-										.modify { content in
-											if #available(iOS 26, *) {
-												content.buttonStyle(.glass)
-											} else {
-												content.buttonStyle(.bordered)
-											}
-										}
-									}
-								},
-								artworkLoader: artworkLoader
-							)
-
-							LazyVStack(spacing: 0) {
-								ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
-									TrackItemRow(
-										track: track, index: index + 1,
-										isActive: playbackViewModel.currentTrack?.id == track.id,
-										accentColor: artworkLoader.primaryColor
-									) {
-										playbackViewModel.playAlbum(id: albumId, startIndex: UInt32(index))
-									}
-									.padding(.vertical, 4)
-									.environment(
-										\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
+									.buttonStyle(.plain)
+								} else {
+									Text(album.artist)
+										.font(.system(size: horizontalSizeClass == .regular ? 20 : 18, weight: .bold))
+										.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 								}
+							},
+							meta: [
+								horizontalSizeClass != .regular ? album.year.map(String.init) : nil,
+								String(localized: "\(Int(album.songCount)) tracks"),
+								String(localized: "\(Int(album.durationSecs / 60)) mins"),
+							].compactMap { $0 }.joined(separator: " • "),
+							description: nil,
+							imageShape: .roundedRectangle,
+							actions: {
+								HStack(alignment: .center) {
+									Button(action: {}) {
+										Image(systemName: "shuffle")
+											.font(.system(size: 18, weight: .bold))
+									}
+									.tint(artworkLoader.primaryColor ?? .accentColor)
+									.buttonBorderShape(.circle)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glass)
+										} else {
+											content.buttonStyle(.bordered)
+										}
+									}
+
+									Button(action: { playbackViewModel.playAlbum(id: albumId, startIndex: 0) }) {
+										HStack(spacing: 8) {
+											Image(systemName: "play.fill")
+											Text("Play")
+										}
+										.font(.system(size: 18, weight: .bold))
+										.padding(.horizontal, 16)
+									}
+									.tint(artworkLoader.primaryColor ?? .accentColor)
+									.foregroundColor(
+										(artworkLoader.primaryColor?.luminance ?? 0) > 0.5 ? .black : .white
+									)
+									.buttonBorderShape(.capsule)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glassProminent)
+										} else {
+											content.buttonStyle(.borderedProminent)
+										}
+									}
+
+									Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
+										Image(systemName: "plus")
+											.font(.system(size: 18, weight: .bold))
+									}
+									.tint(artworkLoader.primaryColor ?? .accentColor)
+									.buttonBorderShape(.circle)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glass)
+										} else {
+											content.buttonStyle(.bordered)
+										}
+									}
+								}
+							},
+							artworkLoader: artworkLoader
+						)
+
+						LazyVStack(spacing: 0) {
+							ForEach(Array(album.songs.enumerated()), id: \.element.id) { index, track in
+								TrackItemRow(
+									track: track, index: index + 1,
+									isActive: playbackViewModel.currentTrack?.id == track.id,
+									accentColor: artworkLoader.primaryColor
+								) {
+									playbackViewModel.playAlbum(id: albumId, startIndex: UInt32(index))
+								}
+								.padding(.vertical, 4)
+								.environment(
+									\.trackRowHorizontalPadding, horizontalSizeClass == .regular ? 60 : 20)
 							}
-							.padding(.bottom, 60)
 						}
-					}
-					.ignoresSafeArea(edges: .top)
-					.coordinateSpace(name: "scroll")
-					.onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-						titleScrollOffset = value
+						.padding(.bottom, 60)
 					}
 				}
-				.toolbar {
-					ToolbarItem(placement: .topBarTrailing) {
-						Menu {
-							if horizontalSizeClass != .regular {
-								Toggle(
-									"Immersive Mode",
-									systemImage: "photo",
-									isOn: $settings.immersiveHeader.animation(.spring)
-								)
-								Divider()
-							}
-							Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
-								Label("Add to Playlist", systemImage: "text.badge.plus")
-							}
-							Button(action: { playbackViewModel.queueAlbum(id: albumId, next: true) }) {
-								Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-							}
-						} label: {
-							Label("More options", systemImage: "ellipsis")
-								.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
+				.ignoresSafeArea(edges: .top)
+				.coordinateSpace(name: "scroll")
+				.onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+					titleScrollOffset = value
+				}
+			}
+			.toolbar {
+				ToolbarItem(placement: .topBarTrailing) {
+					Menu {
+						if horizontalSizeClass != .regular {
+							Toggle(
+								"Immersive Mode",
+								systemImage: "photo",
+								isOn: $settings.immersiveHeader.animation(.spring)
+							)
+							Divider()
 						}
+						Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
+							Label("Add to Playlist", systemImage: "text.badge.plus")
+						}
+						Button(action: { playbackViewModel.queueAlbum(id: albumId, next: true) }) {
+							Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+						}
+					} label: {
+						Label("More options", systemImage: "ellipsis")
+							.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 					}
 				}
-				.task(id: album.coverArt) {
-					let size =
-						horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
-					guard let url = Config.getCoverUrl(id: album.coverArt, size: size) else { return }
-					if let result = try? await ArtworkService.fetchAndExtract(url: url) {
-						artworkLoader.apply(result: result, scheme: colorScheme)
-					}
+			}
+			.task(id: album.coverArt) {
+				let size =
+					horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
+				guard let url = Config.getCoverUrl(id: album.coverArt, size: size) else { return }
+				if let result = try? await ArtworkService.fetchAndExtract(url: url) {
+					artworkLoader.apply(result: result, scheme: colorScheme)
 				}
-			} else if albumDetails.isLoading {
-				ProgressView()
-			} else if let error = albumDetails.error {
-				ContentUnavailableView(
-					"Error", systemImage: "exclamationmark.triangle", description: Text(error))
 			}
 		}
 		.navigationBarTitleDisplayMode(.inline)
@@ -195,13 +188,8 @@ struct AlbumView: View {
 		}
 		.navigationDestination(item: $selectedArtistId) { id in ArtistView(artistId: id) }
 		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-		.mokaQuery(
-			id: albumId,
-			{
-				try await coreManager.core?.getProvider().album().observeGetAlbumDetails(albumId: albumId)
-			},
-			next: { await $0.next() },
-			bind: $albumDetails
-		)
+		.query($albumDetails, id: albumId) {
+			try await coreManager.core?.getProvider().album().observeGetAlbumDetails(albumId: albumId)
+		}
 	}
 }

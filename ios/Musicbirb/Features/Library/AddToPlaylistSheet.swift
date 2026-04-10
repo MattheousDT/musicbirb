@@ -11,7 +11,7 @@ struct AddToPlaylistSheet: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(\.dismiss) private var dismiss
 
-	@State private var playlists: MokaState<[Playlist]> = .idle
+	@UseQuery<[Playlist]> var playlists
 
 	@State private var trackIdsToAdd: [TrackId] = []
 	@State private var playlistPresence: [String: Bool] = [:]
@@ -20,64 +20,54 @@ struct AddToPlaylistSheet: View {
 
 	var body: some View {
 		NavigationStack {
-			Group {
-				if let allPlaylists = playlists.data {
-					let username = authViewModel.activeAccount?.username.lowercased()
-					let owned = allPlaylists.filter { $0.owner?.lowercased() == username }
+			Suspense($playlists) { playlists in
+				let username = authViewModel.activeAccount?.username.lowercased()
+				let owned = playlists.filter { $0.owner?.lowercased() == username }
 
-					if owned.isEmpty {
-						ContentUnavailableView(
-							"No Playlists",
-							systemImage: "music.note.list",
-							description: Text("You haven't created any playlists yet.")
-						)
-					} else {
-						List(owned, id: \.id) { playlist in
-							Button(action: { togglePlaylist(playlist) }) {
-								HStack(spacing: 12) {
-									SmoothImage(
-										url: Config.getCoverUrl(id: playlist.coverArt, size: 100), contentMode: .fill,
-										placeholderColor: Color(UIColor.systemGray5)
-									)
-									.frame(width: 48, height: 48)
-									.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+				if owned.isEmpty {
+					ContentUnavailableView(
+						"No Playlists",
+						systemImage: "music.note.list",
+						description: Text("You haven't created any playlists yet.")
+					)
+				} else {
+					List(owned, id: \.id) { playlist in
+						Button(action: { togglePlaylist(playlist) }) {
+							HStack(spacing: 12) {
+								SmoothImage(
+									url: Config.getCoverUrl(id: playlist.coverArt, size: 100), contentMode: .fill,
+									placeholderColor: Color(UIColor.systemGray5)
+								)
+								.frame(width: 48, height: 48)
+								.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-									VStack(alignment: .leading, spacing: 2) {
-										Text(playlist.name)
-											.font(.system(size: 16, weight: .semibold))
-											.foregroundColor(.primary)
+								VStack(alignment: .leading, spacing: 2) {
+									Text(playlist.name)
+										.font(.system(size: 16, weight: .semibold))
+										.foregroundColor(.primary)
 
-										Text("\(Int(playlist.songCount)) tracks")
-											.font(.system(size: 13))
-											.foregroundColor(.secondary)
-									}
-									Spacer()
+									Text("\(Int(playlist.songCount)) tracks")
+										.font(.system(size: 13))
+										.foregroundColor(.secondary)
+								}
+								Spacer()
 
-									if isWorking[playlist.id] == true {
-										ProgressView()
-									} else if playlistPresence[playlist.id] == true {
-										Image(systemName: "checkmark.circle.fill")
-											.foregroundColor(.accentColor)
-											.font(.title3)
-									} else {
-										Image(systemName: "circle")
-											.foregroundColor(Color(UIColor.tertiaryLabel))
-											.font(.title3)
-									}
+								if isWorking[playlist.id] == true {
+									ProgressView()
+								} else if playlistPresence[playlist.id] == true {
+									Image(systemName: "checkmark.circle.fill")
+										.foregroundColor(.accentColor)
+										.font(.title3)
+								} else {
+									Image(systemName: "circle")
+										.foregroundColor(Color(UIColor.tertiaryLabel))
+										.font(.title3)
 								}
 							}
-							.foregroundColor(.primary)
 						}
-						.task(id: owned.count) { await calculatePresence(owned: owned) }
+						.foregroundColor(.primary)
 					}
-				} else if playlists.isLoading {
-					ProgressView()
-				} else if let error = playlists.error {
-					ContentUnavailableView(
-						"Error",
-						systemImage: "exclamationmark.triangle",
-						description: Text(error)
-					)
+					.task(id: owned.count) { await calculatePresence(owned: owned) }
 				}
 			}
 			.navigationTitle("Add to Playlist")
@@ -107,11 +97,9 @@ struct AddToPlaylistSheet: View {
 				CreateEditPlaylistSheet()
 					.presentationDetents([.medium])
 			}
-			.mokaQuery(
-				{ try await coreManager.core?.getProvider().playlist().observeGetPlaylists() },
-				next: { await $0.next() },
-				bind: $playlists
-			)
+			.query($playlists) {
+				try await coreManager.core?.getProvider().playlist().observeGetPlaylists()
+			}
 		}
 	}
 

@@ -10,8 +10,8 @@ struct ArtistView: View {
 
 	let artistId: ArtistId
 
-	@State private var artistDetails: MokaState<ArtistDetails> = .idle
-	@State private var topSongs: MokaState<[Track]> = .idle
+	@UseQuery<ArtistDetails> var artistDetails
+	@UseQuery<[Track]> var topSongs
 
 	@State private var selectedAlbumId: AlbumId?
 	@State private var selectedSimilarArtistId: ArtistId?
@@ -26,17 +26,13 @@ struct ArtistView: View {
 
 	@ViewBuilder
 	private var viewContent: some View {
-		Group {
-			if let artist = artistDetails.data {
-				ZStack(alignment: .top) {
-					backgroundColor
-					mainContent(artist)
-				}
-				.task(id: artist.coverArt) {
-					await loadArtwork(for: artist)
-				}
-			} else if artistDetails.isLoading {
-				ProgressView()
+		Suspense($artistDetails) { artist in
+			ZStack(alignment: .top) {
+				backgroundColor
+				mainContent(artist)
+			}
+			.task(id: artist.coverArt) {
+				await loadArtwork(for: artist)
 			}
 		}
 	}
@@ -57,34 +53,23 @@ struct ArtistView: View {
 				)
 			)
 			.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
-			.mokaQuery(
-				id: artistId,
-				{
-					try await coreManager.core?.getProvider().artist().observeGetArtistDetails(
-						artistId: artistId)
-				},
-				next: { await $0.next() },
-				bind: $artistDetails
-			)
-			.mokaQuery(
-				enabled: topSongsMode == .global,
-				id: artistId,
-				{
-					try await coreManager.core?.getProvider().artist().observeGetTopSongs(artistId: artistId)
-				},
-				next: { await $0.next() },
-				bind: $topSongs
-			)
-			.mokaQuery(
-				enabled: topSongsMode == .personal,
-				id: artistId,
-				{
-					try await coreManager.core?.getProvider().artist().observeGetPersonalTopSongs(
-						artistId: artistId)
-				},
-				next: { await $0.next() },
-				bind: $topSongs
-			)
+			.query($artistDetails, id: artistId) {
+				try await coreManager.core?.getProvider().artist().observeGetArtistDetails(
+					artistId: artistId)
+			}
+			.query(
+				$topSongs, id: "\(artistId)-global-\(topSongsMode == .global)",
+				enabled: topSongsMode == .global
+			) {
+				try await coreManager.core?.getProvider().artist().observeGetTopSongs(artistId: artistId)
+			}
+			.query(
+				$topSongs, id: "\(artistId)-personal-\(topSongsMode == .personal)",
+				enabled: topSongsMode == .personal
+			) {
+				try await coreManager.core?.getProvider().artist().observeGetPersonalTopSongs(
+					artistId: artistId)
+			}
 	}
 
 	private func loadArtwork(for artist: ArtistDetails) async {

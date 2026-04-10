@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - State Definitions
+
 public enum MokaState<T> {
 	case idle
 	case loading(previous: T?)
@@ -21,6 +23,162 @@ public enum MokaState<T> {
 	public var error: String? {
 		if case .error(let e, _) = self { return e }
 		return nil
+	}
+}
+
+// MARK: - Property Wrappers
+
+@propertyWrapper
+public struct UseQuery<Value>: DynamicProperty {
+	@State public var state: MokaState<Value> = .idle
+	public init() {}
+	public var wrappedValue: MokaState<Value> { state }
+	public var projectedValue: Binding<MokaState<Value>> { $state }
+}
+
+@propertyWrapper
+public struct UseMutation<Value>: DynamicProperty {
+	public enum MutationState {
+		case idle, loading
+		case success(Value)
+		case error(String)
+		public var isLoading: Bool { if case .loading = self { return true } else { return false } }
+	}
+	@SwiftUI.State public var state: MutationState = .idle
+	public init() {}
+	public var wrappedValue: MutationState { state }
+	public var projectedValue: Binding<MutationState> { $state }
+}
+
+// MARK: - Suspense Component
+
+public struct Suspense<Value, Content: View, LoadingView: View, ErrorView: View>: View {
+	@Binding var query: MokaState<Value>
+	let content: (Value) -> Content
+	let loading: LoadingView
+	let error: (String) -> ErrorView
+
+	public init(
+		_ query: Binding<MokaState<Value>>,
+		@ViewBuilder content: @escaping (Value) -> Content,
+		@ViewBuilder loading: () -> LoadingView,
+		@ViewBuilder error: @escaping (String) -> ErrorView
+	) {
+		self._query = query
+		self.content = content
+		self.loading = loading()
+		self.error = error
+	}
+
+	public var body: some View {
+		switch query {
+		case .idle: loading
+		case .loading(let prev):
+			if let prev { content(prev) } else { loading }
+		case .data(let val): content(val)
+		case .error(let msg, let prev):
+			if let prev { content(prev) } else { error(msg) }
+		}
+	}
+}
+
+// Default initializers mimicking swift-query
+extension Suspense where LoadingView == AnyView, ErrorView == AnyView {
+	public init(
+		_ query: Binding<MokaState<Value>>, @ViewBuilder content: @escaping (Value) -> Content
+	) {
+		self.init(query, content: content) {
+			AnyView(ProgressView().scaleEffect(1.5))
+		} error: { error in
+			AnyView(
+				VStack(spacing: 8) {
+					Image(systemName: "exclamationmark.triangle.fill")
+						.font(.system(size: 32))
+						.foregroundStyle(.red)
+					Text(error)
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+			)
+		}
+	}
+}
+
+// MARK: - Core Execution Modifiers
+
+public protocol MokaStreamProtocol {
+	associatedtype RawState
+	func currentCachedState() -> RawState?
+	func next() async -> RawState?
+}
+
+// Automatic trait conformances to strip out boilerplate closures in views
+// TODO: Probably could be code-gen'd
+extension ObserveSearchStream: MokaStreamProtocol {}
+extension ObserveGetPlaylistsStream: MokaStreamProtocol {}
+extension ObserveGetAlbumDetailsStream: MokaStreamProtocol {}
+extension ObserveGetArtistDetailsStream: MokaStreamProtocol {}
+extension ObserveGetTopSongsStream: MokaStreamProtocol {}
+extension ObserveGetPersonalTopSongsStream: MokaStreamProtocol {}
+extension ObserveGetPlaylistDetailsStream: MokaStreamProtocol {}
+
+public struct MokaQueryModifier<Stream, RawState, Output>: ViewModifier {
+	@Binding var binding: MokaState<Output>
+	let id: AnyHashable?
+	let enabled: Bool
+	let streamProvider: () async throws -> Stream?
+	let current: (Stream) -> RawState?
+	let next: (Stream) async -> RawState?
+	let map: ((RawState, MokaState<Output>) -> MokaState<Output>)?
+
+	public func body(content: Content) -> some View {
+		let taskID =
+			enabled ? AnyHashable([id, AnyHashable(true)]) : AnyHashable([id, AnyHashable(false)])
+		content.task(id: taskID) {
+			if !enabled { return }
+			await MainActor.run {
+				binding = .loading(previous: binding.data)
+			}
+
+			guard let stream = try? await streamProvider() else { return }
+
+			if let rawCurrent = current(stream) {
+				let newState = map?(rawCurrent, .idle) ?? MokaDefaults.map(raw: rawCurrent, previous: .idle)
+				await MainActor.run { binding = newState }
+			}
+
+			while !Task.isCancelled {
+				guard let raw = await next(stream) else { break }
+				let currentState = await MainActor.run { binding }
+				let newState = map?(raw, currentState) ?? MokaDefaults.map(raw: raw, previous: currentState)
+
+				await MainActor.run {
+					withAnimation(.snappy(duration: 0.3)) { binding = newState }
+				}
+			}
+		}
+	}
+}
+
+extension View {
+	public func query<Stream: MokaStreamProtocol, Output>(
+		_ binding: Binding<MokaState<Output>>,
+		id: AnyHashable? = nil,
+		enabled: Bool = true,
+		stream: @escaping () async throws -> Stream?,
+		map: ((Stream.RawState, MokaState<Output>) -> MokaState<Output>)? = nil
+	) -> some View {
+		self.modifier(
+			MokaQueryModifier(
+				binding: binding,
+				id: id,
+				enabled: enabled,
+				streamProvider: stream,
+				current: { $0.currentCachedState() },
+				next: { await $0.next() },
+				map: map
+			)
+		)
 	}
 }
 
@@ -55,46 +213,5 @@ public enum MokaDefaults {
 			return .error(errorMsg, previous: prevData)
 		}
 		return previous
-	}
-}
-
-extension View {
-	@ViewBuilder
-	public func mokaQuery<Stream, RawState, Output>(
-		enabled: Bool = true,  // Added enabled flag
-		id: AnyHashable? = nil,
-		_ streamProvider: @escaping () async throws -> Stream?,
-		next: @escaping (Stream) async -> RawState?,
-		map: ((RawState, MokaState<Output>) -> MokaState<Output>)? = nil,
-		bind binding: Binding<MokaState<Output>>
-	) -> some View {
-		// We use a composite ID so the task restarts if 'enabled' changes
-		let taskID =
-			enabled ? AnyHashable([id, AnyHashable(true)]) : AnyHashable([id, AnyHashable(false)])
-
-		self.task(id: taskID) {
-			if !enabled {
-				// If disabled, we don't wipe data, just stop the loop.
-				return
-			}
-
-			await MainActor.run {
-				binding.wrappedValue = .loading(previous: binding.wrappedValue.data)
-			}
-
-			guard let stream = try? await streamProvider() else { return }
-
-			while !Task.isCancelled {
-				guard let raw = await next(stream) else { break }
-				let current = await MainActor.run { binding.wrappedValue }
-				let newState = map?(raw, current) ?? MokaDefaults.map(raw: raw, previous: current)
-
-				await MainActor.run {
-					withAnimation(.snappy(duration: 0.3)) {
-						binding.wrappedValue = newState
-					}
-				}
-			}
-		}
 	}
 }
