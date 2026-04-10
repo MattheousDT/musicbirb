@@ -85,6 +85,19 @@ struct PlayerSheet: View {
 											Image(uiImage: image)
 												.resizable()
 												.aspectRatio(1, contentMode: .fit)
+												.modify { content in
+													if #available(iOS 26, *) {
+														content
+															.glassEffect(
+																in: .rect(
+																	cornerRadius: 24 * settings.cornerRounding.multiplier,
+																	style: .continuous
+																)
+															)
+													} else {
+														content
+													}
+												}
 												.clipShape(
 													RoundedRectangle(
 														cornerRadius: 24 * settings.cornerRounding.multiplier,
@@ -96,6 +109,19 @@ struct PlayerSheet: View {
 											RoundedRectangle(cornerRadius: 24 * settings.cornerRounding.multiplier)
 												.fill(Color.primary.opacity(0.05))
 												.aspectRatio(1, contentMode: .fit)
+												.modify { content in
+													if #available(iOS 26, *) {
+														content
+															.glassEffect(
+																in: .rect(
+																	cornerRadius: 24 * settings.cornerRounding.multiplier,
+																	style: .continuous
+																)
+															)
+													} else {
+														content
+													}
+												}
 										}
 									}
 									.padding(.horizontal, 32)

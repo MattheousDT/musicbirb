@@ -11,6 +11,146 @@ pub trait ArtistProvider: Send + Sync {
 	async fn star_artist(&self, id: &String) -> Result<(), String>;
 }
 
+#[moka_query_proxy(namespace = "NoArgs")]
+pub trait NoArgsProvider: Send + Sync {
+	#[query(key = "FetchAll")]
+	async fn fetch_all(&self) -> Result<String, String>;
+}
+
+struct MockNoArgsProvider;
+
+#[async_trait::async_trait]
+impl NoArgsProvider for MockNoArgsProvider {
+	async fn fetch_all(&self) -> Result<String, String> {
+		Ok("All Data".to_string())
+	}
+}
+
+#[tokio::test]
+async fn test_no_args_compilation_and_execution() {
+	let global_client = Arc::new(GlobalQueryClient::new());
+	let provider = CachedNoArgsProvider::new(Arc::new(MockNoArgsProvider), global_client);
+
+	let stream = provider.observe_fetch_all();
+
+	let state = stream.next().await.unwrap();
+	assert!(matches!(state, ObserveFetchAllState::Loading));
+
+	let state = stream.next().await.unwrap();
+	assert_eq!(
+		state,
+		ObserveFetchAllState::Data {
+			data: "All Data".to_string()
+		}
+	);
+}
+
+#[tokio::test]
+async fn test_optimistic_update_success_flow() {
+	let call_count = Arc::new(Mutex::new(0));
+	let backend_data = Arc::new(Mutex::new("Server V1".to_string()));
+
+	struct FlowProvider {
+		count: Arc<Mutex<usize>>,
+		data: Arc<Mutex<String>>,
+	}
+	#[async_trait::async_trait]
+	impl NoArgsProvider for FlowProvider {
+		async fn fetch_all(&self) -> Result<String, String> {
+			let mut c = self.count.lock().unwrap();
+			*c += 1;
+			Ok(self.data.lock().unwrap().clone())
+		}
+	}
+
+	let global_client = Arc::new(GlobalQueryClient::new());
+	let provider = CachedNoArgsProvider::new(
+		Arc::new(FlowProvider {
+			count: call_count.clone(),
+			data: backend_data.clone(),
+		}),
+		global_client,
+	);
+
+	let stream = provider.observe_fetch_all();
+	let _ = stream.next().await; // Loading
+	let _ = stream.next().await; // "Server V1"
+	assert_eq!(*call_count.lock().unwrap(), 1);
+
+	// 1. Trigger Optimistic Update
+	provider.set_cached_fetch_all("Optimistic Guess".to_string()).await;
+	assert_eq!(
+		stream.next().await.unwrap(),
+		ObserveFetchAllState::Data {
+			data: "Optimistic Guess".to_string()
+		}
+	);
+
+	// 2. Simulate Mutation Success (Backend updates to V2)
+	{
+		*backend_data.lock().unwrap() = "Server V2".to_string();
+	}
+	provider.moka_invalidate("NoArgs/*".to_string()).await;
+
+	// 3. Stream should re-fetch and overwrite optimistic data with Server V2
+	assert_eq!(
+		stream.next().await.unwrap(),
+		ObserveFetchAllState::Data {
+			data: "Server V2".to_string()
+		}
+	);
+	assert_eq!(*call_count.lock().unwrap(), 2);
+}
+
+#[tokio::test]
+async fn test_optimistic_update_rollback_flow() {
+	let backend_data = Arc::new(Mutex::new("Stable Server Data".to_string()));
+
+	struct RollbackProvider {
+		data: Arc<Mutex<String>>,
+	}
+	#[async_trait::async_trait]
+	impl NoArgsProvider for RollbackProvider {
+		async fn fetch_all(&self) -> Result<String, String> {
+			Ok(self.data.lock().unwrap().clone())
+		}
+	}
+
+	let global_client = Arc::new(GlobalQueryClient::new());
+	let provider = CachedNoArgsProvider::new(
+		Arc::new(RollbackProvider {
+			data: backend_data.clone(),
+		}),
+		global_client,
+	);
+
+	let stream = provider.observe_fetch_all();
+	let _ = stream.next().await; // Loading
+	let _ = stream.next().await; // "Stable Server Data"
+
+	// 1. Trigger Optimistic Update
+	provider.set_cached_fetch_all("Bad Guess".to_string()).await;
+	let state = stream.next().await.unwrap();
+	assert_eq!(
+		state,
+		ObserveFetchAllState::Data {
+			data: "Bad Guess".to_string()
+		}
+	);
+
+	// 2. Mutation Fails! We trigger invalidation to "roll back" to server truth
+	provider.moka_invalidate("NoArgs/FetchAll".to_string()).await;
+
+	// 3. Stream should yield the original stable data again
+	let state = stream.next().await.unwrap();
+	assert_eq!(
+		state,
+		ObserveFetchAllState::Data {
+			data: "Stable Server Data".to_string()
+		}
+	);
+}
+
 // 2. Implement a mock backend that counts API calls
 struct MockArtistProvider {
 	pub call_count: Arc<Mutex<usize>>,

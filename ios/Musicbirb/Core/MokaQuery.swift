@@ -82,13 +82,32 @@ public struct Suspense<Value, Content: View, LoadingView: View, ErrorView: View>
 	}
 }
 
+public struct MokaDelayedLoadingView: View {
+	@State private var isVisible = false
+	public var body: some View {
+		Group {
+			if isVisible {
+				ProgressView().scaleEffect(1.5)
+			} else {
+				Color.clear
+			}
+		}
+		.task {
+			do {
+				try await Task.sleep(nanoseconds: 100_000_000)  // 100ms
+				await MainActor.run { isVisible = true }
+			} catch {}
+		}
+	}
+}
+
 // Default initializers mimicking swift-query
 extension Suspense where LoadingView == AnyView, ErrorView == AnyView {
 	public init(
 		_ query: Binding<MokaState<Value>>, @ViewBuilder content: @escaping (Value) -> Content
 	) {
 		self.init(query, content: content) {
-			AnyView(ProgressView().scaleEffect(1.5))
+			AnyView(MokaDelayedLoadingView())
 		} error: { error in
 			AnyView(
 				VStack(spacing: 8) {
@@ -136,15 +155,23 @@ public struct MokaQueryModifier<Stream, RawState, Output>: ViewModifier {
 			enabled ? AnyHashable([id, AnyHashable(true)]) : AnyHashable([id, AnyHashable(false)])
 		content.task(id: taskID) {
 			if !enabled { return }
-			await MainActor.run {
-				binding = .loading(previous: binding.data)
-			}
 
 			guard let stream = try? await streamProvider() else { return }
+			let rawCurrent = current(stream)
 
-			if let rawCurrent = current(stream) {
-				let newState = map?(rawCurrent, .idle) ?? MokaDefaults.map(raw: rawCurrent, previous: .idle)
-				await MainActor.run { binding = newState }
+			await MainActor.run {
+				let currentState = binding
+				let newState: MokaState<Output>
+
+				if let raw = rawCurrent {
+					newState = map?(raw, currentState) ?? MokaDefaults.map(raw: raw, previous: currentState)
+				} else {
+					newState = .loading(previous: currentState.data)
+				}
+
+				withAnimation(.snappy(duration: 0.3)) {
+					binding = newState
+				}
 			}
 
 			while !Task.isCancelled {

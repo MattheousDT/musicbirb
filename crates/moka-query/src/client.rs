@@ -36,6 +36,17 @@ impl GlobalQueryClient {
 		}
 	}
 
+	pub async fn set_query_data<T: Any + Send + Sync + Clone>(&self, key: &str, data: T) {
+		// Insert into cache so that current_cached_state() and the next observe loop pick it up
+		self.cache
+			.insert(key.to_string(), Arc::new(data) as Arc<dyn Any + Send + Sync>)
+			.await;
+		self.active_keys.write().unwrap().insert(key.to_string());
+
+		// Notify listeners that this specific key has changed
+		let _ = self.tx.send(key.to_string());
+	}
+
 	pub async fn invalidate_pattern(&self, pattern: &str) {
 		let pattern_str = pattern.to_string();
 		let keys_to_remove: Vec<String> = {

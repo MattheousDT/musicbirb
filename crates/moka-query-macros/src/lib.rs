@@ -189,7 +189,14 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					})
 					.collect();
 
+				let set_method_name = format_ident!("set_cached_{}", method_name);
+
 				uniffi_inherent_methods.push(quote! {
+					pub async fn #set_method_name(&self, #( #arg_names: #arg_types_owned, )* data: #inner_ok_type) {
+						let key = format!(#full_key);
+						self.global_client.set_query_data(&key, data).await;
+					}
+
 					pub fn #observe_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let key = format!(#full_key);
 						let inner = self.inner.clone();
