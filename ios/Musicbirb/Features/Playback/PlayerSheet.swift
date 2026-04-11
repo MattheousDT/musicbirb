@@ -193,7 +193,7 @@ struct PlayerSheet: View {
 												if availableWidth > 0 {
 													let offset = padding + (availableWidth * progress)
 													Rectangle()
-														.fill((artworkLoader.primaryColor ?? Color.blue).opacity(0.8))
+														.fill((artworkLoader.primaryColor ?? .accentColor).opacity(0.8))
 														.frame(width: 2, height: 12)
 														.offset(x: offset)
 														.allowsHitTesting(false)
