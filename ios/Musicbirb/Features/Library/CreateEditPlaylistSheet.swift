@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct CreateEditPlaylistSheet: View {
@@ -6,11 +5,17 @@ struct CreateEditPlaylistSheet: View {
 
 	@Environment(\.dismiss) private var dismiss
 	@Environment(CoreManager.self) private var coreManager
-	@UseMutation var saveMutation
 
 	@State private var name: String = ""
 	@State private var description: String = ""
 	@State private var isPublic: Bool = false
+
+	@UseMutation<Playlist> var createPlaylistMutation
+	@UseMutation<Void> var updatePlaylistMutation
+
+	var isSaving: Bool {
+		createPlaylistMutation.isLoading || updatePlaylistMutation.isLoading
+	}
 
 	var isEditing: Bool { existingPlaylist != nil }
 
@@ -32,15 +37,11 @@ struct CreateEditPlaylistSheet: View {
 			.navigationBarTitleDisplayMode(.inline)
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
-					Button("Cancel") { dismiss() }
-						.disabled(saveMutation.isLoading)
+					Button("Cancel") { dismiss() }.disabled(isSaving)
 				}
 				ToolbarItem(placement: .confirmationAction) {
-					Button("Save") {
-						performSave()
-					}
-					.disabled(
-						name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saveMutation.isLoading)
+					Button("Save") { performSave() }
+						.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
 				}
 			}
 			.onAppear {
@@ -51,9 +52,7 @@ struct CreateEditPlaylistSheet: View {
 				}
 			}
 			.overlay {
-				if saveMutation.isLoading {
-					ProgressHUD(title: "Saving...")
-				}
+				if isSaving { ProgressHUD(title: "Saving...") }
 			}
 		}
 	}
@@ -64,28 +63,29 @@ struct CreateEditPlaylistSheet: View {
 			description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : description
 		let pid = existingPlaylist?.id
 
+		guard let core = coreManager.core else { return }
+
 		Task {
-			await saveMutation.asyncPerform {
+			do {
 				if let id = pid {
-					try await coreManager.core?.updatePlaylist(
-						id: id, name: cleanName, description: descOpt, isPublic: isPublic)
+					let stream = try await core.getProvider().playlist().executeUpdatePlaylist(
+						id: id, name: cleanName, description: descOpt, public: isPublic)
+					await _updatePlaylistMutation.execute(stream)
+
+					if case .success = updatePlaylistMutation {
+						await MainActor.run { dismiss() }
+					}
 				} else {
-					_ = try await coreManager.core?.createPlaylist(
-						name: cleanName, description: descOpt, isPublic: isPublic)
-				}
-			} onCompleted: { client in
-				Task {
-					await client.invalidate(["playlists"])
+					let stream = try await core.getProvider().playlist().executeCreatePlaylist(
+						name: cleanName, description: descOpt, public: isPublic)
+					await _createPlaylistMutation.execute(stream)
 
-					if let id = pid {
-						await client.invalidate(["playlists", id])
-						await client.invalidate(["playlists", id, "artwork"])
-					}
-
-					await MainActor.run {
-						dismiss()
+					if case .success = createPlaylistMutation {
+						await MainActor.run { dismiss() }
 					}
 				}
+			} catch {
+				print("Failed to get provider for mutation: \(error)")
 			}
 		}
 	}

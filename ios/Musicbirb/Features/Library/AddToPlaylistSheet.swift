@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct AddToPlaylistSheet: View {
@@ -13,7 +12,6 @@ struct AddToPlaylistSheet: View {
 	@Environment(\.dismiss) private var dismiss
 
 	@UseQuery<[Playlist]> var playlists
-	@UseMutation var toggleMutation
 
 	@State private var trackIdsToAdd: [TrackId] = []
 	@State private var playlistPresence: [String: Bool] = [:]
@@ -22,62 +20,55 @@ struct AddToPlaylistSheet: View {
 
 	var body: some View {
 		NavigationStack {
-			Boundary($playlists) { allPlaylists in
+			Suspense($playlists) { playlists in
 				let username = authViewModel.activeAccount?.username.lowercased()
-				let owned = allPlaylists.filter { $0.owner?.lowercased() == username }
+				let owned = playlists.filter { $0.owner?.lowercased() == username }
 
-				Group {
-					if owned.isEmpty {
-						ContentUnavailableView(
-							"No Playlists",
-							systemImage: "music.note.list",
-							description: Text("You haven't created any playlists yet.")
-						)
-					} else {
-						List(owned, id: \.id) { playlist in
-							Button(action: { togglePlaylist(playlist) }) {
-								HStack(spacing: 12) {
-									SmoothImage(
-										url: Config.getCoverUrl(id: playlist.coverArt, size: 100), contentMode: .fill,
-										placeholderColor: Color(UIColor.systemGray5)
-									)
-									.frame(width: 48, height: 48)
-									.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+				if owned.isEmpty {
+					ContentUnavailableView(
+						"No Playlists",
+						systemImage: "music.note.list",
+						description: Text("You haven't created any playlists yet.")
+					)
+				} else {
+					List(owned, id: \.id) { playlist in
+						Button(action: { togglePlaylist(playlist) }) {
+							HStack(spacing: 12) {
+								SmoothImage(
+									url: Config.getCoverUrl(id: playlist.coverArt, size: 100), contentMode: .fill,
+									placeholderColor: Color(UIColor.systemGray5)
+								)
+								.frame(width: 48, height: 48)
+								.clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-									VStack(alignment: .leading, spacing: 2) {
-										Text(playlist.name)
-											.font(.system(size: 16, weight: .semibold))
-											.foregroundColor(.primary)
+								VStack(alignment: .leading, spacing: 2) {
+									Text(playlist.name)
+										.font(.system(size: 16, weight: .semibold))
+										.foregroundColor(.primary)
 
-										Text("\(Int(playlist.songCount)) tracks")
-											.font(.system(size: 13))
-											.foregroundColor(.secondary)
-									}
-									Spacer()
+									Text("\(Int(playlist.songCount)) tracks")
+										.font(.system(size: 13))
+										.foregroundColor(.secondary)
+								}
+								Spacer()
 
-									if isWorking[playlist.id] == true {
-										ProgressView()
-									} else if playlistPresence[playlist.id] == true {
-										Image(systemName: "checkmark.circle.fill")
-											.foregroundColor(.accentColor)
-											.font(.title3)
-									} else {
-										Image(systemName: "circle")
-											.foregroundColor(Color(UIColor.tertiaryLabel))
-											.font(.title3)
-									}
+								if isWorking[playlist.id] == true {
+									ProgressView()
+								} else if playlistPresence[playlist.id] == true {
+									Image(systemName: "checkmark.circle.fill")
+										.foregroundColor(.accentColor)
+										.font(.title3)
+								} else {
+									Image(systemName: "circle")
+										.foregroundColor(Color(UIColor.tertiaryLabel))
+										.font(.title3)
 								}
 							}
-							.foregroundColor(.primary)
 						}
+						.foregroundColor(.primary)
 					}
+					.task(id: owned.count) { await calculatePresence(owned: owned) }
 				}
-				.task(id: allPlaylists.count) {
-					await calculatePresence(owned: owned)
-				}
-			}
-			.query($playlists, queryKey: ["playlists"]) {
-				try await coreManager.core!.getProvider().playlist().getPlaylists()
 			}
 			.navigationTitle("Add to Playlist")
 			.navigationBarTitleDisplayMode(.inline)
@@ -106,6 +97,9 @@ struct AddToPlaylistSheet: View {
 				CreateEditPlaylistSheet()
 					.presentationDetents([.medium])
 			}
+			.query($playlists) {
+				try await coreManager.core?.getProvider().playlist().observeGetPlaylists()
+			}
 		}
 	}
 
@@ -121,13 +115,12 @@ struct AddToPlaylistSheet: View {
 			self.trackIdsToAdd = currentTrackIds
 		}
 
-		let core = coreManager.core
+		guard let core = coreManager.core else { return }
 
 		await withTaskGroup(of: (String, Bool).self) { group in
 			for pl in owned {
 				group.addTask {
-					let tracks = try? await core?.getProvider().playlist().getPlaylistTracks(
-						playlistId: pl.id)
+					let tracks = try? await core.getProvider().playlist().getPlaylistTracks(playlistId: pl.id)
 					let plTrackIds = Set(tracks?.map { $0.id } ?? [])
 					let isPresent =
 						!currentTrackIds.isEmpty && currentTrackIds.allSatisfy { plTrackIds.contains($0) }
@@ -147,33 +140,42 @@ struct AddToPlaylistSheet: View {
 		let allowDuplicates = settings.allowDuplicatesInPlaylists
 		let playlistId = playlist.id
 
-		isWorking[playlist.id] = true
+		isWorking[playlistId] = true
 
 		Task {
-			await toggleMutation.asyncPerform {
+			do {
 				if !isPresent {
-					return try await core.addTracksToPlaylist(
-						id: playlistId, trackIds: targetIds, allowDuplicates: allowDuplicates)
+					var finalIds = targetIds
+					var skipped: UInt32 = 0
+
+					if !allowDuplicates {
+						let currentTracks =
+							(try? await core.getProvider().playlist().getPlaylistTracks(playlistId: playlistId))
+							?? []
+						let existingIds = Set(currentTracks.map { $0.id })
+						finalIds = targetIds.filter { !existingIds.contains($0) }
+						skipped = UInt32(targetIds.count - finalIds.count)
+					}
+
+					if !finalIds.isEmpty {
+						_ = try? await core.getProvider().playlist().addToPlaylist(
+							id: playlistId, trackIds: finalIds)
+					}
+					if skipped > 0 { await MainActor.run { onResult(skipped) } }
 				} else {
-					let currentTracks = try await core.getProvider().playlist().getPlaylistTracks(
-						playlistId: playlistId)
+					let currentTracks =
+						(try? await core.getProvider().playlist().getPlaylistTracks(playlistId: playlistId))
+						?? []
 					let toRemove = Set(targetIds)
 					let newIds = currentTracks.filter { !toRemove.contains($0.id) }.map { $0.id }
-					try await core.replacePlaylistTracks(id: playlistId, trackIds: newIds)
-					return UInt32(0)
+					_ = try? await core.getProvider().playlist().replacePlaylistTracks(
+						id: playlistId, trackIds: newIds)
 				}
-			} onCompleted: { skipped, client in
-				Task {
-					await client.invalidate(["playlists"])
-					await client.invalidate(["playlists", playlistId])
-					await client.invalidate(["playlists", playlistId, "artwork"])
+			}
 
-					await MainActor.run {
-						playlistPresence[playlistId] = !isPresent
-						isWorking[playlistId] = false
-						if skipped > 0 { onResult(skipped) }
-					}
-				}
+			await MainActor.run {
+				playlistPresence[playlistId] = !isPresent
+				isWorking[playlistId] = false
 			}
 		}
 	}

@@ -21,10 +21,10 @@ pub fn async_ffi(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 						let new_block: Block = parse_quote! {
 							{
-								#[cfg(feature = "ffi")]
+								#[cfg(feature = "uniffi")]
 								let __musicbirb_res = crate::ffi::WithTokio::new(async move { #original_block }).await;
 
-								#[cfg(not(feature = "ffi"))]
+								#[cfg(not(feature = "uniffi"))]
 								let __musicbirb_res = { #original_block };
 
 								__musicbirb_res

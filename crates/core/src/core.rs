@@ -1,12 +1,12 @@
 use crate::{
-	AlbumId, AudioBackend, CoreMessage, CoreState, CoverArtId, MusicbirbError, Playlist, PlaylistId, Provider, TrackId,
+	AlbumId, AudioBackend, CoreMessage, CoreState, CoverArtId, MusicbirbError, PlaylistId, Provider, TrackId,
 	actor::CoreActor,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 #[uniffi::export]
 pub fn init_client(
 	provider: Option<Arc<dyn crate::Provider>>,
@@ -87,14 +87,14 @@ pub fn init_client(
 	Ok(core)
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct Musicbirb {
 	api: Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
 	tx: mpsc::UnboundedSender<CoreMessage>,
 	state_rx: watch::Receiver<CoreState>,
 }
 
-#[cfg_attr(feature = "ffi", uniffi::export)]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 #[macros::async_ffi]
 impl Musicbirb {
 	// ------------- ASYNC METHODS WITH OUR SAFE MACRO WRAPPER -------------
@@ -160,90 +160,6 @@ impl Musicbirb {
 			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
 			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))?;
 		Ok(count as u32)
-	}
-
-	pub async fn create_playlist(
-		self: Arc<Self>,
-		name: String,
-		description: Option<String>,
-		is_public: bool,
-	) -> Result<Playlist, MusicbirbError> {
-		let provider = self.get_provider().await?;
-		provider.playlist().create_playlist(&name, description, is_public).await
-	}
-
-	pub async fn update_playlist(
-		self: Arc<Self>,
-		id: PlaylistId,
-		name: Option<String>,
-		description: Option<String>,
-		is_public: Option<bool>,
-	) -> Result<(), MusicbirbError> {
-		let provider = self.get_provider().await?;
-		provider
-			.playlist()
-			.update_playlist(&id, name, description, is_public)
-			.await
-	}
-
-	pub async fn delete_playlist(self: Arc<Self>, id: PlaylistId) -> Result<(), MusicbirbError> {
-		let provider = self.get_provider().await?;
-		provider.playlist().delete_playlist(&id).await
-	}
-
-	pub async fn add_tracks_to_playlist(
-		self: Arc<Self>,
-		id: PlaylistId,
-		track_ids: Vec<TrackId>,
-		allow_duplicates: bool,
-	) -> Result<u32, MusicbirbError> {
-		let provider = self.get_provider().await?;
-		let mut final_ids = track_ids;
-		let mut skipped = 0;
-
-		if !allow_duplicates {
-			let existing_tracks = provider.playlist().get_playlist_tracks(&id).await?;
-			let existing_ids: std::collections::HashSet<_> = existing_tracks.into_iter().map(|t| t.id.0).collect();
-			let original_count = final_ids.len();
-			final_ids.retain(|tid| !existing_ids.contains(&tid.0));
-			skipped = original_count - final_ids.len();
-		}
-
-		if !final_ids.is_empty() {
-			provider.playlist().add_to_playlist(&id, final_ids).await?;
-		}
-
-		Ok(skipped as u32)
-	}
-
-	pub async fn add_album_to_playlist(
-		self: Arc<Self>,
-		id: PlaylistId,
-		album_id: AlbumId,
-		allow_duplicates: bool,
-	) -> Result<u32, MusicbirbError> {
-		let provider = self.get_provider().await?;
-		let tracks = provider.album().get_album_tracks(&album_id).await?;
-		let track_ids: Vec<TrackId> = tracks.into_iter().map(|t| t.id).collect();
-		self.add_tracks_to_playlist(id, track_ids, allow_duplicates).await
-	}
-
-	pub async fn replace_playlist_tracks(
-		self: Arc<Self>,
-		id: PlaylistId,
-		track_ids: Vec<TrackId>,
-	) -> Result<(), MusicbirbError> {
-		let provider = self.get_provider().await?;
-		provider.playlist().replace_playlist_tracks(&id, track_ids).await
-	}
-
-	pub async fn remove_from_playlist(
-		self: Arc<Self>,
-		id: PlaylistId,
-		indices: Vec<u32>,
-	) -> Result<(), MusicbirbError> {
-		let provider = self.get_provider().await?;
-		provider.playlist().remove_from_playlist(&id, indices).await
 	}
 
 	pub async fn play_playlist(
@@ -375,12 +291,12 @@ impl Musicbirb {
 		let actor = CoreActor::new(data_dir, cache_dir);
 		let tx_clone = tx.clone();
 
-		#[cfg(feature = "ffi")]
+		#[cfg(feature = "uniffi")]
 		crate::RUNTIME.spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_lock, player).await;
 		});
 
-		#[cfg(not(feature = "ffi"))]
+		#[cfg(not(feature = "uniffi"))]
 		tokio::spawn(async move {
 			actor.run(rx, tx_clone, state_tx, api_lock, player).await;
 		});

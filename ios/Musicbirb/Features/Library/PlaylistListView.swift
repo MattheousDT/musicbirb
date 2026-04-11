@@ -1,4 +1,3 @@
-import SwiftQuery
 import SwiftUI
 
 struct PlaylistListView: View {
@@ -7,35 +6,30 @@ struct PlaylistListView: View {
 	@State private var showCreateSheet = false
 
 	var body: some View {
-		Boundary($playlists) { items in
-			Group {
-				if items.isEmpty {
-					ContentUnavailableView("No Playlists", systemImage: "music.note.list")
-				} else {
-					List(items) { playlist in
-						NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
-							PlaylistItem(playlist: playlist)
-						}
-						.listRowInsets(EdgeInsets())
+		Suspense($playlists) { playlists in
+			if playlists.isEmpty {
+				ContentUnavailableView("No Playlists", systemImage: "music.note.list")
+			} else {
+				List(playlists) { playlist in
+					NavigationLink(destination: PlaylistView(playlistId: playlist.id)) {
+						PlaylistItem(playlist: playlist)
 					}
-					.listStyle(.plain)
+					.listRowInsets(EdgeInsets())
 				}
+				.listStyle(.plain)
 			}
-		}
-		.query($playlists, queryKey: ["playlists"], options: QueryOptions(staleTime: 300)) {
-			try await coreManager.core!.getProvider().playlist().getPlaylists()
 		}
 		.navigationTitle("Playlists")
 		.toolbar {
 			ToolbarItem(placement: .topBarTrailing) {
-				Button(action: { showCreateSheet = true }) {
-					Label("New Playlist", systemImage: "plus")
-				}
+				Button(action: { showCreateSheet = true }) { Label("New Playlist", systemImage: "plus") }
 			}
 		}
 		.sheet(isPresented: $showCreateSheet) {
-			CreateEditPlaylistSheet()
-				.presentationDetents([.medium])
+			CreateEditPlaylistSheet().presentationDetents([.medium])
+		}
+		.query($playlists) {
+			try await self.coreManager.core?.getProvider().playlist().observeGetPlaylists()
 		}
 	}
 }

@@ -1,5 +1,6 @@
 use crate::MusicbirbError;
 use crate::providers::*;
+use moka_query::QueryClient;
 use reqwest::{Client, Url};
 use std::sync::{Arc, RwLock};
 
@@ -121,6 +122,7 @@ impl SubsonicContext {
 
 pub struct SubsonicProvider {
 	ctx: Arc<SubsonicContext>,
+	query_client: Arc<QueryClient>,
 }
 
 impl SubsonicProvider {
@@ -145,11 +147,12 @@ impl SubsonicProvider {
 				nd_jwt: RwLock::new(None),
 				nd_id: RwLock::new(None),
 			}),
+			query_client: Arc::new(QueryClient::new()),
 		})
 	}
 }
 
-#[cfg(feature = "ffi")]
+#[cfg(feature = "uniffi")]
 #[uniffi::export]
 pub fn create_subsonic_provider(
 	url: String,
@@ -191,39 +194,57 @@ impl Provider for SubsonicProvider {
 		})
 	}
 
-	fn track(&self) -> Arc<dyn TrackProvider> {
-		Arc::new(SubsonicTrack {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn track(&self) -> Arc<CachedTrackProvider> {
+		Arc::new(crate::providers::CachedTrackProvider::new(
+			Arc::new(SubsonicTrack {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn album(&self) -> Arc<dyn AlbumProvider> {
-		Arc::new(SubsonicAlbum {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn album(&self) -> Arc<CachedAlbumProvider> {
+		Arc::new(CachedAlbumProvider::new(
+			Arc::new(SubsonicAlbum {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn artist(&self) -> Arc<dyn ArtistProvider> {
-		Arc::new(SubsonicArtist {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn artist(&self) -> Arc<CachedArtistProvider> {
+		Arc::new(CachedArtistProvider::new(
+			Arc::new(SubsonicArtist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn playlist(&self) -> Arc<dyn PlaylistProvider> {
-		Arc::new(SubsonicPlaylist {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn playlist(&self) -> Arc<CachedPlaylistProvider> {
+		Arc::new(CachedPlaylistProvider::new(
+			Arc::new(SubsonicPlaylist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn activity(&self) -> Arc<dyn ActivityProvider> {
-		Arc::new(SubsonicActivity {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn activity(&self) -> Arc<CachedActivityProvider> {
+		Arc::new(CachedActivityProvider::new(
+			Arc::new(SubsonicActivity {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn search(&self) -> Arc<dyn SearchProvider> {
-		Arc::new(SubsonicSearch {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn search(&self) -> Arc<CachedSearchProvider> {
+		Arc::new(CachedSearchProvider::new(
+			Arc::new(SubsonicSearch {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 }

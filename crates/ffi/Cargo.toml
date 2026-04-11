@@ -8,7 +8,7 @@ name = "musicbirb"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-musicbirb = { path = "../core", features = ["ffi", "rodio"] }
+musicbirb = { path = "../core", features = ["uniffi", "rodio"] }
 uniffi = { version = "0.30.0", features = ["cli"] }
 anyhow = "1.0"
 

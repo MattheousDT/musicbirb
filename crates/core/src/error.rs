@@ -1,6 +1,7 @@
+use moka_query::Retryable;
 use thiserror::Error;
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 #[derive(Error, Debug)]
 pub enum MusicbirbError {
 	#[error("Subsonic API error: {0}")]
@@ -17,4 +18,15 @@ pub enum MusicbirbError {
 
 	#[error("Authentication error: {0}")]
 	Auth(String),
+}
+
+impl Retryable for MusicbirbError {
+	fn is_transient(&self) -> bool {
+		match self {
+			// Network errors are usually transient
+			MusicbirbError::Network(_) => true,
+			// Internal or specific API errors (like 404) might not be
+			_ => false,
+		}
+	}
 }

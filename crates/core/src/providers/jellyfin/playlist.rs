@@ -36,7 +36,7 @@ impl PlaylistProvider for JellyfinPlaylist {
 
 	async fn create_playlist(
 		&self,
-		_name: &str,
+		_name: String,
 		_description: Option<String>,
 		_public: bool,
 	) -> Result<Playlist, MusicbirbError> {

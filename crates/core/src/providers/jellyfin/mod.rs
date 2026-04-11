@@ -1,6 +1,7 @@
 use crate::error::MusicbirbError;
 use crate::providers::*;
 use dto::*;
+use moka_query::QueryClient;
 use reqwest::Client;
 use std::sync::Arc;
 
@@ -109,11 +110,15 @@ impl JellyfinContext {
 
 pub struct JellyfinProvider {
 	ctx: Arc<JellyfinContext>,
+	query_client: Arc<QueryClient>,
 }
 
 impl JellyfinProvider {
 	pub fn new(ctx: JellyfinContext) -> Self {
-		Self { ctx: Arc::new(ctx) }
+		Self {
+			ctx: Arc::new(ctx),
+			query_client: Arc::new(QueryClient::new()),
+		}
 	}
 }
 
@@ -130,39 +135,57 @@ impl Provider for JellyfinProvider {
 		})
 	}
 
-	fn track(&self) -> Arc<dyn TrackProvider> {
-		Arc::new(JellyfinTrack {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn track(&self) -> Arc<CachedTrackProvider> {
+		Arc::new(crate::providers::CachedTrackProvider::new(
+			Arc::new(JellyfinTrack {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn album(&self) -> Arc<dyn AlbumProvider> {
-		Arc::new(JellyfinAlbum {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn album(&self) -> Arc<CachedAlbumProvider> {
+		Arc::new(crate::providers::CachedAlbumProvider::new(
+			Arc::new(JellyfinAlbum {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn artist(&self) -> Arc<dyn ArtistProvider> {
-		Arc::new(JellyfinArtist {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn artist(&self) -> Arc<CachedArtistProvider> {
+		Arc::new(crate::providers::CachedArtistProvider::new(
+			Arc::new(JellyfinArtist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn playlist(&self) -> Arc<dyn PlaylistProvider> {
-		Arc::new(JellyfinPlaylist {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn playlist(&self) -> Arc<CachedPlaylistProvider> {
+		Arc::new(crate::providers::CachedPlaylistProvider::new(
+			Arc::new(JellyfinPlaylist {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn activity(&self) -> Arc<dyn ActivityProvider> {
-		Arc::new(JellyfinActivity {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn activity(&self) -> Arc<CachedActivityProvider> {
+		Arc::new(crate::providers::CachedActivityProvider::new(
+			Arc::new(JellyfinActivity {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 
-	fn search(&self) -> Arc<dyn SearchProvider> {
-		Arc::new(JellyfinSearch {
-			ctx: Arc::clone(&self.ctx),
-		})
+	fn search(&self) -> Arc<CachedSearchProvider> {
+		Arc::new(crate::providers::CachedSearchProvider::new(
+			Arc::new(JellyfinSearch {
+				ctx: Arc::clone(&self.ctx),
+			}),
+			Arc::clone(&self.query_client),
+		))
 	}
 }

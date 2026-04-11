@@ -1,14 +1,14 @@
 use crate::{MusicbirbError, Provider};
 use std::sync::Arc;
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AuthCredential {
 	Password(String),
 	Token(String),
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum AuthStep {
 	UserPass,
@@ -19,19 +19,19 @@ pub enum AuthStep {
 	},
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct AuthResult {
 	pub provider: Arc<dyn Provider>,
 	pub credential: AuthCredential,
 }
 
-#[cfg_attr(feature = "ffi", derive(uniffi::Object))]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct Authenticator;
 
-#[cfg_attr(feature = "ffi", uniffi::export)]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 #[macros::async_ffi]
 impl Authenticator {
-	#[cfg_attr(feature = "ffi", uniffi::constructor)]
+	#[cfg_attr(feature = "uniffi", uniffi::constructor)]
 	pub fn new() -> Arc<Self> {
 		Arc::new(Self)
 	}
