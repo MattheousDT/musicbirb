@@ -1,10 +1,10 @@
-use moka_query::{GlobalQueryClient, moka_query_proxy};
+use moka_query::{QueryClient, query_group};
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!("moka_query_retry_test");
 
-#[moka_query_proxy(namespace = "Retry")]
+#[query_group(namespace = "Retry")]
 pub trait RetryTrait: Send + Sync {
 	#[query(key = "Test", retries = 3)]
 	async fn fetch_retry(&self) -> Result<String, String>;
@@ -40,12 +40,12 @@ impl RetryTrait for FailProvider {
 #[tokio::test]
 async fn test_retry_success_flow() {
 	let attempts = Arc::new(Mutex::new(0));
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedRetryTrait::new(
 		Arc::new(RetryProvider {
 			attempts: attempts.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch_retry();
@@ -65,12 +65,12 @@ async fn test_retry_success_flow() {
 #[tokio::test]
 async fn test_retry_exhaustion_flow() {
 	let attempts = Arc::new(Mutex::new(0));
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedRetryTrait::new(
 		Arc::new(FailProvider {
 			attempts: attempts.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch_retry();
@@ -92,13 +92,13 @@ pub enum MyError {
 	Transient,
 }
 
-impl moka_query::client::MokaRetryable for MyError {
+impl moka_query::client::Retryable for MyError {
 	fn is_transient(&self) -> bool {
 		matches!(self, MyError::Transient)
 	}
 }
 
-#[moka_query_proxy(namespace = "Fatal")]
+#[query_group(namespace = "Fatal")]
 pub trait FatalTrait: Send + Sync {
 	#[query(key = "Test", retries = 5)]
 	async fn fetch(&self) -> Result<String, MyError>;
@@ -120,12 +120,12 @@ async fn test_fatal_error_stops_retrying() {
 		}
 	}
 
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedFatalTrait::new(
 		Arc::new(FatalProviderImpl {
 			attempts: attempts.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch();
@@ -155,12 +155,12 @@ async fn test_custom_error_transient_retry_flow() {
 		}
 	}
 
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedFatalTrait::new(
 		Arc::new(TransientProvider {
 			attempts: attempts.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch();

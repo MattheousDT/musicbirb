@@ -93,8 +93,8 @@ struct HomeView: View {
 
 	private func performRefresh() async {
 		guard let p = try? await coreManager.core?.getProvider() else { return }
-		await p.search().mokaInvalidate(pattern: "Search/*")
-		await p.playlist().mokaInvalidate(pattern: "Playlists/*")
+		await p.search().invalidate(pattern: "Search/*")
+		await p.playlist().invalidate(pattern: "Playlists/*")
 	}
 
 	// MARK: - UI Components

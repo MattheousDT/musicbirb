@@ -3,7 +3,7 @@ use crate::models::{
 	AlbumDetails, AlbumId, ArtistDetails, ArtistId, CoverArtId, Playlist, PlaylistDetails, PlaylistId, SearchQuery,
 	SearchResults, Track, TrackId, TrackScrobble,
 };
-use moka_query::moka_query_proxy;
+use moka_query::query_group;
 use std::sync::Arc;
 
 #[cfg(feature = "jellyfin")]
@@ -51,7 +51,7 @@ pub trait MediaProvider: Send + Sync {
 
 /// Handles fetching and modifying specific tracks.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Track")]
+#[query_group(namespace = "Track")]
 pub trait TrackProvider: Send + Sync {
 	/// Fetches a single track's metadata.
 	#[query(key = "Track({track_id:?})")]
@@ -60,7 +60,7 @@ pub trait TrackProvider: Send + Sync {
 
 /// Handles fetching and modifying albums.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Album")]
+#[query_group(namespace = "Album")]
 pub trait AlbumProvider: Send + Sync {
 	/// Fetches all tracks associated with a given album ID.
 	#[query(key = "AlbumTracks({album_id:?})")]
@@ -73,7 +73,7 @@ pub trait AlbumProvider: Send + Sync {
 
 /// Handles fetching and modifying artists.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Artist")]
+#[query_group(namespace = "Artist")]
 pub trait ArtistProvider: Send + Sync {
 	/// Fetches basic artist metadata, biography, and similar artists.
 	#[query(key = "ArtistDetails({artist_id:?})")]
@@ -90,7 +90,7 @@ pub trait ArtistProvider: Send + Sync {
 
 /// Handles fetching, browsing, and editing playlists.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Playlist")]
+#[query_group(namespace = "Playlist")]
 pub trait PlaylistProvider: Send + Sync {
 	/// Fetches all playlists owned by or visible to the user.
 	#[query(key = "AllPlaylists")]
@@ -142,7 +142,7 @@ pub trait PlaylistProvider: Send + Sync {
 
 /// Handles reporting playback data back to the server.
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Activity")]
+#[query_group(namespace = "Activity")]
 pub trait ActivityProvider: Send + Sync {
 	/// Reports to the server that a track has started playing.
 	#[mutation(invalidates = [])]
@@ -156,7 +156,7 @@ pub trait ActivityProvider: Send + Sync {
 /// Handles searching the library, either by textual query or via explicit preset filters
 /// (like Recently Added, Newly Released, etc).
 #[cfg_attr(feature = "uniffi", uniffi::export)]
-#[moka_query_proxy(namespace = "Search")]
+#[query_group(namespace = "Search")]
 pub trait SearchProvider: Send + Sync {
 	/// Submits a query to the server, returning mixed tracks, albums, and artists.
 	#[query(key = "Search({query:?})")]

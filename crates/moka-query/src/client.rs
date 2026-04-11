@@ -8,23 +8,23 @@ use tokio::sync::broadcast;
 use tokio::time::{Duration, sleep};
 
 /// Trait to determine if an error should trigger a retry.
-pub trait MokaRetryable {
+pub trait Retryable {
 	fn is_transient(&self) -> bool {
 		true
 	}
 }
 
 // Default implementation for String so simple errors retry by default
-impl MokaRetryable for String {}
+impl Retryable for String {}
 
 /// Global Client that orchestrates caching, deduplication, and reactivity.
-pub struct GlobalQueryClient {
+pub struct QueryClient {
 	cache: Cache<String, Arc<dyn Any + Send + Sync>>,
 	tx: broadcast::Sender<String>,
 	active_keys: Arc<RwLock<HashSet<String>>>,
 }
 
-impl GlobalQueryClient {
+impl QueryClient {
 	pub fn new() -> Self {
 		let (tx, _) = broadcast::channel(1024);
 		Self {
@@ -97,7 +97,7 @@ impl GlobalQueryClient {
 		T: Any + Send + Sync + Clone + 'static,
 		F: Fn() -> Fut + Send + Sync + 'static,
 		Fut: Future<Output = Result<T, E>> + Send + 'static,
-		E: std::fmt::Display + MokaRetryable + Send + Sync + 'static,
+		E: std::fmt::Display + Retryable + Send + Sync + 'static,
 	{
 		self.active_keys.write().unwrap().insert(key.clone());
 
@@ -164,7 +164,7 @@ impl GlobalQueryClient {
 	}
 }
 
-impl Default for GlobalQueryClient {
+impl Default for QueryClient {
 	fn default() -> Self {
 		Self::new()
 	}

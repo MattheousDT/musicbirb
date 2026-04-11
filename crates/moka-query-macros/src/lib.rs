@@ -46,7 +46,7 @@ fn extract_ok_type(ret: &ReturnType) -> Option<Type> {
 }
 
 #[proc_macro_attribute]
-pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn query_group(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let input_trait = parse_macro_input!(item as ItemTrait);
 	let is_uniffi = cfg!(feature = "uniffi");
 
@@ -150,7 +150,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					async fn #method_name #generics (#inputs) #output {
 						let res = self.inner.#method_name(#(#arg_names),*).await;
 						if res.is_ok() {
-							#( self.global_client.invalidate_pattern(#invalidates_patterns).await; )*
+							#( self.query_client.invalidate_pattern(#invalidates_patterns).await; )*
 						}
 						res
 					}
@@ -175,7 +175,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					pub async fn #method_name #generics (#inputs) #output {
 						let res = self.inner.#method_name(#(#arg_names),*).await;
 						if res.is_ok() {
-							#( self.global_client.invalidate_pattern(#invalidates_patterns).await; )*
+							#( self.query_client.invalidate_pattern(#invalidates_patterns).await; )*
 						}
 						res
 					}
@@ -233,7 +233,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 				uniffi_inherent_methods.push(quote! {
 					pub fn #execute_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let inner = self.inner.clone();
-						let global_client = self.global_client.clone();
+						let query_client = self.query_client.clone();
 						#( let #arg_names = #arg_names.clone(); )*
 
 						let stream = moka_query::async_stream::stream! {
@@ -242,7 +242,7 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 							let res = inner.#method_name(#(#arg_names),*).await;
 							match res {
 								Ok(data) => {
-									#( global_client.invalidate_pattern(#invalidates_patterns).await; )*
+									#( query_client.invalidate_pattern(#invalidates_patterns).await; )*
 									#data_yield
 								}
 								Err(err) => yield #state_enum_name::Error { message: err.to_string() }
@@ -332,20 +332,20 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 				uniffi_inherent_methods.push(quote! {
 					pub async fn #set_method_name(&self, #( #arg_names: #arg_types_owned, )* data: #inner_ok_type) {
 						let key = format!(#full_key);
-						self.global_client.set_query_data(&key, data).await;
+						self.query_client.set_query_data(&key, data).await;
 					}
 
 					pub fn #observe_method_name(&self, #( #arg_names: #arg_types_owned ),*) -> std::sync::Arc<#stream_struct_name> {
 						let key = format!(#full_key);
 						let inner = self.inner.clone();
-						let stream = self.global_client.clone().observe(key.clone(), #retries, move || {
+						let stream = self.query_client.clone().observe(key.clone(), #retries, move || {
 							let inner = inner.clone();
 							#( let #arg_names = #arg_names.clone(); )*
 							async move { #( #captures )* inner.#method_name(#(#arg_names),*).await }
 						});
 						std::sync::Arc::new(#stream_struct_name {
 							inner: tokio::sync::Mutex::new(Box::pin(stream)),
-							global_client: self.global_client.clone(),
+							query_client: self.query_client.clone(),
 							key,
 						})
 					}
@@ -373,14 +373,14 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 					#obj_attr
 					pub struct #stream_struct_name {
 						inner: tokio::sync::Mutex<std::pin::Pin<Box<dyn futures::Stream<Item = moka_query::QueryState<#inner_ok_type>> + Send>>>,
-						global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
+						query_client: std::sync::Arc<moka_query::QueryClient>,
 						key: String,
 					}
 
 					#export_attr
 					impl #stream_struct_name {
 						pub fn current_cached_state(&self) -> Option<#state_enum_name> {
-							match self.global_client.get_cached_state::<#inner_ok_type>(&self.key) {
+							match self.query_client.get_cached_state::<#inner_ok_type>(&self.key) {
 								Some(moka_query::QueryState::Loading) => Some(#state_enum_name::Loading),
 								Some(moka_query::QueryState::Data(d)) => Some(#state_enum_name::Data { data: d }),
 								Some(moka_query::QueryState::Error(e)) => Some(#state_enum_name::Error { message: e }),
@@ -429,12 +429,12 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 		#proxy_obj_attr
 		#vis struct #proxy_name {
 			inner: std::sync::Arc<dyn #trait_name + Send + Sync>,
-			global_client: std::sync::Arc<moka_query::GlobalQueryClient>,
+			query_client: std::sync::Arc<moka_query::QueryClient>,
 		}
 
 		impl #proxy_name {
-			pub fn new(inner: std::sync::Arc<dyn #trait_name + Send + Sync>, global_client: std::sync::Arc<moka_query::GlobalQueryClient>) -> Self {
-				Self { inner, global_client }
+			pub fn new(inner: std::sync::Arc<dyn #trait_name + Send + Sync>, query_client: std::sync::Arc<moka_query::QueryClient>) -> Self {
+				Self { inner, query_client }
 			}
 		}
 
@@ -443,8 +443,8 @@ pub fn moka_query_proxy(attr: TokenStream, item: TokenStream) -> TokenStream {
 			#( #uniffi_inherent_methods )*
 
 			// Native Manual Invalidation!
-			pub async fn moka_invalidate(&self, pattern: String) {
-				self.global_client.invalidate_pattern(&pattern).await;
+			pub async fn invalidate(&self, pattern: String) {
+				self.query_client.invalidate_pattern(&pattern).await;
 			}
 		}
 

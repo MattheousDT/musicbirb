@@ -1,10 +1,10 @@
-use moka_query::moka_query_proxy;
+use moka_query::{QueryClient, query_group};
 use std::sync::Arc;
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!("moka_query_feature_test");
 
-#[moka_query_proxy(namespace = "FeatureTest")]
+#[query_group(namespace = "FeatureTest")]
 pub trait FeatureTrait: Send + Sync {
 	#[query(key = "Test")]
 	async fn test_method(&self) -> Result<String, String>;
@@ -20,7 +20,7 @@ impl FeatureTrait for FeatureProvider {
 
 #[tokio::test]
 async fn test_feature_forwarding_compilation() {
-	let client = Arc::new(moka_query::GlobalQueryClient::new());
+	let client = Arc::new(QueryClient::new());
 	let provider = CachedFeatureTrait::new(Arc::new(FeatureProvider), client);
 
 	// This method is generated natively by the macro.

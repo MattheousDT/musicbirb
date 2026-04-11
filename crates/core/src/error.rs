@@ -1,4 +1,4 @@
-use moka_query::client::MokaRetryable;
+use moka_query::Retryable;
 use thiserror::Error;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
@@ -20,7 +20,7 @@ pub enum MusicbirbError {
 	Auth(String),
 }
 
-impl MokaRetryable for MusicbirbError {
+impl Retryable for MusicbirbError {
 	fn is_transient(&self) -> bool {
 		match self {
 			// Network errors are usually transient

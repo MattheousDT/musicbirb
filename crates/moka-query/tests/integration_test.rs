@@ -1,11 +1,11 @@
-use moka_query::{GlobalQueryClient, moka_query_proxy};
+use moka_query::{QueryClient, query_group};
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!("moka_query_integration_test");
 
 // 1. Define the provider trait
-#[moka_query_proxy(namespace = "Artist")]
+#[query_group(namespace = "Artist")]
 pub trait ArtistProvider: Send + Sync {
 	#[query(key = "Details({id})")]
 	async fn get_artist_details(&self, id: &String) -> Result<String, String>;
@@ -14,7 +14,7 @@ pub trait ArtistProvider: Send + Sync {
 	async fn star_artist(&self, id: &String) -> Result<(), String>;
 }
 
-#[moka_query_proxy(namespace = "NoArgs")]
+#[query_group(namespace = "NoArgs")]
 pub trait NoArgsProvider: Send + Sync {
 	#[query(key = "FetchAll")]
 	async fn fetch_no_args(&self) -> Result<String, String>;
@@ -31,8 +31,8 @@ impl NoArgsProvider for MockNoArgsProvider {
 
 #[tokio::test]
 async fn test_no_args_compilation_and_execution() {
-	let global_client = Arc::new(GlobalQueryClient::new());
-	let provider = CachedNoArgsProvider::new(Arc::new(MockNoArgsProvider), global_client);
+	let query_client = Arc::new(QueryClient::new());
+	let provider = CachedNoArgsProvider::new(Arc::new(MockNoArgsProvider), query_client);
 
 	let stream = provider.observe_fetch_no_args();
 
@@ -66,13 +66,13 @@ async fn test_optimistic_update_success_flow() {
 		}
 	}
 
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedNoArgsProvider::new(
 		Arc::new(FlowProvider {
 			count: call_count.clone(),
 			data: backend_data.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch_no_args();
@@ -93,7 +93,7 @@ async fn test_optimistic_update_success_flow() {
 	{
 		*backend_data.lock().unwrap() = "Server V2".to_string();
 	}
-	provider.moka_invalidate("NoArgs/*".to_string()).await;
+	provider.invalidate("NoArgs/*".to_string()).await;
 
 	// 3. Stream should re-fetch and overwrite optimistic data with Server V2
 	assert_eq!(
@@ -119,12 +119,12 @@ async fn test_optimistic_update_rollback_flow() {
 		}
 	}
 
-	let global_client = Arc::new(GlobalQueryClient::new());
+	let query_client = Arc::new(QueryClient::new());
 	let provider = CachedNoArgsProvider::new(
 		Arc::new(RollbackProvider {
 			data: backend_data.clone(),
 		}),
-		global_client,
+		query_client,
 	);
 
 	let stream = provider.observe_fetch_no_args();
@@ -142,7 +142,7 @@ async fn test_optimistic_update_rollback_flow() {
 	);
 
 	// 2. Mutation Fails! We trigger invalidation to "roll back" to server truth
-	provider.moka_invalidate("NoArgs/FetchAll".to_string()).await;
+	provider.invalidate("NoArgs/FetchAll".to_string()).await;
 
 	// 3. Stream should yield the original stable data again
 	let state = stream.next().await.unwrap();
@@ -187,8 +187,8 @@ async fn test_caching_and_invalidation() {
 		data: data.clone(),
 	};
 
-	let global_client = Arc::new(GlobalQueryClient::new());
-	let provider = CachedArtistProvider::new(Arc::new(raw_provider), global_client);
+	let query_client = Arc::new(QueryClient::new());
+	let provider = CachedArtistProvider::new(Arc::new(raw_provider), query_client);
 
 	// Observer 1
 	let stream1 = provider.observe_get_artist_details("123".to_string());
@@ -254,8 +254,8 @@ async fn test_mutation_stream_flow() {
 		data: data.clone(),
 	};
 
-	let global_client = Arc::new(GlobalQueryClient::new());
-	let provider = CachedArtistProvider::new(Arc::new(raw_provider), global_client);
+	let query_client = Arc::new(QueryClient::new());
+	let provider = CachedArtistProvider::new(Arc::new(raw_provider), query_client);
 
 	let stream = provider.execute_star_artist("123".to_string());
 

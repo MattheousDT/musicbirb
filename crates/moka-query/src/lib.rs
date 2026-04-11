@@ -5,8 +5,8 @@ pub mod state;
 pub use async_stream;
 
 // Re-export everything for easy access
-pub use client::GlobalQueryClient;
-pub use moka_query_macros::moka_query_proxy;
+pub use client::{QueryClient, Retryable};
+pub use moka_query_macros::query_group;
 pub use state::QueryState;
 
 #[cfg(feature = "uniffi")]

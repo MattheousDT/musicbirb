@@ -1,5 +1,6 @@
 use crate::MusicbirbError;
 use crate::providers::*;
+use moka_query::QueryClient;
 use reqwest::{Client, Url};
 use std::sync::{Arc, RwLock};
 
@@ -121,7 +122,7 @@ impl SubsonicContext {
 
 pub struct SubsonicProvider {
 	ctx: Arc<SubsonicContext>,
-	global_client: Arc<moka_query::GlobalQueryClient>,
+	query_client: Arc<QueryClient>,
 }
 
 impl SubsonicProvider {
@@ -146,7 +147,7 @@ impl SubsonicProvider {
 				nd_jwt: RwLock::new(None),
 				nd_id: RwLock::new(None),
 			}),
-			global_client: Arc::new(moka_query::GlobalQueryClient::new()),
+			query_client: Arc::new(QueryClient::new()),
 		})
 	}
 }
@@ -198,7 +199,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicTrack {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -207,7 +208,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicAlbum {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -216,7 +217,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicArtist {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -225,7 +226,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicPlaylist {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -234,7 +235,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicActivity {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -243,7 +244,7 @@ impl Provider for SubsonicProvider {
 			Arc::new(SubsonicSearch {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 }

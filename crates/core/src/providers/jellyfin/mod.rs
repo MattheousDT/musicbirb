@@ -1,6 +1,7 @@
 use crate::error::MusicbirbError;
 use crate::providers::*;
 use dto::*;
+use moka_query::QueryClient;
 use reqwest::Client;
 use std::sync::Arc;
 
@@ -109,14 +110,14 @@ impl JellyfinContext {
 
 pub struct JellyfinProvider {
 	ctx: Arc<JellyfinContext>,
-	global_client: Arc<moka_query::GlobalQueryClient>,
+	query_client: Arc<QueryClient>,
 }
 
 impl JellyfinProvider {
 	pub fn new(ctx: JellyfinContext) -> Self {
 		Self {
 			ctx: Arc::new(ctx),
-			global_client: Arc::new(moka_query::GlobalQueryClient::new()),
+			query_client: Arc::new(QueryClient::new()),
 		}
 	}
 }
@@ -139,7 +140,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinTrack {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -148,7 +149,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinAlbum {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -157,7 +158,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinArtist {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -166,7 +167,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinPlaylist {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -175,7 +176,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinActivity {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 
@@ -184,7 +185,7 @@ impl Provider for JellyfinProvider {
 			Arc::new(JellyfinSearch {
 				ctx: Arc::clone(&self.ctx),
 			}),
-			Arc::clone(&self.global_client),
+			Arc::clone(&self.query_client),
 		))
 	}
 }
