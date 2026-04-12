@@ -134,29 +134,6 @@ struct AlbumView: View {
 					titleScrollOffset = value
 				}
 			}
-			.toolbar {
-				ToolbarItem(placement: .topBarTrailing) {
-					Menu {
-						if horizontalSizeClass != .regular {
-							Toggle(
-								"Immersive Mode",
-								systemImage: "photo",
-								isOn: $settings.immersiveHeader.animation(.spring)
-							)
-							Divider()
-						}
-						Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
-							Label("Add to Playlist", systemImage: "text.badge.plus")
-						}
-						Button(action: { playbackViewModel.queueAlbum(id: albumId, next: true) }) {
-							Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-						}
-					} label: {
-						Label("More options", systemImage: "ellipsis")
-							.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
-					}
-				}
-			}
 			.task(id: album.coverArt) {
 				let size =
 					horizontalSizeClass == .regular ? 800 : Int(UIScreen.main.bounds.width * displayScale)
@@ -174,6 +151,29 @@ struct AlbumView: View {
 					.font(.headline)
 					.opacity(titleScrollOffset < 0 ? 1 : 0)
 					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+			}
+			ToolbarItem(placement: .topBarTrailing) {
+				Menu {
+					if let album = albumDetails.data {
+						if horizontalSizeClass != .regular {
+							Toggle(
+								"Immersive Mode",
+								systemImage: "photo",
+								isOn: $settings.immersiveHeader.animation(.spring)
+							)
+							Divider()
+						}
+						Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
+							Label("Add to Playlist", systemImage: "text.badge.plus")
+						}
+						Button(action: { playbackViewModel.queueAlbum(id: albumId, next: true) }) {
+							Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+						}
+					}
+				} label: {
+					Label("More options", systemImage: "ellipsis")
+						.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
+				}
 			}
 			if #available(iOS 26, *) {
 				ToolbarItem(placement: .subtitle) {

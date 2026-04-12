@@ -56,6 +56,8 @@ struct PlaylistView: View {
 					}
 				}
 			}
+
+			ToolbarItem(placement: .topBarTrailing) { trailingToolbarMenu() }
 		}
 		.overlay { if isSaving { ProgressHUD(title: "Saving...") } }
 		.sheet(isPresented: $showEditDetails) {
@@ -113,9 +115,6 @@ struct PlaylistView: View {
 				if value == .infinity && titleScrollOffset < 0 { return }
 				titleScrollOffset = value
 			}
-		}
-		.toolbar {
-			ToolbarItem(placement: .topBarTrailing) { trailingToolbarMenu(playlist) }
 		}
 		.task(id: playlist.coverArt) {
 			let size =
@@ -242,7 +241,7 @@ struct PlaylistView: View {
 	}
 
 	@ViewBuilder
-	private func trailingToolbarMenu(_ playlist: PlaylistDetails) -> some View {
+	private func trailingToolbarMenu() -> some View {
 		@Bindable var settings = settings
 
 		if editMode.isEditing {
@@ -259,19 +258,21 @@ struct PlaylistView: View {
 					)
 					Divider()
 				}
-				Button(action: { playbackViewModel.queuePlaylist(id: playlistId, next: true) }) {
-					Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-				}
-				if isOwner(playlist) {
-					Divider()
-					Button(action: { withAnimation { editMode = .active } }) {
-						Label("Reorder Tracks", systemImage: "arrow.up.arrow.down")
+				if let playlist = playlistDetails.data {
+					Button(action: { playbackViewModel.queuePlaylist(id: playlistId, next: true) }) {
+						Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
 					}
-					Button(action: { showEditDetails = true }) {
-						Label("Edit Details", systemImage: "pencil")
-					}
-					Button(role: .destructive, action: { showDeleteConfirm = true }) {
-						Label("Delete Playlist", systemImage: "trash")
+					if isOwner(playlist) {
+						Divider()
+						Button(action: { withAnimation { editMode = .active } }) {
+							Label("Reorder Tracks", systemImage: "arrow.up.arrow.down")
+						}
+						Button(action: { showEditDetails = true }) {
+							Label("Edit Details", systemImage: "pencil")
+						}
+						Button(role: .destructive, action: { showDeleteConfirm = true }) {
+							Label("Delete Playlist", systemImage: "trash")
+						}
 					}
 				}
 			} label: {

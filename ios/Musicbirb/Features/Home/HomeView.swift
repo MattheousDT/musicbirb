@@ -101,8 +101,8 @@ struct HomeView: View {
 
 	@ToolbarContentBuilder
 	private var homeToolbar: some ToolbarContent {
-		ToolbarItem(placement: .navigationBarTrailing) {
-			if !playbackViewModel.queue.isEmpty {
+		if !playbackViewModel.queue.isEmpty {
+			ToolbarItem(placement: .navigationBarTrailing) {
 				Button {
 					showQueueSheet = true
 				} label: {
