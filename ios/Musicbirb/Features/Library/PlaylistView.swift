@@ -180,7 +180,7 @@ struct PlaylistView: View {
 	@ViewBuilder
 	private var playlistActions: some View {
 		HStack(alignment: .center) {
-			Button(action: {}) {
+			Button(action: { playbackViewModel.playPlaylist(id: playlistId, shuffle: true) }) {
 				Image(systemName: "shuffle")
 					.font(.system(size: 18, weight: .bold))
 			}
@@ -197,7 +197,7 @@ struct PlaylistView: View {
 				}
 			}
 
-			Button(action: { playbackViewModel.playPlaylist(id: playlistId, startIndex: 0) }) {
+			Button(action: { playbackViewModel.playPlaylist(id: playlistId) }) {
 				HStack(spacing: 8) {
 					Image(systemName: "play.fill")
 					Text("Play")

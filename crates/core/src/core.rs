@@ -1,7 +1,9 @@
 use crate::{
 	AlbumId, AudioBackend, CoreMessage, CoreState, CoverArtId, MusicbirbError, PlaylistId, Provider, TrackId,
 	actor::CoreActor,
+	models::{RepeatMode, ShuffleType},
 };
+use rand::seq::SliceRandom;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
@@ -60,6 +62,11 @@ pub fn init_client(
 				position_secs: state.sync.position_secs,
 				status: state.sync.status,
 				scrobble_mark_pos: state.scrobble_mark_pos,
+				repeat_mode: state.repeat_mode,
+				shuffle: state.shuffle,
+				shuffle_type: state.shuffle_type,
+				consume: state.consume,
+				stop_after_current: state.stop_after_current,
 			};
 			(queue, pb)
 		};
@@ -80,6 +87,11 @@ pub fn init_client(
 				position_secs: state.sync.position_secs,
 				status: state.sync.status,
 				scrobble_mark_pos: state.scrobble_mark_pos,
+				repeat_mode: state.repeat_mode,
+				shuffle: state.shuffle,
+				shuffle_type: state.shuffle_type,
+				consume: state.consume,
+				stop_after_current: state.stop_after_current,
 			});
 		}
 	});
@@ -116,9 +128,12 @@ impl Musicbirb {
 		Ok(())
 	}
 
-	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool) -> Result<u32, MusicbirbError> {
+	pub async fn queue_album(self: Arc<Self>, id: AlbumId, next: bool, shuffle: bool) -> Result<u32, MusicbirbError> {
 		let provider: Arc<dyn Provider> = self.get_provider().await?;
-		let tracks = provider.album().get_album_tracks(&id).await?;
+		let mut tracks = provider.album().get_album_tracks(&id).await?;
+		if shuffle {
+			tracks.shuffle(&mut rand::rng());
+		}
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::AddTracks(tracks, next))
@@ -126,9 +141,17 @@ impl Musicbirb {
 		Ok(count as u32)
 	}
 
-	pub async fn queue_playlist(self: Arc<Self>, id: PlaylistId, next: bool) -> Result<u32, MusicbirbError> {
+	pub async fn queue_playlist(
+		self: Arc<Self>,
+		id: PlaylistId,
+		next: bool,
+		shuffle: bool,
+	) -> Result<u32, MusicbirbError> {
 		let provider: Arc<dyn Provider> = self.get_provider().await?;
-		let tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		let mut tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		if shuffle {
+			tracks.shuffle(&mut rand::rng());
+		}
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::AddTracks(tracks, next))
@@ -140,11 +163,15 @@ impl Musicbirb {
 		self: Arc<Self>,
 		ids: Vec<TrackId>,
 		start_index: Option<u32>,
+		shuffle: bool,
 	) -> Result<(), MusicbirbError> {
 		let provider: Arc<dyn Provider> = self.get_provider().await?;
 		let mut tracks = Vec::with_capacity(ids.len());
 		for id in ids {
 			tracks.push(provider.track().get_track(&id).await?);
+		}
+		if shuffle {
+			tracks.shuffle(&mut rand::rng());
 		}
 		self.tx
 			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
@@ -152,9 +179,17 @@ impl Musicbirb {
 		Ok(())
 	}
 
-	pub async fn play_album(self: Arc<Self>, id: AlbumId, start_index: Option<u32>) -> Result<u32, MusicbirbError> {
+	pub async fn play_album(
+		self: Arc<Self>,
+		id: AlbumId,
+		start_index: Option<u32>,
+		shuffle: bool,
+	) -> Result<u32, MusicbirbError> {
 		let provider: Arc<dyn Provider> = self.get_provider().await?;
-		let tracks = provider.album().get_album_tracks(&id).await?;
+		let mut tracks = provider.album().get_album_tracks(&id).await?;
+		if shuffle {
+			tracks.shuffle(&mut rand::rng());
+		}
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
@@ -166,9 +201,13 @@ impl Musicbirb {
 		self: Arc<Self>,
 		id: PlaylistId,
 		start_index: Option<u32>,
+		shuffle: bool,
 	) -> Result<u32, MusicbirbError> {
 		let provider: Arc<dyn Provider> = self.get_provider().await?;
-		let tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		let mut tracks = provider.playlist().get_playlist_tracks(&id).await?;
+		if shuffle {
+			tracks.shuffle(&mut rand::rng());
+		}
 		let count = tracks.len();
 		self.tx
 			.send(CoreMessage::ReplaceTracks(tracks, start_index.unwrap_or(0) as usize))
@@ -177,6 +216,36 @@ impl Musicbirb {
 	}
 
 	// ------------- SYNCHRONOUS METHODS (No Macro Needed) -------------
+
+	pub fn set_repeat_mode(&self, mode: RepeatMode) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetRepeatMode(mode))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn set_shuffle(&self, shuffle: bool) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetShuffle(shuffle))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn set_shuffle_type(&self, mode: ShuffleType) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetShuffleType(mode))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn set_consume(&self, consume: bool) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetConsume(consume))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
+
+	pub fn set_stop_after_current(&self, stop: bool) -> Result<(), MusicbirbError> {
+		self.tx
+			.send(CoreMessage::SetStopAfterCurrent(stop))
+			.map_err(|_| MusicbirbError::Internal("Core loop dead".into()))
+	}
 
 	pub fn set_replay_gain_mode(&self, mode: crate::models::ReplayGainMode) -> Result<(), MusicbirbError> {
 		self.tx

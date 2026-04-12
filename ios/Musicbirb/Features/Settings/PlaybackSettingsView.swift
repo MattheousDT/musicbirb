@@ -21,7 +21,23 @@ struct PlaybackSettingsView: View {
 			}
 
 			Section("Queue") {
-				Toggle("Continuous Play", isOn: $settings.continuousPlay)
+				Picker("Shuffle Mode", selection: $settings.shuffleType) {
+					Text("Smart").tag(ShuffleTypeSetting.smart)
+					Text("Random").tag(ShuffleTypeSetting.random)
+				}
+				.onChange(of: settings.shuffleType) { _, newValue in
+					try? coreManager.core?.setShuffleType(mode: newValue.coreMode)
+				}
+
+				Toggle("Consume Track", isOn: $settings.consume)
+					.onChange(of: settings.consume) { _, newValue in
+						try? coreManager.core?.setConsume(consume: newValue)
+					}
+
+				Toggle("Stop After Current", isOn: $settings.stopAfterCurrent)
+					.onChange(of: settings.stopAfterCurrent) { _, newValue in
+						try? coreManager.core?.setStopAfterCurrent(stop: newValue)
+					}
 			}
 		}
 		.navigationTitle("Playback")

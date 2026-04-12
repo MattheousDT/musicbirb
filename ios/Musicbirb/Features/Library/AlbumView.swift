@@ -55,7 +55,7 @@ struct AlbumView: View {
 							imageShape: .roundedRectangle,
 							actions: {
 								HStack(alignment: .center) {
-									Button(action: {}) {
+									Button(action: { playbackViewModel.playAlbum(id: albumId, shuffle: true) }) {
 										Image(systemName: "shuffle")
 											.font(.system(size: 18, weight: .bold))
 									}
@@ -70,7 +70,7 @@ struct AlbumView: View {
 										}
 									}
 
-									Button(action: { playbackViewModel.playAlbum(id: albumId, startIndex: 0) }) {
+									Button(action: { playbackViewModel.playAlbum(id: albumId) }) {
 										HStack(spacing: 8) {
 											Image(systemName: "play.fill")
 											Text("Play")

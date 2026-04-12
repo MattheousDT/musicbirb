@@ -51,9 +51,46 @@ enum ReplayGainSetting: String, CaseIterable, Identifiable {
 	}
 }
 
+enum ShuffleTypeSetting: String, CaseIterable, Identifiable {
+	case smart, random
+	var id: String { self.rawValue }
+
+	var coreMode: ShuffleType {
+		switch self {
+		case .smart: return .smart
+		case .random: return .random
+		}
+	}
+}
+
 @Observable
 class SettingsViewModel: @unchecked Sendable {
 	private let defaults = UserDefaults.standard
+
+	// General
+	var saveSearches: Bool { didSet { defaults.set(saveSearches, forKey: "saveSearches") } }
+	var allowDuplicatesInPlaylists: Bool {
+		didSet { defaults.set(allowDuplicatesInPlaylists, forKey: "allowDuplicatesInPlaylists") }
+	}
+	var ignoreTracksBelowRating: Int {
+		didSet { defaults.set(ignoreTracksBelowRating, forKey: "ignoreTracksBelowRating") }
+	}
+	var scrobblingEnabled: Bool {
+		didSet { defaults.set(scrobblingEnabled, forKey: "scrobblingEnabled") }
+	}
+	var sharingEnabled: Bool { didSet { defaults.set(sharingEnabled, forKey: "sharingEnabled") } }
+
+	// Playback
+	var replayGain: ReplayGainSetting {
+		didSet { defaults.set(replayGain.rawValue, forKey: "replayGain") }
+	}
+	var shuffleType: ShuffleTypeSetting {
+		didSet { defaults.set(shuffleType.rawValue, forKey: "shuffleType") }
+	}
+	var consume: Bool { didSet { defaults.set(consume, forKey: "consume") } }
+	var stopAfterCurrent: Bool {
+		didSet { defaults.set(stopAfterCurrent, forKey: "stopAfterCurrent") }
+	}
 
 	// UI
 	var theme: AppTheme { didSet { defaults.set(theme.rawValue, forKey: "theme") } }
@@ -74,19 +111,6 @@ class SettingsViewModel: @unchecked Sendable {
 	var immersiveHeader: Bool {
 		didSet { defaults.set(immersiveHeader, forKey: "immersiveHeader") }
 	}
-
-	// General
-	var saveSearches: Bool { didSet { defaults.set(saveSearches, forKey: "saveSearches") } }
-	var allowDuplicatesInPlaylists: Bool {
-		didSet { defaults.set(allowDuplicatesInPlaylists, forKey: "allowDuplicatesInPlaylists") }
-	}
-	var ignoreTracksBelowRating: Int {
-		didSet { defaults.set(ignoreTracksBelowRating, forKey: "ignoreTracksBelowRating") }
-	}
-	var scrobblingEnabled: Bool {
-		didSet { defaults.set(scrobblingEnabled, forKey: "scrobblingEnabled") }
-	}
-	var sharingEnabled: Bool { didSet { defaults.set(sharingEnabled, forKey: "sharingEnabled") } }
 
 	// Data Usage
 	var autoDownloadLyrics: Bool {
@@ -133,13 +157,21 @@ class SettingsViewModel: @unchecked Sendable {
 		didSet { defaults.set(estimateContentLength, forKey: "estimateContentLength") }
 	}
 
-	// Playback
-	var replayGain: ReplayGainSetting {
-		didSet { defaults.set(replayGain.rawValue, forKey: "replayGain") }
-	}
-	var continuousPlay: Bool { didSet { defaults.set(continuousPlay, forKey: "continuousPlay") } }
-
 	init() {
+		self.saveSearches = defaults.object(forKey: "saveSearches") as? Bool ?? true
+		self.allowDuplicatesInPlaylists =
+			defaults.object(forKey: "allowDuplicatesInPlaylists") as? Bool ?? false
+		self.ignoreTracksBelowRating = defaults.object(forKey: "ignoreTracksBelowRating") as? Int ?? 0
+		self.scrobblingEnabled = defaults.object(forKey: "scrobblingEnabled") as? Bool ?? true
+		self.sharingEnabled = defaults.object(forKey: "sharingEnabled") as? Bool ?? true
+
+		self.replayGain =
+			ReplayGainSetting(rawValue: defaults.string(forKey: "replayGain") ?? "auto") ?? .auto
+		self.shuffleType =
+			ShuffleTypeSetting(rawValue: defaults.string(forKey: "shuffleType") ?? "smart") ?? .smart
+		self.consume = defaults.object(forKey: "consume") as? Bool ?? false
+		self.stopAfterCurrent = defaults.object(forKey: "stopAfterCurrent") as? Bool ?? false
+
 		self.theme = AppTheme(rawValue: defaults.string(forKey: "theme") ?? "system") ?? .system
 		self.cornerRounding =
 			CornerRoundingMode(rawValue: defaults.string(forKey: "cornerRounding") ?? "medium") ?? .medium
@@ -151,13 +183,6 @@ class SettingsViewModel: @unchecked Sendable {
 		self.showAlbumDetail = defaults.object(forKey: "showAlbumDetail") as? Bool ?? true
 		self.showScrobbleMarker = defaults.object(forKey: "showScrobbleMarker") as? Bool ?? true
 		self.immersiveHeader = defaults.object(forKey: "immersiveHeader") as? Bool ?? true
-
-		self.saveSearches = defaults.object(forKey: "saveSearches") as? Bool ?? true
-		self.allowDuplicatesInPlaylists =
-			defaults.object(forKey: "allowDuplicatesInPlaylists") as? Bool ?? false
-		self.ignoreTracksBelowRating = defaults.object(forKey: "ignoreTracksBelowRating") as? Int ?? 0
-		self.scrobblingEnabled = defaults.object(forKey: "scrobblingEnabled") as? Bool ?? true
-		self.sharingEnabled = defaults.object(forKey: "sharingEnabled") as? Bool ?? true
 
 		self.autoDownloadLyrics = defaults.object(forKey: "autoDownloadLyrics") as? Bool ?? true
 		self.streamingCacheSizeMB = defaults.object(forKey: "streamingCacheSizeMB") as? Double ?? 1024
@@ -181,9 +206,5 @@ class SettingsViewModel: @unchecked Sendable {
 			TranscodingMode(rawValue: defaults.string(forKey: "downloadsTranscoding") ?? "original")
 			?? .original
 		self.estimateContentLength = defaults.object(forKey: "estimateContentLength") as? Bool ?? true
-
-		self.replayGain =
-			ReplayGainSetting(rawValue: defaults.string(forKey: "replayGain") ?? "auto") ?? .auto
-		self.continuousPlay = defaults.object(forKey: "continuousPlay") as? Bool ?? true
 	}
 }

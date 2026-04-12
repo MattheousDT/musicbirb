@@ -60,6 +60,32 @@ final class RemoteCommandManager: @unchecked Sendable {
 			}
 			return .commandFailed
 		}
+
+		commandCenter.changeRepeatModeCommand.isEnabled = true
+		commandCenter.changeRepeatModeCommand.addTarget { [weak self] event in
+			if let event = event as? MPChangeRepeatModeCommandEvent {
+				let mode: RepeatMode
+				switch event.repeatType {
+				case .off: mode = .none
+				case .one: mode = .one
+				case .all: mode = .all
+				@unknown default: mode = .none
+				}
+				try? self?.core?.setRepeatMode(mode: mode)
+				return .success
+			}
+			return .commandFailed
+		}
+
+		commandCenter.changeShuffleModeCommand.isEnabled = true
+		commandCenter.changeShuffleModeCommand.addTarget { [weak self] event in
+			if let event = event as? MPChangeShuffleModeCommandEvent {
+				let shuffle = event.shuffleType != .off
+				try? self?.core?.setShuffle(shuffle: shuffle)
+				return .success
+			}
+			return .commandFailed
+		}
 	}
 
 	func updateNowPlaying(track: Track?, position: Double, isPlaying: Bool) {

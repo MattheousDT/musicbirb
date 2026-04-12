@@ -125,8 +125,8 @@ struct PlayerSheet: View {
 										}
 									}
 									.padding(.horizontal, 32)
-
-									Spacer(minLength: 24)
+									.padding(.top, 40)
+									.padding(.bottom, 8)
 								}
 								.frame(maxWidth: .infinity, maxHeight: .infinity)
 							} else {
@@ -134,7 +134,7 @@ struct PlayerSheet: View {
 							}
 
 							// --- BOTTOM CONTROLS SECTION ---
-							VStack(spacing: 0) {
+							VStack(spacing: 24) {
 								VStack(spacing: 4) {
 									Text(playbackViewModel.currentTrack?.title ?? "Not Playing")
 										.font(.system(size: 28, weight: .black))
@@ -148,8 +148,6 @@ struct PlayerSheet: View {
 										.lineLimit(1)
 								}
 								.padding(.horizontal, 24)
-
-								Spacer().frame(height: 32)
 
 								// SLIDER
 								VStack(spacing: 8) {
@@ -219,8 +217,6 @@ struct PlayerSheet: View {
 								}
 								.padding(.horizontal, 40)
 
-								Spacer().frame(height: 32)
-
 								// TRANSPORT CONTROLS
 								HStack(spacing: 48) {
 									Button(action: { try? coreManager.core?.prev() }) {
@@ -243,7 +239,79 @@ struct PlayerSheet: View {
 									}
 									.foregroundColor(.primary)
 								}
-								Spacer().frame(height: 24)
+
+								// PLAYBACK MODIFIERS
+								HStack {
+									let isShuffle = playbackViewModel.playbackState?.shuffle ?? false
+									Button(action: {
+										try? coreManager.core?.setShuffle(shuffle: !isShuffle)
+									}) {
+										Image(systemName: "shuffle")
+											.font(.system(size: 18, weight: .bold))
+									}
+									.tint(
+										isShuffle
+											? (artworkLoader.primaryColor ?? .accentColor) : .primary.opacity(0.4)
+									)
+									.buttonBorderShape(.circle)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glass)
+										} else {
+											content.buttonStyle(.bordered)
+										}
+									}
+
+									Spacer()
+
+									Button(action: { isQueueOpen = true }) {
+										Label("Queue", systemImage: "music.note.list")
+											.font(.system(size: 18, weight: .bold))
+									}
+									.tint(.primary.opacity(0.4))
+									.buttonBorderShape(.capsule)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glass)
+										} else {
+											content.buttonStyle(.bordered)
+										}
+									}
+
+									Spacer()
+
+									let repeatMode = playbackViewModel.playbackState?.repeatMode ?? .none
+									Button(action: {
+										let nextMode: RepeatMode = {
+											switch repeatMode {
+											case .none: return .all
+											case .all: return .one
+											case .one: return .none
+											}
+										}()
+										try? coreManager.core?.setRepeatMode(mode: nextMode)
+									}) {
+										Image(systemName: repeatMode == .one ? "repeat.1" : "repeat")
+											.font(.system(size: 18, weight: .bold))
+									}
+									.tint(
+										repeatMode != .none
+											? (artworkLoader.primaryColor ?? .accentColor) : .primary.opacity(0.4)
+									)
+									.buttonBorderShape(.circle)
+									.controlSize(.large)
+									.modify { content in
+										if #available(iOS 26, *) {
+											content.buttonStyle(.glass)
+										} else {
+											content.buttonStyle(.bordered)
+										}
+									}
+								}
+								.padding(.horizontal, 32)
+								.padding(.top, 12)
 							}
 							.padding(.vertical, 32)
 						}
@@ -251,15 +319,6 @@ struct PlayerSheet: View {
 					}
 				}
 			}
-			.toolbar {
-				ToolbarItem(placement: .navigationBarTrailing) {
-					Button(action: { isQueueOpen = true }) {
-						Image(systemName: "music.note.list")
-					}
-				}
-			}
-			.navigationBarTitleDisplayMode(.inline)
-			.toolbarBackground(.hidden, for: .navigationBar)
 			.task(id: playbackViewModel.currentTrack?.coverArt) {
 				guard let cover = playbackViewModel.currentTrack?.coverArt else { return }
 				let size =

@@ -22,7 +22,7 @@ struct SettingsView: View {
 			("General", .general), ("Save Searches", .general), ("Allow Adding Duplicates", .general),
 			("Scrobbling", .general), ("Sharing", .general), ("Scan Library", .general),
 			("UI", .ui), ("Theme", .ui), ("Corner Rounding", .ui), ("Audio Quality", .ui),
-			("Star Rating", .ui), ("Item Rating", .ui), ("Shuffle", .ui), ("Directories", .ui),
+			("Star Rating", .ui), ("Item Rating", .ui), ("Show Shuffle", .ui), ("Directories", .ui),
 			("Album Detail", .ui),
 			("Data Usage", .dataUsage), ("Lyrics", .dataUsage), ("Cache", .dataUsage),
 			("Resolution", .dataUsage), ("Wi-Fi only alert", .dataUsage),
@@ -30,7 +30,8 @@ struct SettingsView: View {
 			("Downloads", .downloads), ("Sync", .downloads), ("Delete Downloads", .downloads),
 			("Transcoding", .transcoding), ("Wi-Fi Transcoding", .transcoding),
 			("Mobile Transcoding", .transcoding), ("Downloads Transcoding", .transcoding),
-			("Playback", .playback), ("ReplayGain", .playback), ("Continuous Play", .playback),
+			("Playback", .playback), ("ReplayGain", .playback), ("Shuffle", .playback),
+			("Consume Track", .playback), ("Stop After Current", .playback),
 		]
 
 	var filteredResults: [(name: LocalizedStringResource, destination: SettingsDestination)] {
@@ -85,6 +86,9 @@ struct SettingsView: View {
 						NavigationLink(value: SettingsDestination.general) {
 							Label("General", systemImage: "gearshape")
 						}
+						NavigationLink(value: SettingsDestination.playback) {
+							Label("Playback", systemImage: "play.circle")
+						}
 						NavigationLink(value: SettingsDestination.ui) {
 							Label("UI", systemImage: "paintbrush")
 						}
@@ -96,9 +100,6 @@ struct SettingsView: View {
 						}
 						NavigationLink(value: SettingsDestination.transcoding) {
 							Label("Transcoding", systemImage: "waveform.path")
-						}
-						NavigationLink(value: SettingsDestination.playback) {
-							Label("Playback", systemImage: "play.circle")
 						}
 					}
 				}

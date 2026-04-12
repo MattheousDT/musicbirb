@@ -225,9 +225,9 @@ extension Color {
 
 		let bgLuminance = background.luminance
 
-		// Check if it's virtually grayscale, and just return strict white or black instead.
+		// Check if it's virtually grayscale, and just return the app's theme instead.
 		if s < 0.05 {
-			return bgLuminance < 0.5 ? .white : .black
+			return .accentColor
 		}
 
 		// Ensure the accent has enough color, without artificially blowing out duller images

@@ -1,10 +1,11 @@
 use crate::art_cache::ArtCache;
 use crate::backend::{AudioBackend, BackendEvent, PlayerState, PlayerStatus};
-use crate::models::{CoverArtId, ReplayGainMode, Track};
+use crate::models::{CoverArtId, RepeatMode, ReplayGainMode, ShuffleType, Track};
 use crate::providers::Provider;
 use crate::scrobble::{ScrobbleManager, ScrobbleTracker};
 use crate::state::{CoreMessage, CoreState, PlaybackSync};
 use image::DynamicImage;
+use rand::seq::SliceRandom;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -35,6 +36,16 @@ pub struct CoreActor {
 	auto_play: bool,
 	replay_gain_mode: ReplayGainMode,
 
+	repeat_mode: RepeatMode,
+	shuffle: bool,
+	shuffle_type: ShuffleType,
+	consume: bool,
+	stop_after_current: bool,
+
+	shuffle_history: Vec<usize>,
+	shuffle_unplayed: Vec<usize>,
+	next_in_sequence: Option<usize>,
+
 	#[cfg(feature = "os-media-controls")]
 	mpris: Option<MprisManager>,
 }
@@ -60,6 +71,16 @@ impl CoreActor {
 
 			auto_play: true,
 			replay_gain_mode: ReplayGainMode::Auto,
+
+			repeat_mode: RepeatMode::None,
+			shuffle: false,
+			shuffle_type: ShuffleType::Smart,
+			consume: false,
+			stop_after_current: false,
+
+			shuffle_history: Vec::new(),
+			shuffle_unplayed: Vec::new(),
+			next_in_sequence: None,
 
 			#[cfg(feature = "os-media-controls")]
 			mpris: None,
@@ -156,11 +177,22 @@ impl CoreActor {
 					for _ in 0..advanced_by {
 						let _ = player.remove_index(0).await;
 					}
-					self.queue_position += advanced_by;
+
+					if let Some(next_idx) = self.next_in_sequence {
+						self.commit_transition(next_idx);
+					} else {
+						self.commit_transition(self.queue_position + 1);
+					}
+
 					self.player_has_current = true;
 					self.player_has_next = false;
 
+					if self.stop_after_current {
+						self.stop_after_current = false;
+					}
+
 					self.update_art_state(api, tx);
+					self.recalculate_next();
 					self.check_preload(api, tx);
 				}
 
@@ -177,9 +209,21 @@ impl CoreActor {
 					// Prevent race condition: if MPV has already begun loading/playing the next track, ignore this stale Stopped event.
 					if actual_status == PlayerStatus::Stopped {
 						self.player_has_current = false;
-						if self.queue_position + 1 < self.queue.len() {
-							self.play_track_at(self.queue_position + 1, player, api, tx, state_tx)
+
+						let was_stop_after = self.stop_after_current;
+						if was_stop_after {
+							self.stop_after_current = false;
+						}
+
+						self.recalculate_next();
+
+						if let Some(next_idx) = self.next_in_sequence {
+							self.commit_transition(next_idx);
+							self.play_track_at(self.queue_position, !was_stop_after, player, api, tx, state_tx)
 								.await;
+							return;
+						} else {
+							self.stop_playback(player, state_tx).await;
 							return;
 						}
 					}
@@ -216,27 +260,44 @@ impl CoreActor {
 			}
 			CoreMessage::ProviderChanged => {
 				self.queue.clear();
-				self.queue_position = 0;
-				self.player_has_current = false;
-				self.player_has_next = false;
-				self.auto_play = false;
-				self.fetching_current_for = None;
-				self.fetching_preload_for = None;
-
-				let _ = player.stop().await;
-				let _ = player.clear_playlist().await;
-
+				self.shuffle_history.clear();
+				self.shuffle_unplayed.clear();
+				self.next_in_sequence = None;
+				self.stop_playback(player, state_tx).await;
 				self.update_art_state(api, tx);
-				self.dispatch_state(&player.get_state(), state_tx);
 			}
 			CoreMessage::AddTracks(tracks, next) => {
 				let was_empty = self.queue.is_empty();
+				let new_count = tracks.len();
+
 				if was_empty {
 					self.queue.extend(tracks);
-					self.play_track_at(0, player, api, tx, state_tx).await;
+					if self.shuffle && self.shuffle_type == ShuffleType::Smart {
+						self.shuffle_unplayed = (1..self.queue.len()).collect();
+						self.shuffle_unplayed.shuffle(&mut rand::rng());
+					}
+					self.recalculate_next();
+					self.play_track_at(0, true, player, api, tx, state_tx).await;
 				} else {
 					if next {
 						let insert_pos = self.queue_position + 1;
+
+						for i in &mut self.shuffle_history {
+							if *i >= insert_pos {
+								*i += new_count;
+							}
+						}
+						for i in &mut self.shuffle_unplayed {
+							if *i >= insert_pos {
+								*i += new_count;
+							}
+						}
+
+						let mut new_indices: Vec<usize> = (insert_pos..(insert_pos + new_count)).collect();
+						if self.shuffle && self.shuffle_type == ShuffleType::Smart {
+							new_indices.shuffle(&mut rand::rng());
+							self.shuffle_unplayed.extend(new_indices);
+						}
 
 						// Evict the currently preloaded next track if we're interrupting it
 						if self.player_has_next {
@@ -249,74 +310,63 @@ impl CoreActor {
 						self.queue.extend(tracks);
 						self.queue.extend(tail);
 					} else {
+						let start_idx = self.queue.len();
+						let mut new_indices: Vec<usize> = (start_idx..(start_idx + new_count)).collect();
+						if self.shuffle && self.shuffle_type == ShuffleType::Smart {
+							new_indices.shuffle(&mut rand::rng());
+							self.shuffle_unplayed.extend(new_indices);
+						}
 						self.queue.extend(tracks);
 					}
 
-					self.check_preload(api, tx);
+					self.recalculate_next();
+					self.fix_preload(player, api, tx).await;
 					self.dispatch_state(&player.get_state(), state_tx);
 				}
 			}
 			CoreMessage::ReplaceTracks(tracks, start_index) => {
 				self.queue = tracks;
 				let idx = if start_index < self.queue.len() { start_index } else { 0 };
-				self.play_track_at(idx, player, api, tx, state_tx).await;
+
+				self.shuffle_history.clear();
+				if self.shuffle && self.shuffle_type == ShuffleType::Smart {
+					self.shuffle_unplayed = (0..self.queue.len()).filter(|&i| i != idx).collect();
+					self.shuffle_unplayed.shuffle(&mut rand::rng());
+				}
+
+				self.queue_position = idx;
+				self.play_track_at(idx, true, player, api, tx, state_tx).await;
 			}
 			CoreMessage::ClearQueue => {
 				self.queue.clear();
-				self.queue_position = 0;
-				self.player_has_current = false;
-				self.player_has_next = false;
-				self.auto_play = false;
-				self.fetching_current_for = None;
-				self.fetching_preload_for = None;
-
-				let _ = player.stop().await;
-				let _ = player.clear_playlist().await;
-
+				self.shuffle_history.clear();
+				self.shuffle_unplayed.clear();
+				self.next_in_sequence = None;
+				self.stop_playback(player, state_tx).await;
 				self.update_art_state(api, tx);
-				self.dispatch_state(&player.get_state(), state_tx);
 			}
 			CoreMessage::RemoveIndex(idx) => {
 				if idx >= self.queue.len() {
 					return;
 				}
+				let playing_removed = idx == self.queue_position;
 
-				if idx < self.queue_position {
-					// We removed an earlier track, decrement our tracking index to match the shift
-					self.queue.remove(idx);
-					self.queue_position -= 1;
-				} else if idx == self.queue_position {
-					// We removed the currently playing track!
-					self.queue.remove(idx);
-					if self.queue.is_empty() || self.queue_position >= self.queue.len() {
-						// No next track available, stop playback
-						self.queue_position = 0;
-						self.player_has_current = false;
-						self.player_has_next = false;
-						self.auto_play = false;
-						self.fetching_current_for = None;
-						self.fetching_preload_for = None;
+				self.remove_index_internal(idx);
 
-						let _ = player.stop().await;
-						let _ = player.clear_playlist().await;
-						self.update_art_state(api, tx);
+				if playing_removed {
+					if self.queue.is_empty() {
+						self.stop_playback(player, state_tx).await;
 					} else {
-						// Play the next track which has now shifted into `queue_position`
-						self.play_track_at(self.queue_position, player, api, tx, state_tx).await;
-						return;
+						self.recalculate_next();
+						let next = self.next_in_sequence.unwrap_or(self.queue_position);
+						let actual = next.min(self.queue.len().saturating_sub(1));
+						self.play_track_at(actual, true, player, api, tx, state_tx).await;
 					}
 				} else {
-					// We removed a future track.
-					self.queue.remove(idx);
-					if idx == self.queue_position + 1 && self.player_has_next {
-						// It was already loaded securely as our gapless preloaded track. Evict it.
-						let _ = player.remove_index(1).await;
-						self.player_has_next = false;
-						self.fetching_preload_for = None;
-						self.check_preload(api, tx);
-					}
+					self.recalculate_next();
+					self.fix_preload(player, api, tx).await;
+					self.dispatch_state(&player.get_state(), state_tx);
 				}
-				self.dispatch_state(&player.get_state(), state_tx);
 			}
 			CoreMessage::MoveIndex(from, to) => {
 				if from >= self.queue.len() || to >= self.queue.len() {
@@ -329,6 +379,22 @@ impl CoreActor {
 				let item = self.queue.remove(from);
 				self.queue.insert(to, item);
 
+				let adjust = |idx: &mut usize| {
+					if *idx == from {
+						*idx = to;
+					} else if from < *idx && *idx <= to {
+						*idx -= 1;
+					} else if from > *idx && *idx >= to {
+						*idx += 1;
+					}
+				};
+				for i in &mut self.shuffle_history {
+					adjust(i);
+				}
+				for i in &mut self.shuffle_unplayed {
+					adjust(i);
+				}
+
 				if self.queue_position == from {
 					self.queue_position = to;
 				} else if from < self.queue_position && to >= self.queue_position {
@@ -337,34 +403,49 @@ impl CoreActor {
 					self.queue_position += 1;
 				}
 
-				// Preloaded next track might be invalid now
-				if self.player_has_next {
-					let _ = player.remove_index(1).await;
-					self.player_has_next = false;
-					self.fetching_preload_for = None;
-				}
-				self.check_preload(api, tx);
-
+				self.recalculate_next();
+				self.fix_preload(player, api, tx).await;
 				self.dispatch_state(&player.get_state(), state_tx);
 			}
 			CoreMessage::Next => {
-				if self.queue_position + 1 < self.queue.len() {
-					self.play_track_at(self.queue_position + 1, player, api, tx, state_tx)
+				let next_idx = self.compute_next_index(true);
+				if let Some(idx) = next_idx {
+					self.commit_transition(idx);
+					self.play_track_at(self.queue_position, true, player, api, tx, state_tx)
+						.await;
+				} else if !self.queue.is_empty() {
+					self.commit_transition(0);
+					self.play_track_at(self.queue_position, false, player, api, tx, state_tx)
 						.await;
 				}
 			}
 			CoreMessage::Prev => {
-				if self.queue_position > 0 {
-					self.play_track_at(self.queue_position - 1, player, api, tx, state_tx)
+				if self.shuffle && self.shuffle_type == ShuffleType::Smart && !self.shuffle_history.is_empty() {
+					let prev_idx = self.shuffle_history.pop().unwrap();
+					self.shuffle_unplayed.push(self.queue_position);
+					self.queue_position = prev_idx;
+					self.play_track_at(self.queue_position, true, player, api, tx, state_tx)
 						.await;
-				} else if !self.queue.is_empty() {
-					// Restart the current track
-					self.play_track_at(0, player, api, tx, state_tx).await;
+				} else {
+					if self.queue_position > 0 {
+						self.queue_position -= 1;
+						self.play_track_at(self.queue_position, true, player, api, tx, state_tx)
+							.await;
+					} else if !self.queue.is_empty() {
+						if self.repeat_mode == RepeatMode::All {
+							self.queue_position = self.queue.len() - 1;
+							self.play_track_at(self.queue_position, true, player, api, tx, state_tx)
+								.await;
+						} else {
+							self.play_track_at(0, true, player, api, tx, state_tx).await;
+						}
+					}
 				}
 			}
 			CoreMessage::PlayIndex(idx) => {
 				if idx < self.queue.len() {
-					self.play_track_at(idx, player, api, tx, state_tx).await;
+					self.queue_position = idx;
+					self.play_track_at(idx, true, player, api, tx, state_tx).await;
 				}
 			}
 			CoreMessage::Seek(secs) => {
@@ -384,13 +465,55 @@ impl CoreActor {
 			CoreMessage::TogglePause => {
 				let _ = player.toggle_pause().await;
 			}
+			CoreMessage::SetRepeatMode(mode) => {
+				self.repeat_mode = mode;
+				self.recalculate_next();
+				self.fix_preload(player, api, tx).await;
+				self.dispatch_state(&player.get_state(), state_tx);
+			}
+			CoreMessage::SetShuffle(s) => {
+				if self.shuffle != s {
+					self.shuffle = s;
+					if s && self.shuffle_type == ShuffleType::Smart {
+						self.shuffle_history.clear();
+						self.shuffle_unplayed = (0..self.queue.len()).filter(|&i| i != self.queue_position).collect();
+						self.shuffle_unplayed.shuffle(&mut rand::rng());
+					}
+					self.recalculate_next();
+					self.fix_preload(player, api, tx).await;
+					self.dispatch_state(&player.get_state(), state_tx);
+				}
+			}
+			CoreMessage::SetShuffleType(st) => {
+				if self.shuffle_type != st {
+					self.shuffle_type = st;
+					if self.shuffle && st == ShuffleType::Smart {
+						self.shuffle_history.clear();
+						self.shuffle_unplayed = (0..self.queue.len()).filter(|&i| i != self.queue_position).collect();
+						self.shuffle_unplayed.shuffle(&mut rand::rng());
+					}
+					self.recalculate_next();
+					self.fix_preload(player, api, tx).await;
+					self.dispatch_state(&player.get_state(), state_tx);
+				}
+			}
+			CoreMessage::SetConsume(c) => {
+				self.consume = c;
+				self.dispatch_state(&player.get_state(), state_tx);
+			}
+			CoreMessage::SetStopAfterCurrent(s) => {
+				self.stop_after_current = s;
+				self.recalculate_next();
+				self.fix_preload(player, api, tx).await;
+				self.dispatch_state(&player.get_state(), state_tx);
+			}
 			CoreMessage::UrlReady { url, index, is_preload } => {
 				if is_preload {
 					if self.fetching_preload_for == Some(index) {
 						self.fetching_preload_for = None;
 					}
 					// Verify this is still the correct next track (avoid race conditions from rapidly pressing next)
-					if index == self.queue_position + 1 {
+					if Some(index) == self.next_in_sequence {
 						let _ = player.add(&url).await;
 						self.player_has_next = true;
 					}
@@ -429,10 +552,26 @@ impl CoreActor {
 		}
 	}
 
+	async fn stop_playback(&mut self, player: &Arc<dyn AudioBackend>, state_tx: &watch::Sender<CoreState>) {
+		self.queue_position = 0;
+		self.player_has_current = false;
+		self.player_has_next = false;
+		self.auto_play = false;
+		self.fetching_current_for = None;
+		self.fetching_preload_for = None;
+
+		let _ = player.stop().await;
+		let _ = player.clear_playlist().await;
+		let mut p_state = player.get_state();
+		p_state.status = PlayerStatus::Stopped;
+		self.dispatch_state(&p_state, state_tx);
+	}
+
 	/// Clears the player out and manually forces playback at a specific target index
 	async fn play_track_at(
 		&mut self,
 		index: usize,
+		auto_play: bool,
 		player: &Arc<dyn AudioBackend>,
 		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
@@ -443,7 +582,9 @@ impl CoreActor {
 		self.player_has_next = false;
 		self.fetching_current_for = None;
 		self.fetching_preload_for = None;
-		self.auto_play = true;
+		self.auto_play = auto_play;
+
+		self.recalculate_next();
 
 		let _ = player.stop().await;
 		let _ = player.clear_playlist().await;
@@ -457,13 +598,113 @@ impl CoreActor {
 	}
 
 	/// Checks to see if there is an empty index trailing the current actively playing track in the backend
+	fn recalculate_next(&mut self) {
+		self.next_in_sequence = self.compute_next_index(false);
+	}
+
+	fn compute_next_index(&mut self, force_advance: bool) -> Option<usize> {
+		if self.queue.is_empty() {
+			return None;
+		}
+		if self.stop_after_current && !force_advance {
+			return None;
+		}
+		if self.repeat_mode == RepeatMode::One && !force_advance {
+			return Some(self.queue_position);
+		}
+
+		if self.shuffle {
+			match self.shuffle_type {
+				ShuffleType::Random => Some(rand::random_range(0..self.queue.len())),
+				ShuffleType::Smart => {
+					if self.shuffle_unplayed.is_empty() {
+						if self.repeat_mode == RepeatMode::All || force_advance {
+							self.shuffle_unplayed =
+								(0..self.queue.len()).filter(|&i| i != self.queue_position).collect();
+							self.shuffle_unplayed.shuffle(&mut rand::rng());
+						} else {
+							return None;
+						}
+					}
+					self.shuffle_unplayed.last().copied()
+				}
+			}
+		} else {
+			if self.queue_position + 1 < self.queue.len() {
+				Some(self.queue_position + 1)
+			} else if self.repeat_mode == RepeatMode::All || force_advance {
+				Some(0)
+			} else {
+				None
+			}
+		}
+	}
+
+	fn commit_transition(&mut self, mut new_idx: usize) {
+		if self.shuffle && self.shuffle_type == ShuffleType::Smart {
+			self.shuffle_history.push(self.queue_position);
+			if let Some(pos) = self.shuffle_unplayed.iter().position(|&i| i == new_idx) {
+				self.shuffle_unplayed.remove(pos);
+			}
+		}
+
+		if self.consume {
+			let old_pos = self.queue_position;
+			self.remove_index_internal(old_pos);
+			if new_idx > old_pos {
+				new_idx -= 1;
+			}
+		}
+		self.queue_position = new_idx;
+	}
+
+	fn remove_index_internal(&mut self, idx: usize) {
+		self.queue.remove(idx);
+		self.shuffle_history.retain(|&i| i != idx);
+		for i in &mut self.shuffle_history {
+			if *i > idx {
+				*i -= 1;
+			}
+		}
+
+		self.shuffle_unplayed.retain(|&i| i != idx);
+		for i in &mut self.shuffle_unplayed {
+			if *i > idx {
+				*i -= 1;
+			}
+		}
+
+		if self.queue_position > idx {
+			self.queue_position -= 1;
+		}
+	}
+
+	async fn fix_preload(
+		&mut self,
+		player: &Arc<dyn AudioBackend>,
+		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
+		tx: &mpsc::UnboundedSender<CoreMessage>,
+	) {
+		if self.player_has_next {
+			// Try to evict if we no longer want it or it changed
+			let _ = player.remove_index(1).await;
+			self.player_has_next = false;
+			self.fetching_preload_for = None;
+		}
+		self.check_preload(api, tx);
+	}
+
 	fn check_preload(
 		&mut self,
 		api: &Arc<tokio::sync::RwLock<Option<Arc<dyn Provider>>>>,
 		tx: &mpsc::UnboundedSender<CoreMessage>,
 	) {
-		if self.player_has_current && !self.player_has_next && self.queue_position + 1 < self.queue.len() {
-			self.spawn_url_fetch(api, tx, self.queue_position + 1, true);
+		if self.player_has_current && !self.player_has_next {
+			if let Some(next_idx) = self.next_in_sequence {
+				if !self.stop_after_current {
+					self.spawn_url_fetch(api, tx, next_idx, true);
+				}
+			}
 		}
 	}
 
@@ -639,6 +880,58 @@ impl CoreActor {
 			},
 			current_art: self.current_art.clone(),
 			scrobble_mark_pos: mark,
+			repeat_mode: self.repeat_mode,
+			shuffle: self.shuffle,
+			shuffle_type: self.shuffle_type,
+			consume: self.consume,
+			stop_after_current: self.stop_after_current,
 		});
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::models::{RepeatMode, TrackId};
+
+	fn mock_track(id: &str) -> Track {
+		Track {
+			id: TrackId(id.to_string()),
+			..Default::default()
+		}
+	}
+
+	#[tokio::test]
+	async fn test_compute_next_index_normal() {
+		let mut actor = CoreActor::new(None, None);
+		actor.queue = vec![mock_track("1"), mock_track("2"), mock_track("3")];
+		actor.queue_position = 0;
+
+		assert_eq!(actor.compute_next_index(false), Some(1));
+		actor.queue_position = 2;
+		assert_eq!(actor.compute_next_index(false), None);
+		actor.repeat_mode = RepeatMode::All;
+		assert_eq!(actor.compute_next_index(false), Some(0));
+	}
+
+	#[tokio::test]
+	async fn test_compute_next_index_repeat_one() {
+		let mut actor = CoreActor::new(None, None);
+		actor.queue = vec![mock_track("1"), mock_track("2"), mock_track("3")];
+		actor.queue_position = 1;
+		actor.repeat_mode = RepeatMode::One;
+
+		assert_eq!(actor.compute_next_index(false), Some(1));
+		assert_eq!(actor.compute_next_index(true), Some(2)); // Force advance test
+	}
+
+	#[tokio::test]
+	async fn test_stop_after_current() {
+		let mut actor = CoreActor::new(None, None);
+		actor.queue = vec![mock_track("1"), mock_track("2"), mock_track("3")];
+		actor.queue_position = 0;
+		actor.stop_after_current = true;
+
+		assert_eq!(actor.compute_next_index(false), None);
 	}
 }

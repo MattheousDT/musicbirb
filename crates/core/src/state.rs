@@ -1,5 +1,5 @@
 use crate::backend::PlayerStatus;
-use crate::models::{CoverArtId, Track};
+use crate::models::{CoverArtId, RepeatMode, ShuffleType, Track};
 use image::DynamicImage;
 use std::sync::Arc;
 use std::time::Instant;
@@ -18,6 +18,11 @@ pub struct CoreState {
 	pub sync: PlaybackSync,
 	pub current_art: Option<Arc<DynamicImage>>,
 	pub scrobble_mark_pos: Option<f64>,
+	pub repeat_mode: RepeatMode,
+	pub shuffle: bool,
+	pub shuffle_type: ShuffleType,
+	pub consume: bool,
+	pub stop_after_current: bool,
 }
 
 impl Default for CoreState {
@@ -32,6 +37,11 @@ impl Default for CoreState {
 			},
 			current_art: None,
 			scrobble_mark_pos: None,
+			repeat_mode: RepeatMode::None,
+			shuffle: false,
+			shuffle_type: ShuffleType::Smart,
+			consume: false,
+			stop_after_current: false,
 		}
 	}
 }
@@ -43,6 +53,11 @@ pub struct PlaybackState {
 	pub position_secs: f64,
 	pub status: PlayerStatus,
 	pub scrobble_mark_pos: Option<f64>,
+	pub repeat_mode: RepeatMode,
+	pub shuffle: bool,
+	pub shuffle_type: ShuffleType,
+	pub consume: bool,
+	pub stop_after_current: bool,
 }
 
 pub enum CoreMessage {
@@ -71,4 +86,9 @@ pub enum CoreMessage {
 		bytes: Vec<u8>,
 	},
 	SetReplayGainMode(crate::models::ReplayGainMode),
+	SetRepeatMode(RepeatMode),
+	SetShuffle(bool),
+	SetShuffleType(ShuffleType),
+	SetConsume(bool),
+	SetStopAfterCurrent(bool),
 }

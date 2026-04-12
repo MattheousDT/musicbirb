@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TrackId(pub String);
 
 impl From<String> for TrackId {
@@ -131,7 +131,7 @@ pub enum ReleaseSubtype {
 }
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Track {
 	pub id: TrackId,
 	pub title: String,
@@ -303,4 +303,21 @@ pub struct SearchResults {
 	pub tracks: Vec<Track>,
 	pub albums: Vec<Album>,
 	pub artists: Vec<Artist>,
+}
+
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum RepeatMode {
+	#[default]
+	None,
+	All,
+	One,
+}
+
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum ShuffleType {
+	#[default]
+	Smart,
+	Random,
 }

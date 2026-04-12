@@ -452,15 +452,8 @@
         }
       }
     },
-    "Continuous Play" : {
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "연속 재생"
-          }
-        }
-      }
+    "Consume Track" : {
+      "comment" : "Remove the track from the queue once listened to"
     },
     "Corner Rounding" : {
       "localizations" : {
@@ -1173,23 +1166,15 @@
         }
       }
     },
+    "Random" : {
+
+    },
     "Recently Added" : {
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "최근 추가된 항목"
-          }
-        }
-      }
-    },
-    "Releases" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "릴리스"
           }
         }
       }
@@ -1447,6 +1432,9 @@
         }
       }
     },
+    "Shuffle Mode" : {
+
+    },
     "Sign In" : {
       "localizations" : {
         "ko" : {
@@ -1507,6 +1495,9 @@
         }
       }
     },
+    "Smart" : {
+      "comment" : "Shuffle mode that takes previously played tracks into account"
+    },
     "Songs" : {
       "localizations" : {
         "ko" : {
@@ -1546,6 +1537,9 @@
           }
         }
       }
+    },
+    "Stop After Current" : {
+      "comment" : "Stop playback once the current track has finished"
     },
     "Stream via Wi-Fi only alert" : {
       "localizations" : {
