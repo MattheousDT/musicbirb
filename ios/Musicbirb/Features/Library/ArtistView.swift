@@ -304,7 +304,10 @@ private struct ArtistToolbarModifier: ViewModifier {
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
 						if let artist = artistDetails {
+							ArtistDetailsContextMenu(artist: artist)
+
 							if artist.lastfmUrl != nil || artist.musicbrainzId != nil {
+								Divider()
 								Section("External Links") {
 									if let lastfmUrl = artist.lastfmUrl {
 										Button {

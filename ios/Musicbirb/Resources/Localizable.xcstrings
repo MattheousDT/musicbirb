@@ -258,6 +258,9 @@
         }
       }
     },
+    "Allow Downloading" : {
+
+    },
     "Appearance" : {
       "localizations" : {
         "ko" : {
@@ -351,6 +354,9 @@
           }
         }
       }
+    },
+    "Audio & File Info" : {
+
     },
     "Audio Options" : {
       "localizations" : {
@@ -495,6 +501,9 @@
         }
       }
     },
+    "Dates" : {
+
+    },
     "Delete" : {
       "localizations" : {
         "ko" : {
@@ -535,6 +544,12 @@
         }
       }
     },
+    "Description (optional)" : {
+
+    },
+    "Details" : {
+
+    },
     "Directories" : {
       "localizations" : {
         "ko" : {
@@ -564,6 +579,9 @@
           }
         }
       }
+    },
+    "Download" : {
+
     },
     "Downloads" : {
       "localizations" : {
@@ -635,6 +653,9 @@
         }
       }
     },
+    "Expires On" : {
+
+    },
     "External Links" : {
       "localizations" : {
         "ko" : {
@@ -655,6 +676,9 @@
         }
       }
     },
+    "Full Details" : {
+
+    },
     "General" : {
       "localizations" : {
         "ko" : {
@@ -665,6 +689,15 @@
         }
       }
     },
+    "General Info" : {
+
+    },
+    "Generate & Copy Link" : {
+
+    },
+    "Generates a public link that can be shared with anyone without requiring them to log in." : {
+
+    },
     "Global" : {
       "localizations" : {
         "ko" : {
@@ -674,6 +707,12 @@
           }
         }
       }
+    },
+    "Go to Album" : {
+
+    },
+    "Go to Artist" : {
+
     },
     "High" : {
       "localizations" : {
@@ -694,6 +733,9 @@
           }
         }
       }
+    },
+    "Identifiers & Links" : {
+
     },
     "Ignore Tracks Below Rating" : {
       "localizations" : {
@@ -795,6 +837,9 @@
           }
         }
       }
+    },
+    "Loading full details..." : {
+
     },
     "Low" : {
       "localizations" : {
@@ -1166,6 +1211,9 @@
         }
       }
     },
+    "Radio / Instant Mix" : {
+
+    },
     "Random" : {
 
     },
@@ -1332,6 +1380,9 @@
         }
       }
     },
+    "Set Expiration" : {
+
+    },
     "Settings" : {
       "localizations" : {
         "ko" : {
@@ -1341,6 +1392,15 @@
           }
         }
       }
+    },
+    "Share" : {
+
+    },
+    "Share Item" : {
+
+    },
+    "Share Settings" : {
+
     },
     "Sharing" : {
       "localizations" : {
@@ -1517,6 +1577,9 @@
           }
         }
       }
+    },
+    "Star" : {
+
     },
     "Star Rating" : {
       "localizations" : {

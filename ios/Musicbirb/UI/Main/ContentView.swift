@@ -6,6 +6,9 @@ struct ContentView: View {
 	@Environment(SettingsViewModel.self) private var settings
 	@Environment(AppRouter.self) private var router
 
+	@State private var itemDetails: MediaItem?
+	@State private var shareItem: MediaItem?
+
 	var body: some View {
 		ZStack {
 			if authViewModel.isAuthenticating {
@@ -43,6 +46,20 @@ struct ContentView: View {
 		}
 		.environment(\.openAddAlbumToPlaylist) { album in
 			router.activeSheet = .addToPlaylist(trackIds: nil, albumId: album.id)
+		}
+		.environment(\.openItemDetails) { item in
+			itemDetails = item
+		}
+		.environment(\.openShareItem) { item in
+			shareItem = item
+		}
+		.sheet(item: $itemDetails) { item in
+			ItemDetailsSheet(item: item)
+				.presentationDetents([.medium, .large])
+		}
+		.sheet(item: $shareItem) { item in
+			ShareItemSheet(item: item)
+				.presentationDetents([.medium])
 		}
 		.preferredColorScheme(settings.theme.colorScheme)
 		.onChange(of: playbackViewModel.showPlayerSheet) { _, show in

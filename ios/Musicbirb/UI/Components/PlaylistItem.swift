@@ -36,5 +36,8 @@ struct PlaylistItem: View {
 		}
 		.padding(.all, 12)
 		.contentShape(Rectangle())
+		.contextMenu {
+			PlaylistContextMenu(playlist: playlist)
+		}
 	}
 }

@@ -96,9 +96,7 @@ struct TrackItemRow: View {
 			.frame(maxWidth: .infinity)
 		}
 		.contextMenu {
-			Button(action: { openAddToPlaylist(track) }) {
-				Label("Add to Playlist", systemImage: "text.badge.plus")
-			}
+			TrackContextMenu(track: track)
 		}
 	}
 

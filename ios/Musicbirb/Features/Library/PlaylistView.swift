@@ -259,9 +259,8 @@ struct PlaylistView: View {
 					Divider()
 				}
 				if let playlist = playlistDetails.data {
-					Button(action: { playbackViewModel.queuePlaylist(id: playlistId, next: true) }) {
-						Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-					}
+					PlaylistDetailsContextMenu(playlist: playlist)
+
 					if isOwner(playlist) {
 						Divider()
 						Button(action: { withAnimation { editMode = .active } }) {

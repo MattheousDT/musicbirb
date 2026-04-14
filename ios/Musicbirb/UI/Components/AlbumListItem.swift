@@ -42,9 +42,7 @@ struct AlbumListItem: View {
 		.padding(.all, 12)
 		.contentShape(Rectangle())
 		.contextMenu {
-			Button(action: { openAddAlbumToPlaylist(album) }) {
-				Label("Add to Playlist", systemImage: "text.badge.plus")
-			}
+			AlbumContextMenu(album: album)
 		}
 	}
 }

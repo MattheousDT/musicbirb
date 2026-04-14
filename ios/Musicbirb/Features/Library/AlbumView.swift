@@ -154,21 +154,16 @@ struct AlbumView: View {
 			}
 			ToolbarItem(placement: .topBarTrailing) {
 				Menu {
+					if horizontalSizeClass != .regular {
+						Toggle(
+							"Immersive Mode",
+							systemImage: "photo",
+							isOn: $settings.immersiveHeader.animation(.spring)
+						)
+						Divider()
+					}
 					if let album = albumDetails.data {
-						if horizontalSizeClass != .regular {
-							Toggle(
-								"Immersive Mode",
-								systemImage: "photo",
-								isOn: $settings.immersiveHeader.animation(.spring)
-							)
-							Divider()
-						}
-						Button(action: { openAddAlbumToPlaylist(Album(album)) }) {
-							Label("Add to Playlist", systemImage: "text.badge.plus")
-						}
-						Button(action: { playbackViewModel.queueAlbum(id: albumId, next: true) }) {
-							Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
-						}
+						AlbumDetailsContextMenu(album: album)
 					}
 				} label: {
 					Label("More options", systemImage: "ellipsis")

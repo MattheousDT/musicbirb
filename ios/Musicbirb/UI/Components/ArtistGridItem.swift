@@ -28,5 +28,8 @@ struct ArtistGridItem: View {
 				.lineLimit(1)
 				.frame(width: 120)
 		}
+		.contextMenu {
+			ArtistContextMenu(artist: artist)
+		}
 	}
 }
