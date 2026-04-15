@@ -17,4 +17,12 @@ impl TrackProvider for JellyfinTrack {
 			.await?;
 		Ok(Track::from(item))
 	}
+
+	async fn star_track(&self, _track_id: &TrackId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
+
+	async fn unstar_track(&self, _track_id: &TrackId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
 }

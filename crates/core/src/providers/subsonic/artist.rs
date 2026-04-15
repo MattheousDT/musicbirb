@@ -166,4 +166,22 @@ impl ArtistProvider for SubsonicArtist {
 
 		self.get_top_songs(artist_id).await
 	}
+
+	async fn star_artist(&self, artist_id: &ArtistId) -> Result<(), MusicbirbError> {
+		let _ = self
+			.ctx
+			.get_rest_response("star", &[("artistId", &artist_id.0)])
+			.await?;
+
+		Ok(())
+	}
+
+	async fn unstar_artist(&self, artist_id: &ArtistId) -> Result<(), MusicbirbError> {
+		let _ = self
+			.ctx
+			.get_rest_response("unstar", &[("artistId", &artist_id.0)])
+			.await?;
+
+		Ok(())
+	}
 }

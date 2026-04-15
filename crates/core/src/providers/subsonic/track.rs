@@ -16,4 +16,16 @@ impl TrackProvider for SubsonicTrack {
 
 		Ok(Track::from(song))
 	}
+
+	async fn star_track(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
+		let _ = self.ctx.get_rest_response("star", &[("id", &track_id.0)]).await?;
+
+		Ok(())
+	}
+
+	async fn unstar_track(&self, track_id: &TrackId) -> Result<(), MusicbirbError> {
+		let _ = self.ctx.get_rest_response("unstar", &[("id", &track_id.0)]).await?;
+
+		Ok(())
+	}
 }

@@ -56,6 +56,23 @@ pub trait TrackProvider: Send + Sync {
 	/// Fetches a single track's metadata.
 	#[query(key = "Track({track_id:?})")]
 	async fn get_track(&self, track_id: &TrackId) -> Result<Track, MusicbirbError>;
+
+	/// Stars a specific track, marking it as a favorite in the provider's library.
+	#[mutation(invalidates =["Artist/*", "Album/*", "Search/*"])]
+	async fn star_track(&self, track_id: &TrackId) -> Result<(), MusicbirbError>;
+
+	/// Removes the starred status from a specific track.
+	#[mutation(invalidates =["Artist/*", "Album/*", "Search/*"])]
+	async fn unstar_track(&self, track_id: &TrackId) -> Result<(), MusicbirbError>;
+
+	// /// Sets a 1-5 user rating for a specific track.
+	// TODO: async fn set_track_rating(&self, id: &TrackId, rating: u8) -> Result<(), MusicbirbError>;
+
+	// /// Creates a bookmark for a track to save its specific playback position.
+	// TODO: async fn create_bookmark(&self, id: &TrackId, position_millis: u64, comment: &str) -> Result<(), MusicbirbError>;
+
+	// /// Deletes an existing bookmark for a track.
+	// TODO: async fn delete_bookmark(&self, id: &TrackId) -> Result<(), MusicbirbError>;
 }
 
 /// Handles fetching and modifying albums.
@@ -69,6 +86,17 @@ pub trait AlbumProvider: Send + Sync {
 	/// Fetches detailed album metadata, including the full list of tracks inside it.
 	#[query(key = "AlbumDetails({album_id:?})")]
 	async fn get_album_details(&self, album_id: &AlbumId) -> Result<AlbumDetails, MusicbirbError>;
+
+	/// Stars a specific album, marking it as a favorite.
+	#[mutation(invalidates =["Artist/*", "Album/*", "Search/*"])]
+	async fn star_album(&self, album_id: &AlbumId) -> Result<(), MusicbirbError>;
+
+	/// Removes the starred status from a specific album.
+	#[mutation(invalidates =["Artist/*", "Album/*", "Search/*"])]
+	async fn unstar_album(&self, album_id: &AlbumId) -> Result<(), MusicbirbError>;
+
+	// /// Sets a 1-5 user rating for a specific album.
+	// TODO: async fn set_album_rating(&self, album_id: &AlbumId, rating: u8) -> Result<(), MusicbirbError>;
 }
 
 /// Handles fetching and modifying artists.
@@ -86,6 +114,14 @@ pub trait ArtistProvider: Send + Sync {
 	/// Fetches top songs for an artist based on the current user's play history.
 	#[query(key = "PersonalTopSongs({artist_id:?})")]
 	async fn get_personal_top_songs(&self, artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError>;
+
+	/// Stars a specific artist, marking it as a favorite.
+	#[mutation(invalidates =["Artist/*", "Search/*"])]
+	async fn star_artist(&self, artist_id: &ArtistId) -> Result<(), MusicbirbError>;
+
+	/// Removes the starred status from a specific artist.
+	#[mutation(invalidates =["Artist/*", "Search/*"])]
+	async fn unstar_artist(&self, artist_id: &ArtistId) -> Result<(), MusicbirbError>;
 }
 
 /// Handles fetching, browsing, and editing playlists.

@@ -1591,6 +1591,12 @@
         }
       }
     },
+    "Star this album" : {
+
+    },
+    "Starred" : {
+
+    },
     "Starred Songs" : {
       "localizations" : {
         "ko" : {
@@ -1743,6 +1749,9 @@
           }
         }
       }
+    },
+    "Unstar this album" : {
+
     },
     "Username" : {
       "localizations" : {

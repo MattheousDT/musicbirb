@@ -293,14 +293,28 @@ struct ArtistView: View {
 }
 
 private struct ArtistToolbarModifier: ViewModifier {
+	@Environment(CoreManager.self) private var coreManager
+
 	let artistDetails: ArtistDetails?
 	let primaryColor: Color?
 	let titleScrollOffset: CGFloat
 	let openURL: OpenURLAction
 
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
+
 	func body(content: Content) -> some View {
 		content
 			.toolbar {
+				ToolbarItem(placement: .topBarTrailing) {
+					Button(action: { toggleStar() }) {
+						Image(systemName: (artistDetails?.starred ?? false) ? "star.fill" : "star")
+							.contentTransition(.symbolEffect(.replace))
+					}
+					.accessibilityLabel(
+						(artistDetails?.starred ?? false) ? "Unstar this album" : "Star this album")
+				}
+
 				ToolbarItem(placement: .topBarTrailing) {
 					Menu {
 						if let artist = artistDetails {
@@ -338,6 +352,38 @@ private struct ArtistToolbarModifier: ViewModifier {
 						.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
 				}
 			}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().artist(),
+				let artist = artistDetails
+			else { return }
+
+			let isCurrentlyStarred = artist.starred ?? false
+			let nextStarredState = !isCurrentlyStarred
+
+			// 1. OPTIMISTIC UPDATE
+			var optimisticData: ArtistDetails = artist
+			optimisticData.starred = nextStarredState
+			await provider.setCachedGetArtistDetails(artistId: artist.id, data: optimisticData)
+
+			// 2. MUTATION
+			if isCurrentlyStarred {
+				await _unstarMutation.execute(provider.executeUnstarArtist(artistId: artist.id))
+
+				// 3. ERROR HANDLING / ROLLBACK
+				if case .error = unstarMutation {
+					await provider.invalidate(pattern: "Artist/ArtistDetails(\(artist.id))")
+				}
+			} else {
+				await _starMutation.execute(provider.executeStarArtist(artistId: artist.id))
+
+				if case .error = starMutation {
+					await provider.invalidate(pattern: "Artist/ArtistDetails(\(artist.id))")
+				}
+			}
+		}
 	}
 }
 

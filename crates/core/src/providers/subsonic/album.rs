@@ -23,4 +23,19 @@ impl AlbumProvider for SubsonicAlbum {
 
 		Ok(AlbumDetails::from(album))
 	}
+
+	async fn star_album(&self, album_id: &AlbumId) -> Result<(), MusicbirbError> {
+		let _ = self.ctx.get_rest_response("star", &[("albumId", &album_id.0)]).await?;
+
+		Ok(())
+	}
+
+	async fn unstar_album(&self, album_id: &AlbumId) -> Result<(), MusicbirbError> {
+		let _ = self
+			.ctx
+			.get_rest_response("unstar", &[("albumId", &album_id.0)])
+			.await?;
+
+		Ok(())
+	}
 }

@@ -56,4 +56,12 @@ impl AlbumProvider for JellyfinAlbum {
 			release_subtype: ReleaseSubtype::None,
 		})
 	}
+
+	async fn star_album(&self, _album_id: &AlbumId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
+
+	async fn unstar_album(&self, _album_id: &AlbumId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
 }

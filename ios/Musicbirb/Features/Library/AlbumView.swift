@@ -13,6 +13,9 @@ struct AlbumView: View {
 
 	@UseQuery<AlbumDetails> var albumDetails
 
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
+
 	@State private var selectedArtistId: ArtistId?
 	@State private var artworkLoader = ArtworkColorLoader()
 	@State private var titleScrollOffset: CGFloat = .infinity
@@ -152,6 +155,27 @@ struct AlbumView: View {
 					.opacity(titleScrollOffset < 0 ? 1 : 0)
 					.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
 			}
+
+			if #available(iOS 26, *) {
+				ToolbarItem(placement: .subtitle) {
+					if let artist = albumDetails.data?.artist {
+						Text(artist)
+							.font(.subheadline)
+							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
+							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
+					}
+				}
+			}
+
+			ToolbarItem(placement: .topBarTrailing) {
+				Button(action: { toggleStar() }) {
+					Image(systemName: (albumDetails.data?.starred ?? false) ? "star.fill" : "star")
+						.contentTransition(.symbolEffect(.replace))
+				}
+				.accessibilityLabel(
+					(albumDetails.data?.starred ?? false) ? "Unstar this album" : "Star this album")
+			}
+
 			ToolbarItem(placement: .topBarTrailing) {
 				Menu {
 					if horizontalSizeClass != .regular {
@@ -170,21 +194,43 @@ struct AlbumView: View {
 						.foregroundColor(artworkLoader.primaryColor ?? .accentColor)
 				}
 			}
-			if #available(iOS 26, *) {
-				ToolbarItem(placement: .subtitle) {
-					if let artist = albumDetails.data?.artist {
-						Text(artist)
-							.font(.subheadline)
-							.opacity(titleScrollOffset < 0 ? 0.8 : 0)
-							.animation(.easeInOut(duration: 0.2), value: titleScrollOffset < 0)
-					}
-				}
-			}
 		}
 		.navigationDestination(item: $selectedArtistId) { id in ArtistView(artistId: id) }
 		.onChange(of: colorScheme) { _, newScheme in artworkLoader.updateTheme(for: newScheme) }
 		.query($albumDetails, id: albumId) {
 			try await coreManager.core?.getProvider().album().observeGetAlbumDetails(albumId: albumId)
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().album(),
+				let album = albumDetails.data
+			else { return }
+
+			let isCurrentlyStarred = album.starred ?? false
+			let nextStarredState = !isCurrentlyStarred
+
+			// 1. OPTIMISTIC UPDATE
+			var optimisticData: AlbumDetails = album
+			optimisticData.starred = nextStarredState
+			await provider.setCachedGetAlbumDetails(albumId: albumId, data: optimisticData)
+
+			// 2. MUTATION
+			if isCurrentlyStarred {
+				await _unstarMutation.execute(provider.executeUnstarAlbum(albumId: albumId))
+
+				// 3. ERROR HANDLING / ROLLBACK
+				if case .error = unstarMutation {
+					await provider.invalidate(pattern: "Album/AlbumDetails(\(albumId))")
+				}
+			} else {
+				await _starMutation.execute(provider.executeStarAlbum(albumId: albumId))
+
+				if case .error = starMutation {
+					await provider.invalidate(pattern: "Album/AlbumDetails(\(albumId))")
+				}
+			}
 		}
 	}
 }

@@ -52,4 +52,12 @@ impl ArtistProvider for JellyfinArtist {
 	async fn get_personal_top_songs(&self, _artist_id: &ArtistId) -> Result<Vec<Track>, MusicbirbError> {
 		todo!()
 	}
+
+	async fn star_artist(&self, _artist_id: &ArtistId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
+
+	async fn unstar_artist(&self, _artist_id: &ArtistId) -> Result<(), MusicbirbError> {
+		todo!()
+	}
 }

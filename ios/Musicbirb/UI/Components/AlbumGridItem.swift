@@ -12,27 +12,49 @@ struct AlbumGridItem: View {
 	var body: some View {
 		let cornerRadius = 16 * settings.cornerRounding.multiplier
 		VStack(alignment: .leading, spacing: 8) {
-			Color.clear
-				.aspectRatio(1, contentMode: .fill)
-				.overlay(
-					GeometryReader { geometry in
-						SmoothImage(
-							url: Config.getCoverUrl(
-								id: album.coverArt, size: Int(geometry.size.width * displayScale)),
-							contentMode: .fit,
-							placeholderColor: .primary.opacity(0.2)
-						)
-						.modify { content in
-							if #available(iOS 26, *) {
-								content
-									.glassEffect(in: .rect(cornerRadius: cornerRadius, style: .continuous))
-							} else {
-								content
+			ZStack(alignment: .topTrailing) {
+				Color.clear
+					.aspectRatio(1, contentMode: .fill)
+					.overlay(
+						GeometryReader { geometry in
+							SmoothImage(
+								url: Config.getCoverUrl(
+									id: album.coverArt, size: Int(geometry.size.width * displayScale)),
+								contentMode: .fit,
+								placeholderColor: .primary.opacity(0.2)
+							)
+							.modify { content in
+								if #available(iOS 26, *) {
+									content
+										.glassEffect(in: .rect(cornerRadius: cornerRadius, style: .continuous))
+								} else {
+									content
+								}
 							}
 						}
+					)
+					.clipShape(.rect(cornerRadius: cornerRadius, style: .continuous))
+
+				if album.starred == true {
+					HStack {
+						Image(systemName: "star.fill")
+							.font(.system(size: 14, weight: .semibold))
+							.foregroundColor(.primary)
+							.transition(.symbolEffect)
 					}
-				)
-				.clipShape(.rect(cornerRadius: cornerRadius, style: .continuous))
+					.frame(width: 28, height: 28)
+					.modify({ content in
+						if #available(iOS 26, *) {
+							content
+								.glassEffect(.regular.tint(.accentColor), in: .circle)
+						} else {
+							content
+								.tint(.accentColor)
+						}
+					})
+					.offset(x: -4, y: 4)
+				}
+			}
 
 			VStack(alignment: .leading, spacing: 2) {
 				Text(album.title)

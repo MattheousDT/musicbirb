@@ -114,6 +114,7 @@ struct SearchView: View {
 					}
 				}.scrollTargetLayout()
 			}
+			.scrollClipDisabled()
 			.contentMargins(.horizontal, 16, for: .scrollContent)
 			.scrollTargetBehavior(.viewAligned)
 		}

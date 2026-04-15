@@ -45,10 +45,14 @@ extension EnvironmentValues {
 }
 
 public struct AlbumContextMenu: View {
+	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
 	@Environment(\.openItemDetails) private var openItemDetails
 	@Environment(\.openShareItem) private var openShareItem
+
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
 
 	let album: Album
 
@@ -86,20 +90,39 @@ public struct AlbumContextMenu: View {
 		Button(action: { /* TODO: Hook up Radio / Instant Mix API */  }) {
 			Label("Radio / Instant Mix", systemImage: "radio")
 		}
-		Button(action: { /* TODO: Hook up Star / Rating API */  }) {
-			Label("Star", systemImage: "star")
+
+		Button(action: toggleStar) {
+			let isStarred = album.starred ?? false
+			Label(isStarred ? "Starred" : "Star", systemImage: isStarred ? "star.fill" : "star")
 		}
+		.menuActionDismissBehavior(.disabled)
+
 		Button(action: { /* TODO: Hook up Download Manager API */  }) {
 			Label("Download", systemImage: "arrow.down.circle")
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().album() else { return }
+			if album.starred ?? false {
+				await _unstarMutation.execute(provider.executeUnstarAlbum(albumId: album.id))
+			} else {
+				await _starMutation.execute(provider.executeStarAlbum(albumId: album.id))
+			}
 		}
 	}
 }
 
 public struct AlbumDetailsContextMenu: View {
+	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.openAddAlbumToPlaylist) private var openAddAlbumToPlaylist
 	@Environment(\.openItemDetails) private var openItemDetails
 	@Environment(\.openShareItem) private var openShareItem
+
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
 
 	let album: AlbumDetails
 
@@ -137,19 +160,43 @@ public struct AlbumDetailsContextMenu: View {
 		Button(action: { /* TODO: Hook up Radio / Instant Mix API */  }) {
 			Label("Radio / Instant Mix", systemImage: "radio")
 		}
-		Button(action: { /* TODO: Hook up Star / Rating API */  }) {
-			Label("Star", systemImage: "star")
+
+		Button(action: toggleStar) {
+			let isStarred = album.starred ?? false
+			Label(isStarred ? "Starred" : "Star", systemImage: isStarred ? "star.fill" : "star")
 		}
+
 		Button(action: { /* TODO: Hook up Download Manager API */  }) {
 			Label("Download", systemImage: "arrow.down.circle")
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().album() else { return }
+
+			// Optimistic Update for Details
+			var optimistic = album
+			optimistic.starred = !(album.starred ?? false)
+			await provider.setCachedGetAlbumDetails(albumId: album.id, data: optimistic)
+
+			if album.starred ?? false {
+				await _unstarMutation.execute(provider.executeUnstarAlbum(albumId: album.id))
+			} else {
+				await _starMutation.execute(provider.executeStarAlbum(albumId: album.id))
+			}
 		}
 	}
 }
 
 public struct ArtistContextMenu: View {
+	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.openItemDetails) private var openItemDetails
 	@Environment(\.openShareItem) private var openShareItem
+
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
 
 	let artist: Artist
 
@@ -175,19 +222,37 @@ public struct ArtistContextMenu: View {
 		Button(action: { /* TODO: Hook up Radio / Instant Mix API */  }) {
 			Label("Radio / Instant Mix", systemImage: "radio")
 		}
-		Button(action: { /* TODO: Hook up Star / Rating API */  }) {
-			Label("Star", systemImage: "star")
+
+		Button(action: toggleStar) {
+			let isStarred = artist.starred ?? false
+			Label(isStarred ? "Starred" : "Star", systemImage: isStarred ? "star.fill" : "star")
 		}
+
 		Button(action: { /* TODO: Hook up Download Manager API */  }) {
 			Label("Download", systemImage: "arrow.down.circle")
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
+			if artist.starred ?? false {
+				await _unstarMutation.execute(provider.executeUnstarArtist(artistId: artist.id))
+			} else {
+				await _starMutation.execute(provider.executeStarArtist(artistId: artist.id))
+			}
 		}
 	}
 }
 
 public struct ArtistDetailsContextMenu: View {
+	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.openItemDetails) private var openItemDetails
 	@Environment(\.openShareItem) private var openShareItem
+
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
 
 	let artist: ArtistDetails
 
@@ -213,11 +278,31 @@ public struct ArtistDetailsContextMenu: View {
 		Button(action: { /* TODO: Hook up Radio / Instant Mix API */  }) {
 			Label("Radio / Instant Mix", systemImage: "radio")
 		}
-		Button(action: { /* TODO: Hook up Star / Rating API */  }) {
-			Label("Star", systemImage: "star")
+
+		Button(action: toggleStar) {
+			let isStarred = artist.starred ?? false
+			Label(isStarred ? "Starred" : "Star", systemImage: isStarred ? "star.fill" : "star")
 		}
+
 		Button(action: { /* TODO: Hook up Download Manager API */  }) {
 			Label("Download", systemImage: "arrow.down.circle")
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			guard let provider = try? await coreManager.core?.getProvider().artist() else { return }
+
+			// Optimistic Update
+			var optimistic = artist
+			optimistic.starred = !(artist.starred ?? false)
+			await provider.setCachedGetArtistDetails(artistId: artist.id, data: optimistic)
+
+			if artist.starred ?? false {
+				await _unstarMutation.execute(provider.executeUnstarArtist(artistId: artist.id))
+			} else {
+				await _starMutation.execute(provider.executeStarArtist(artistId: artist.id))
+			}
 		}
 	}
 }
@@ -293,10 +378,14 @@ public struct PlaylistDetailsContextMenu: View {
 }
 
 public struct TrackContextMenu: View {
+	@Environment(CoreManager.self) private var coreManager
 	@Environment(PlaybackViewModel.self) private var playbackViewModel
 	@Environment(\.openAddToPlaylist) private var openAddToPlaylist
 	@Environment(\.openItemDetails) private var openItemDetails
 	@Environment(\.openShareItem) private var openShareItem
+
+	@UseMutation<Void> var starMutation
+	@UseMutation<Void> var unstarMutation
 
 	let track: Track
 
@@ -336,11 +425,26 @@ public struct TrackContextMenu: View {
 		Button(action: { /* TODO: Hook up Radio / Instant Mix API */  }) {
 			Label("Radio / Instant Mix", systemImage: "radio")
 		}
-		Button(action: { /* TODO: Hook up Star / Rating API */  }) {
-			Label("Star", systemImage: "star")
+
+		Button(action: toggleStar) {
+			let isStarred = track.starred ?? false
+			Label(isStarred ? "Starred" : "Star", systemImage: isStarred ? "star.fill" : "star")
 		}
+
 		Button(action: { /* TODO: Hook up Download Manager API */  }) {
 			Label("Download", systemImage: "arrow.down.circle")
+		}
+	}
+
+	private func toggleStar() {
+		Task {
+			// Note: Track mutations usually live in the 'Track' provider
+			guard let provider = try? await coreManager.core?.getProvider().track() else { return }
+			if track.starred ?? false {
+				await _unstarMutation.execute(provider.executeUnstarTrack(trackId: track.id))
+			} else {
+				await _starMutation.execute(provider.executeStarTrack(trackId: track.id))
+			}
 		}
 	}
 }

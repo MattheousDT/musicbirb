@@ -50,6 +50,12 @@ extension MutateDeletePlaylistStream: MokaMutationStreamProtocol {}
 extension MutateAddToPlaylistStream: MokaMutationStreamProtocol {}
 extension MutateRemoveFromPlaylistStream: MokaMutationStreamProtocol {}
 extension MutateReplacePlaylistTracksStream: MokaMutationStreamProtocol {}
+extension MutateStarAlbumStream: MokaMutationStreamProtocol {}
+extension MutateUnstarAlbumStream: MokaMutationStreamProtocol {}
+extension MutateStarArtistStream: MokaMutationStreamProtocol {}
+extension MutateUnstarArtistStream: MokaMutationStreamProtocol {}
+extension MutateStarTrackStream: MokaMutationStreamProtocol {}
+extension MutateUnstarTrackStream: MokaMutationStreamProtocol {}
 
 @propertyWrapper
 public struct UseMutation<Value>: DynamicProperty {
@@ -97,14 +103,33 @@ public struct Suspense<Value, Content: View, LoadingView: View, ErrorView: View>
 	}
 
 	public var body: some View {
-		switch query {
-		case .idle: loading
-		case .loading(let prev):
-			if let prev { content(prev) } else { loading }
-		case .data(let val): content(val)
-		case .error(let msg, let prev):
-			if let prev { content(prev) } else { error(msg) }
+		ZStack {
+			switch query {
+			case .idle:
+				loading
+					.transition(.opacity)
+			case .loading(let prev):
+				if let prev {
+					content(prev)
+						.transition(.identity)
+				} else {
+					loading
+						.transition(.opacity)
+				}
+			case .data(let val):
+				content(val)
+					.transition(.opacity)
+			case .error(let msg, let prev):
+				if let prev {
+					content(prev)
+						.transition(.identity)
+				} else {
+					error(msg)
+						.transition(.opacity)
+				}
+			}
 		}
+		.animation(.snappy(duration: 0.4), value: query.isLoading)
 	}
 }
 

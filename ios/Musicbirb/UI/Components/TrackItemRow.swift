@@ -85,10 +85,17 @@ struct TrackItemRow: View {
 				}
 				.frame(maxWidth: .infinity, alignment: .leading)
 
+				if track.starred == true {
+					Image(systemName: "star.fill")
+						.font(.system(size: 14, weight: .semibold))
+						.foregroundColor(accentColor ?? .accentColor)
+						.transition(.symbolEffect)
+				}
+
 				Text(formatDuration(track.durationSecs))
 					.font(.system(size: 14, weight: .semibold, design: .monospaced))
 					.monospacedDigit()
-					.foregroundColor(Color(UIColor.tertiaryLabel))
+					.foregroundColor(.primary.opacity(0.5))
 					.fixedSize()
 			}
 			.padding(.vertical, 12)
