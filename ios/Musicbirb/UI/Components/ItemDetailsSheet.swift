@@ -301,9 +301,11 @@ struct ItemDetailsSheet: View {
 				DetailRow(label: "Last.fm", value: lastFm, copyable: true)
 			}
 
-			if let url = authViewModel.activeAccount?.url {
-				let navidromeLink = buildNavidromeLink(baseUrl: url, id: actualItemId)
-				DetailRow(label: "Server URL", value: navidromeLink, copyable: true)
+			if let account = authViewModel.activeAccount {
+				if account.provider == "navidrome" {
+					let navidromeLink = buildNavidromeLink(baseUrl: account.url, id: actualItemId)
+					Link("Open in Navidrome", destination: URL(string: navidromeLink)!)
+				}
 			}
 		}
 	}

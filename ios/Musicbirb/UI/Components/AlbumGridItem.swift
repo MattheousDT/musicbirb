@@ -36,22 +36,24 @@ struct AlbumGridItem: View {
 					.clipShape(.rect(cornerRadius: cornerRadius, style: .continuous))
 
 				if album.starred == true {
-					HStack {
+					ZStack(alignment: .center) {
+						Rectangle()
+							.modify({ content in
+								if #available(iOS 26, *) {
+									content
+										.glassEffect(.regular.tint(.accentColor), in: .circle)
+								} else {
+									content
+										.fill(Color.accentColor)
+								}
+							})
+							.clipShape(.circle)
+							.frame(width: 28, height: 28)
 						Image(systemName: "star.fill")
 							.font(.system(size: 14, weight: .semibold))
 							.foregroundColor(.primary)
 							.transition(.symbolEffect)
 					}
-					.frame(width: 28, height: 28)
-					.modify({ content in
-						if #available(iOS 26, *) {
-							content
-								.glassEffect(.regular.tint(.accentColor), in: .circle)
-						} else {
-							content
-								.tint(.accentColor)
-						}
-					})
 					.offset(x: -4, y: 4)
 				}
 			}
