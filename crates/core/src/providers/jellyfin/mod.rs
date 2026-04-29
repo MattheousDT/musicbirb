@@ -24,11 +24,13 @@ pub mod playlist;
 pub mod search;
 pub mod track;
 
-#[derive(Clone)]
+use std::sync::RwLock;
+
 pub struct JellyfinContext {
 	pub base_url: String,
-	pub token: Option<String>,
-	pub user_id: Option<String>,
+	pub token: RwLock<Option<String>>,
+	pub user_id: RwLock<Option<String>>,
+	pub credentials: RwLock<Option<(String, String)>>,
 	pub http: Client,
 }
 
@@ -37,21 +39,33 @@ impl JellyfinContext {
 	pub fn new(base_url: &str) -> Self {
 		Self {
 			base_url: base_url.trim_end_matches('/').to_string(),
-			token: None,
-			user_id: None,
+			token: RwLock::new(None),
+			user_id: RwLock::new(None),
+			credentials: RwLock::new(None),
 			http: Client::new(),
 		}
 	}
 
 	pub async fn fetch<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, MusicbirbError> {
 		let url = format!("{}{}", self.base_url, path);
-		let resp = self
+		let mut resp = self
 			.http
 			.get(&url)
 			.header("X-Emby-Authorization", self.auth_header())
 			.send()
 			.await
 			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+
+		if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+			let _ = self.refresh_login().await;
+			resp = self
+				.http
+				.get(&url)
+				.header("X-Emby-Authorization", self.auth_header())
+				.send()
+				.await
+				.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+		}
 
 		if !resp.status().is_success() {
 			return Err(MusicbirbError::Api(format!("Jellyfin API error: {}", resp.status())));
@@ -61,16 +75,49 @@ impl JellyfinContext {
 	}
 
 	pub fn auth_header(&self) -> String {
+		let token = self.token.read().unwrap().clone();
 		format!(
 			"MediaBrowser Client=\"Musicbirb\", Device=\"Musicbirb\", DeviceId=\"musicbirb-app\", Version=\"0.1.0\"{}",
-			self.token
-				.as_ref()
-				.map(|t| format!(", Token=\"{}\"", t))
-				.unwrap_or_default()
+			token.as_ref().map(|t| format!(", Token=\"{}\"", t)).unwrap_or_default()
 		)
 	}
 
-	pub async fn login(&mut self, username: &str, pw: &str) -> Result<AuthResponse, MusicbirbError> {
+	pub async fn refresh_login(&self) -> Result<(), MusicbirbError> {
+		let creds = self.credentials.read().unwrap().clone();
+		if let Some((username, pw)) = creds {
+			let url = format!("{}/Users/AuthenticateByName", self.base_url);
+			let resp = self
+				.http
+				.post(&url)
+				.header(
+					"X-Emby-Authorization",
+					"MediaBrowser Client=\"Musicbirb\", Device=\"Musicbirb\", DeviceId=\"musicbirb-app\", Version=\"0.1.0\"",
+				)
+				.json(&AuthRequest {
+					username: &username,
+					pw: &pw,
+				})
+				.send()
+				.await
+				.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+
+			if resp.status().is_success() {
+				if let Ok(auth_res) = resp.json::<AuthResponse>().await {
+					*self.token.write().unwrap() = Some(auth_res.access_token);
+					*self.user_id.write().unwrap() = Some(auth_res.user.id);
+					return Ok(());
+				}
+			}
+			Err(MusicbirbError::Auth("Failed to re-authenticate".into()))
+		} else {
+			Err(MusicbirbError::Auth(
+				"No credentials available for re-authentication".into(),
+			))
+		}
+	}
+
+	pub async fn login(&self, username: &str, pw: &str) -> Result<AuthResponse, MusicbirbError> {
+		*self.credentials.write().unwrap() = Some((username.to_string(), pw.to_string()));
 		let url = format!("{}/Users/AuthenticateByName", self.base_url);
 		let resp = self
 			.http
@@ -86,24 +133,26 @@ impl JellyfinContext {
 		}
 
 		let auth_res: AuthResponse = resp.json().await.map_err(|e| MusicbirbError::Api(e.to_string()))?;
-		self.token = Some(auth_res.access_token.clone());
-		self.user_id = Some(auth_res.user.id.clone());
+		*self.token.write().unwrap() = Some(auth_res.access_token.clone());
+		*self.user_id.write().unwrap() = Some(auth_res.user.id.clone());
 		Ok(auth_res)
 	}
 
-	pub fn set_token(&mut self, token: String) {
-		self.token = Some(token);
+	pub fn set_token(&self, token: String) {
+		*self.token.write().unwrap() = Some(token);
 	}
 
-	pub async fn fetch_me(&mut self) -> Result<(), MusicbirbError> {
+	pub async fn fetch_me(&self) -> Result<(), MusicbirbError> {
 		let user: UserDto = self.fetch("/Users/Me").await?;
-		self.user_id = Some(user.id);
+		*self.user_id.write().unwrap() = Some(user.id);
 		Ok(())
 	}
 
-	pub fn get_user_id(&self) -> Result<&str, MusicbirbError> {
+	pub fn get_user_id(&self) -> Result<String, MusicbirbError> {
 		self.user_id
-			.as_deref()
+			.read()
+			.unwrap()
+			.clone()
 			.ok_or_else(|| MusicbirbError::Internal("No user ID. Missing call to fetch_me?".into()))
 	}
 }

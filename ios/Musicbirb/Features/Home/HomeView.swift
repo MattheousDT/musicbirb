@@ -53,22 +53,22 @@ struct HomeView: View {
 				.navigationTitle(Text("Home"))
 				.refreshable { await performRefresh() }
 				.toolbar { homeToolbar }
-				.query($lastPlayed) {
+				.query($lastPlayed, id: authViewModel.activeAccount?.id) {
 					try await self.searchStream(for: .lastPlayedAlbums)
 				} map: {
 					mapSearchResult($0, $1)
 				}
-				.query($recent) {
+				.query($recent, id: authViewModel.activeAccount?.id) {
 					try await self.searchStream(for: .recentlyAddedAlbums)
 				} map: {
 					mapSearchResult($0, $1)
 				}
-				.query($newReleases) {
+				.query($newReleases, id: authViewModel.activeAccount?.id) {
 					try await self.searchStream(for: .newlyReleasedAlbums)
 				} map: {
 					mapSearchResult($0, $1)
 				}
-				.query($playlists) {
+				.query($playlists, id: authViewModel.activeAccount?.id) {
 					try await self.coreManager.core?.getProvider().playlist().observeGetPlaylists()
 				}
 				.fullScreenCover(isPresented: $showSettings) { SettingsView() }

@@ -88,6 +88,30 @@ impl SubsonicContext {
 	}
 
 	// Specifically for Navidrome rich extended endpoints
+	pub async fn refresh_nd_jwt(&self) -> Result<(), MusicbirbError> {
+		let req = navidrome_dto::NavidromeLoginRequest {
+			username: &self.username,
+			password: &self.pass_or_token,
+		};
+		let url = format!("{}/auth/login", self.base_url.trim_end_matches('/'));
+		let resp = self
+			.client
+			.post(&url)
+			.json(&req)
+			.send()
+			.await
+			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+		if resp.status().is_success() {
+			let json = resp
+				.json::<navidrome_dto::NavidromeLoginResponse>()
+				.await
+				.map_err(|e| MusicbirbError::Api(e.to_string()))?;
+			*self.nd_jwt.write().unwrap() = Some(json.token);
+			*self.nd_id.write().unwrap() = Some(json.id);
+		}
+		Ok(())
+	}
+
 	pub async fn get_nd_api<T: serde::de::DeserializeOwned>(
 		&self,
 		endpoint: &str,
@@ -98,17 +122,32 @@ impl SubsonicContext {
 			url.query_pairs_mut().append_pair(k, v);
 		}
 
-		let token = self.nd_jwt.read().unwrap().clone().unwrap_or_default();
-		let nd_id = self.nd_id.read().unwrap().clone().unwrap_or_default();
+		let mut token = self.nd_jwt.read().unwrap().clone().unwrap_or_default();
+		let mut nd_id = self.nd_id.read().unwrap().clone().unwrap_or_default();
 
-		let resp = self
+		let mut resp = self
 			.client
-			.get(url)
+			.get(url.clone())
 			.header("x-nd-authorization", format!("Bearer {}", token))
-			.header("x-nd-client-unique-id", nd_id)
+			.header("x-nd-client-unique-id", nd_id.clone())
 			.send()
 			.await
 			.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+
+		if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+			let _ = self.refresh_nd_jwt().await;
+			token = self.nd_jwt.read().unwrap().clone().unwrap_or_default();
+			nd_id = self.nd_id.read().unwrap().clone().unwrap_or_default();
+
+			resp = self
+				.client
+				.get(url)
+				.header("x-nd-authorization", format!("Bearer {}", token))
+				.header("x-nd-client-unique-id", nd_id)
+				.send()
+				.await
+				.map_err(|e| MusicbirbError::Network(e.to_string()))?;
+		}
 
 		if !resp.status().is_success() {
 			return Err(MusicbirbError::Api(format!("Navidrome API error: {}", resp.status())));
@@ -168,20 +207,7 @@ pub fn create_subsonic_provider(
 impl Provider for SubsonicProvider {
 	async fn ping(&self) -> Result<(), MusicbirbError> {
 		if self.ctx.server_type == ServerType::Navidrome {
-			// Navidrome specific JWT retrieval for rich API access
-			let req = navidrome_dto::NavidromeLoginRequest {
-				username: &self.ctx.username,
-				password: &self.ctx.pass_or_token,
-			};
-			let url = format!("{}/auth/login", self.ctx.base_url.trim_end_matches('/'));
-			if let Ok(resp) = self.ctx.client.post(&url).json(&req).send().await {
-				if resp.status().is_success() {
-					if let Ok(json) = resp.json::<navidrome_dto::NavidromeLoginResponse>().await {
-						*self.ctx.nd_jwt.write().unwrap() = Some(json.token);
-						*self.ctx.nd_id.write().unwrap() = Some(json.id);
-					}
-				}
-			}
+			let _ = self.ctx.refresh_nd_jwt().await;
 		}
 
 		self.ctx.get_rest_response("ping", &[]).await?;

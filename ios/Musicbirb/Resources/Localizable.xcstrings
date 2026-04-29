@@ -459,7 +459,7 @@
       }
     },
     "Consume Track" : {
-      "comment" : "Remove the track from the queue once listened to"
+
     },
     "Corner Rounding" : {
       "localizations" : {
@@ -1559,7 +1559,7 @@
       }
     },
     "Smart" : {
-      "comment" : "Shuffle mode that takes previously played tracks into account"
+
     },
     "Songs" : {
       "localizations" : {
@@ -1611,7 +1611,7 @@
       }
     },
     "Stop After Current" : {
-      "comment" : "Stop playback once the current track has finished"
+
     },
     "Stream via Wi-Fi only alert" : {
       "localizations" : {

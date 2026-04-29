@@ -12,7 +12,8 @@ pub struct JellyfinMedia {
 impl MediaProvider for JellyfinMedia {
 	async fn get_stream_url(&self, track_id: &TrackId) -> Result<String, MusicbirbError> {
 		let mut url = format!("{}/Audio/{}/stream?static=true", self.ctx.base_url, track_id.0);
-		if let Some(token) = &self.ctx.token {
+		let token_lock = self.ctx.token.read().unwrap();
+		if let Some(token) = token_lock.as_ref() {
 			url.push_str(&format!("&api_key={}", token));
 		}
 		Ok(url)
@@ -21,7 +22,12 @@ impl MediaProvider for JellyfinMedia {
 	fn get_cover_art_url(&self, cover_id: &CoverArtId, size: Option<u32>) -> Result<String, MusicbirbError> {
 		let mut url = format!("{}/Items/{}/Images/Primary", self.ctx.base_url, cover_id.0);
 		if let Some(s) = size {
-			url.push_str(&format!("?maxWidth={}", s));
+			url = format!("{}?maxWidth={}&maxHeight={}", url, s, s);
+		}
+
+		if let Some(token) = self.ctx.token.read().unwrap().as_ref() {
+			let separator = if url.contains('?') { '&' } else { '?' };
+			url = format!("{}{}api_key={}", url, separator, token);
 		}
 		Ok(url)
 	}
@@ -29,7 +35,7 @@ impl MediaProvider for JellyfinMedia {
 	async fn get_cover_art_bytes(&self, cover_id: &CoverArtId) -> Result<Vec<u8>, MusicbirbError> {
 		let url = self.get_cover_art_url(cover_id, Some(600))?;
 		let mut req = self.ctx.http.get(&url);
-		if self.ctx.token.is_some() {
+		if self.ctx.token.read().unwrap().as_ref().is_some() {
 			req = req.header("X-Emby-Authorization", self.ctx.auth_header());
 		}
 

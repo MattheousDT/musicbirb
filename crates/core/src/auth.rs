@@ -83,7 +83,7 @@ impl Authenticator {
 			}
 			#[cfg(feature = "jellyfin")]
 			"jellyfin" => {
-				let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
+				let ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
 				ctx.login(&username, &password).await?;
 
 				let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
@@ -143,7 +143,7 @@ impl Authenticator {
 			"jellyfin" => {
 				match credential {
 					AuthCredential::Password(pass) => {
-						let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
+						let ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
 						ctx.login(&username, &pass).await?;
 
 						let p: Arc<dyn Provider> = Arc::new(crate::providers::jellyfin::JellyfinProvider::new(ctx));
@@ -151,7 +151,7 @@ impl Authenticator {
 					}
 					AuthCredential::Token(token) => {
 						// Fallback for older saves that still have a token cached
-						let mut ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
+						let ctx = crate::providers::jellyfin::JellyfinContext::new(&server_url);
 						ctx.set_token(token);
 
 						ctx.fetch_me().await?;

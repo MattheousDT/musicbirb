@@ -167,6 +167,7 @@ class AuthViewModel: @unchecked Sendable {
 				activeAccount = account
 				saveAccounts()
 				await coreManager.core?.setProvider(provider: provider)
+				try? coreManager.core?.clearQueue()
 				self.showLogin = false
 			} catch {
 				Log.app.error("Failed to switch account: \(error)")
